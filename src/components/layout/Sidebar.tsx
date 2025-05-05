@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/services/api";
+import { useAuth } from "@/services/auth-service";
 import { UserCircle, LayoutDashboard, Upload, Users, LogOut, Settings } from "lucide-react";
 
 export function Sidebar() {

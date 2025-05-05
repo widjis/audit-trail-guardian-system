@@ -1,18 +1,31 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/services/api";
+import { useAuth } from "@/services/auth-service";
 
 export default function Login() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      navigate("/dashboard");
-    }
+    const checkAuth = async () => {
+      const authenticated = await isAuthenticated();
+      if (authenticated) {
+        navigate("/dashboard");
+      }
+      setIsChecking(false);
+    };
+    
+    checkAuth();
   }, [isAuthenticated, navigate]);
+
+  if (isChecking) {
+    return <div className="min-h-screen flex items-center justify-center bg-audit-gray">
+      <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent"></div>
+    </div>;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-audit-gray">
