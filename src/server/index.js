@@ -1,9 +1,14 @@
 
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get current directory path using ES module approach
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize app
 const app = express();
@@ -85,10 +90,10 @@ const generateToken = (userId, username, role) => {
 };
 
 // API Routes
-// Import API route modules
-const authRoutes = require('./routes/auth');
-const hiresRoutes = require('./routes/hires');
-const settingsRoutes = require('./routes/settings');
+// Import API route modules (converting to ES module imports)
+import authRoutes from './routes/auth.js';
+import hiresRoutes from './routes/hires.js';
+import settingsRoutes from './routes/settings.js';
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -105,4 +110,4 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-module.exports = app;
+export default app;
