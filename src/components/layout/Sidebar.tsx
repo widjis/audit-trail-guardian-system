@@ -2,7 +2,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/services/api";
-import { UserCircle, LayoutDashboard, Upload, Users, LogOut } from "lucide-react";
+import { UserCircle, LayoutDashboard, Upload, Users, LogOut, Settings } from "lucide-react";
 
 export function Sidebar() {
   const location = useLocation();
@@ -12,7 +12,8 @@ export function Sidebar() {
   const navItems = [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
     { label: "New Hires", path: "/hires", icon: <Users className="mr-2 h-4 w-4" /> },
-    { label: "Import Data", path: "/import", icon: <Upload className="mr-2 h-4 w-4" /> }
+    { label: "Import Data", path: "/import", icon: <Upload className="mr-2 h-4 w-4" /> },
+    { label: "Settings", path: "/settings", icon: <Settings className="mr-2 h-4 w-4" /> }
   ];
 
   return (
@@ -27,8 +28,8 @@ export function Sidebar() {
           {navItems.map((item) => (
             <Link to={item.path} key={item.path}>
               <Button 
-                variant={location.pathname === item.path ? "secondary" : "ghost"} 
-                className={`w-full justify-start ${location.pathname === item.path ? 'bg-audit-lightBlue text-white' : 'text-white hover:bg-audit-lightBlue hover:text-white'}`}
+                variant={location.pathname.startsWith(item.path) ? "secondary" : "ghost"} 
+                className={`w-full justify-start ${location.pathname.startsWith(item.path) ? 'bg-audit-lightBlue text-white' : 'text-white hover:bg-audit-lightBlue hover:text-white'}`}
               >
                 {item.icon}
                 {item.label}

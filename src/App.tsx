@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Hires from "./pages/Hires";
 import HireDetail from "./pages/HireDetail";
 import Import from "./pages/Import";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/hires" element={<Hires />} />
           <Route path="/hires/:id" element={<HireDetail />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
