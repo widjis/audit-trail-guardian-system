@@ -112,7 +112,6 @@ router.post('/test-connection', async (req, res) => {
     const { type, host, port, database, username, password, instance, encrypt } = req.body;
     
     // Dynamic import of database drivers
-    let client;
     let connected = false;
     let error = null;
     
@@ -137,7 +136,8 @@ router.post('/test-connection', async (req, res) => {
         connected = true;
       } 
       else if (type === 'mssql') {
-        const sql = await import('mssql');
+        // Import mssql as a namespace object
+        const mssql = await import('mssql');
         
         // Build connection string based on whether instance is provided
         let server = host;
@@ -145,7 +145,8 @@ router.post('/test-connection', async (req, res) => {
           server = `${host}\\${instance}`;
         }
         
-        await sql.connect({
+        // Create a new connection using config
+        const config = {
           server,
           port: parseInt(port),
           database,
@@ -156,10 +157,10 @@ router.post('/test-connection', async (req, res) => {
             trustServerCertificate: true,
             connectTimeout: 5000
           }
-        });
+        };
         
-        // Test the connection with a simple query
-        await sql.query`SELECT 1`;
+        // Use the mssql directly
+        await new mssql.default.ConnectionPool(config).connect();
         connected = true;
       }
     } catch (err) {
