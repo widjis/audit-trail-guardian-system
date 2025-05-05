@@ -58,6 +58,8 @@ router.get('/template', (req, res) => {
       'phone_number',
       'mailing_list',
       'account_creation_status',
+      'username',         // Added username field
+      'password',         // Added password field
       'on_site_date',
       'ict_support_pic',
       'remarks',
@@ -79,8 +81,10 @@ router.get('/template', (req, res) => {
       'john.doe@example.com',
       'Jane Smith',
       '555-1234',
-      'engineering,all-staff', // Enclosed in quotes to keep as one field
+      'engineering,all-staff', 
       'Pending',
+      'john.doe',          // Example username
+      'temporary123',      // Example password
       '2025-06-01',
       'Tech Support A',
       'New graduate hire',
@@ -500,4 +504,3 @@ router.post('/import', async (req, res) => {
 });
 
 export default router;
-
