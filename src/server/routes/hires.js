@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -272,6 +271,69 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting hire from database:', error);
     res.status(500).json({ error: 'Failed to delete hire', message: error.message });
+  }
+});
+
+// Download CSV template
+router.get('/template', (req, res) => {
+  try {
+    logger.api.info('GET /hires/template - Generating CSV template');
+    
+    // Define the CSV headers based on required fields
+    const headers = [
+      'name',
+      'title',
+      'department',
+      'email',
+      'direct_report',
+      'phone_number',
+      'mailing_list',
+      'account_creation_status',
+      'on_site_date',
+      'ict_support_pic',
+      'remarks',
+      'license_assigned',
+      'status_srf',
+      'microsoft_365_license',
+      'laptop_ready',
+      'note'
+    ];
+    
+    // Create CSV content with headers and one example row
+    let csvContent = headers.join(',') + '\n';
+    
+    // Add an example row with sample data
+    const exampleData = [
+      'John Doe',
+      'Software Engineer',
+      'IT',
+      'john.doe@example.com',
+      'Jane Smith',
+      '555-1234',
+      'engineering,all-staff',
+      'Pending',
+      '2025-06-01',
+      'Tech Support A',
+      'New graduate hire',
+      'false',
+      'true',
+      'false',
+      'In Progress',
+      'Needs dual monitors'
+    ];
+    
+    csvContent += exampleData.join(',');
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=new_hire_template.csv');
+    
+    // Send the CSV content
+    res.send(csvContent);
+    logger.api.info('CSV template generated and sent successfully');
+  } catch (error) {
+    logger.api.error('Error generating CSV template:', error);
+    res.status(500).json({ error: 'Failed to generate CSV template', message: error.message });
   }
 });
 

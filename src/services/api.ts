@@ -223,6 +223,32 @@ export const hiresApi = {
       throw error;
     }
   },
+  
+  downloadTemplate: async (): Promise<void> => {
+    console.log('[hiresApi] Downloading CSV template');
+    try {
+      const response = await apiClient.get('/hires/template', {
+        responseType: 'blob',
+      });
+      
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'new_hire_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('[hiresApi] CSV template downloaded successfully');
+    } catch (error) {
+      console.error('[hiresApi] Error downloading CSV template:', error);
+      throw error;
+    }
+  },
 };
 
 // Auth helper hook

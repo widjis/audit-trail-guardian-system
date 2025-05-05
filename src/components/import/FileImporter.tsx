@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
-import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, Download, FileText } from "lucide-react";
 
 export function FileImporter() {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string; rowsImported?: number } | null>(null);
   const { toast } = useToast();
 
@@ -80,6 +81,26 @@ export function FileImporter() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    setIsDownloading(true);
+    try {
+      await hiresApi.downloadTemplate();
+      toast({
+        title: "Template Downloaded",
+        description: "CSV template has been downloaded successfully",
+      });
+    } catch (error) {
+      console.error("Download template error:", error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download CSV template",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const resetForm = () => {
     setFile(null);
     setResult(null);
@@ -94,6 +115,31 @@ export function FileImporter() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">Template</h3>
+            <p className="text-xs text-muted-foreground">
+              Download a CSV template with the required columns
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="gap-2"
+            onClick={handleDownloadTemplate}
+            disabled={isDownloading}
+          >
+            {isDownloading ? (
+              <>Downloading...</>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Download Template
+              </>
+            )}
+          </Button>
+        </div>
+
         <div className="space-y-2">
           <label htmlFor="file-upload" className="text-sm font-medium">
             Select File
