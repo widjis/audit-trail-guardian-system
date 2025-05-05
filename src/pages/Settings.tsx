@@ -5,7 +5,8 @@ import { AccountStatusSettings } from "@/components/settings/AccountStatusSettin
 import { MailingListSettings } from "@/components/settings/MailingListSettings";
 import { DepartmentListSettings } from "@/components/settings/DepartmentListSettings";
 import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSettings";
-import { Database } from "lucide-react";
+import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
+import { Database, Users } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -27,6 +28,10 @@ export default function Settings() {
               <Database className="h-4 w-4" />
               <span>Database</span>
             </TabsTrigger>
+            <TabsTrigger value="account-management" className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span>ICT Support Accounts</span>
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="account-status" className="space-y-4">
@@ -43,6 +48,10 @@ export default function Settings() {
           
           <TabsContent value="database" className="space-y-4">
             <DatabaseConfigSettings />
+          </TabsContent>
+          
+          <TabsContent value="account-management" className="space-y-4">
+            <AccountManagementSettings />
           </TabsContent>
         </Tabs>
       </div>

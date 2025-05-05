@@ -42,6 +42,10 @@ export interface User {
   role: string;
 }
 
+export interface UserAccount extends User {
+  // Additional properties specific to ICT support accounts can be added here
+}
+
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -62,3 +66,4 @@ export interface ImportResponse {
   rowsImported?: number;
   errors?: string[];
 }
+

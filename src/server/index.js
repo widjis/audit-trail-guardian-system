@@ -95,12 +95,14 @@ import authRoutes from './routes/auth.js';
 import hiresRoutes from './routes/hires.js';
 import settingsRoutes from './routes/settings.js';
 import databaseRoutes from './routes/database.js';
+import usersRoutes from './routes/users.js';
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/hires', hiresRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/settings/database-config', databaseRoutes);
+app.use('/api/users', usersRoutes);
 
 // Test endpoint
 app.get('/api/test', (req, res) => {
