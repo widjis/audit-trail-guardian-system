@@ -11,6 +11,8 @@ import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { settingsService } from "@/services/settings-service";
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -41,6 +43,12 @@ export function HireForm() {
   const [isFetching, setIsFetching] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Fetch settings to get departments and account statuses
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsService.getSettings,
+  });
 
   useEffect(() => {
     if (!isNewHire && id) {
@@ -116,6 +124,11 @@ export function HireForm() {
     return <div className="text-center py-8">Loading...</div>;
   }
 
+  // Get departments and statuses from settings
+  const departments = settingsData?.departments || [];
+  const accountStatuses = settingsData?.accountStatuses || ["Pending", "In Progress", "Done", "NO NEED"];
+  const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -176,13 +189,21 @@ export function HireForm() {
                 <label htmlFor="department" className="text-sm font-medium">
                   Department
                 </label>
-                <Input
-                  id="department"
-                  name="department"
+                <Select
                   value={hire.department}
-                  onChange={handleInputChange}
-                  required
-                />
+                  onValueChange={(value) => handleSelectChange("department", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept.id} value={dept.name}>
+                        {dept.name} ({dept.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label htmlFor="phone_number" className="text-sm font-medium">
@@ -271,10 +292,11 @@ export function HireForm() {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="NO NEED">NO NEED</SelectItem>
+                    {accountStatuses.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -290,10 +312,11 @@ export function HireForm() {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Ready">Ready</SelectItem>
-                    <SelectItem value="Done">Done</SelectItem>
+                    {laptopStatuses.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

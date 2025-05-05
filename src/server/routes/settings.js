@@ -3,6 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { executeQuery } from '../utils/dbConnection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,13 +33,6 @@ const getSettings = () => {
         { id: "3", name: "Marketing", isDefault: false },
         { id: "4", name: "Management", isDefault: false }
       ],
-      departments: [
-        { id: "1", name: "Engineering", code: "ENG" },
-        { id: "2", name: "Human Resources", code: "HR" },
-        { id: "3", name: "Finance", code: "FIN" },
-        { id: "4", name: "Marketing", code: "MKT" },
-        { id: "5", name: "Sales", code: "SLS" }
-      ],
       mailingListDisplayAsDropdown: true
     };
   } catch (err) {
@@ -58,9 +52,23 @@ const saveSettings = (settings) => {
 };
 
 // Get all settings
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
+    // Get settings from JSON for non-department settings
     const settings = getSettings();
+    
+    // Get departments from database
+    try {
+      const departments = await executeQuery('SELECT id, name, code FROM departments ORDER BY name');
+      settings.departments = departments;
+    } catch (dbError) {
+      console.error('Error fetching departments from database:', dbError);
+      // If database fails, use default departments or empty array
+      if (!settings.departments) {
+        settings.departments = [];
+      }
+    }
+    
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get settings', message: err.message });
@@ -111,21 +119,86 @@ router.put('/mailing-lists', (req, res) => {
   }
 });
 
-// Update departments
-router.put('/departments', (req, res) => {
+// Update departments - now using database
+router.put('/departments', async (req, res) => {
   try {
     const { departments } = req.body;
     
     if (!Array.isArray(departments)) {
       return res.status(400).json({ error: 'Invalid format. Expected an array of departments.' });
     }
-    
-    const settings = getSettings();
-    settings.departments = departments;
-    
-    saveSettings(settings);
-    
-    res.json({ success: true, message: 'Departments updated successfully' });
+
+    try {
+      // Start a transaction to update departments
+      await executeQuery('BEGIN TRANSACTION');
+      
+      // Get existing departments from database to determine what to insert/update/delete
+      const existingDepartments = await executeQuery('SELECT id FROM departments');
+      const existingIds = existingDepartments.map(dept => dept.id);
+      
+      // Process each department
+      for (const dept of departments) {
+        if (existingIds.includes(dept.id)) {
+          // Update existing department
+          await executeQuery(
+            'UPDATE departments SET name = ?, code = ? WHERE id = ?',
+            [dept.name, dept.code, dept.id]
+          );
+        } else {
+          // Insert new department
+          await executeQuery(
+            'INSERT INTO departments (id, name, code) VALUES (?, ?, ?)',
+            [dept.id, dept.name, dept.code]
+          );
+        }
+      }
+      
+      // Delete departments that no longer exist
+      const currentIds = departments.map(dept => dept.id);
+      const idsToDelete = existingIds.filter(id => !currentIds.includes(id));
+      
+      if (idsToDelete.length > 0) {
+        // Check if any employees are using these departments before deleting
+        for (const id of idsToDelete) {
+          const dept = existingDepartments.find(d => d.id === id);
+          if (dept) {
+            const deptName = await executeQuery('SELECT name FROM departments WHERE id = ?', [id]);
+            if (deptName.length > 0) {
+              const hires = await executeQuery('SELECT COUNT(*) as count FROM hires WHERE department = ?', [deptName[0].name]);
+              if (hires.length > 0 && hires[0].count > 0) {
+                await executeQuery('ROLLBACK');
+                return res.status(400).json({ 
+                  error: `Cannot delete department that is used by ${hires[0].count} employee(s)` 
+                });
+              }
+            }
+          }
+        }
+        
+        // Safe to delete
+        for (const id of idsToDelete) {
+          await executeQuery('DELETE FROM departments WHERE id = ?', [id]);
+        }
+      }
+      
+      await executeQuery('COMMIT');
+      
+      res.json({ success: true, message: 'Departments updated successfully' });
+    } catch (dbError) {
+      await executeQuery('ROLLBACK');
+      console.error('Database error updating departments:', dbError);
+      
+      // Fallback to file storage if database fails
+      const settings = getSettings();
+      settings.departments = departments;
+      saveSettings(settings);
+      
+      res.json({ 
+        success: true, 
+        message: 'Departments updated in file storage due to database error',
+        warning: dbError.message
+      });
+    }
   } catch (err) {
     res.status(500).json({ error: 'Failed to update departments', message: err.message });
   }
