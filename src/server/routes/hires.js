@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,12 +19,12 @@ const generateId = () => {
 // Get all hires
 router.get('/', async (req, res) => {
   try {
-    console.log('[Backend] GET /hires - Fetching all hires');
+    logger.api.info('GET /hires - Fetching all hires');
     // Query all hires from database
     const hires = await executeQuery(`
       SELECT * FROM hires ORDER BY created_at DESC
     `);
-    console.log(`[Backend] Retrieved ${hires.length} hires from database`);
+    logger.api.info(`Retrieved ${hires.length} hires from database`);
     
     // Get audit logs for each hire
     for (const hire of hires) {
@@ -32,12 +33,12 @@ router.get('/', async (req, res) => {
       `, [hire.id]);
       
       hire.audit_logs = auditLogs;
-      console.log(`[Backend] Retrieved ${auditLogs.length} audit logs for hire ${hire.id}`);
+      logger.api.debug(`Retrieved ${auditLogs.length} audit logs for hire ${hire.id}`);
     }
     
     res.json(hires);
   } catch (error) {
-    console.error('[Backend] Error fetching hires from database:', error);
+    logger.api.error('Error fetching hires from database:', error);
     res.status(500).json({ error: 'Failed to get hires', message: error.message });
   }
 });
@@ -78,18 +79,18 @@ router.get('/:id', async (req, res) => {
 // Create a new hire
 router.post('/', async (req, res) => {
   const hireData = req.body;
-  console.log('[Backend] POST /hires - Creating new hire');
-  console.log('[Backend] Received hire data:', JSON.stringify(hireData, null, 2));
+  logger.api.info('POST /hires - Creating new hire');
+  logger.api.debug('Received hire data:', JSON.stringify(hireData, null, 2));
   
   if (!hireData.name) {
-    console.log('[Backend] Validation error: Name is required');
+    logger.api.warn('Validation error: Name is required');
     return res.status(400).json({ error: 'Name is required' });
   }
   
   try {
     const id = generateId();
     const now = new Date().toISOString();
-    console.log(`[Backend] Generated ID: ${id}, timestamp: ${now}`);
+    logger.api.debug(`Generated ID: ${id}, timestamp: ${now}`);
     
     // Build columns and values for SQL insert
     const columns = ['id', 'created_at', 'updated_at'];
@@ -104,7 +105,7 @@ router.post('/', async (req, res) => {
         
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
-          console.log(`[Backend] Converting boolean field ${key}: ${value} to ${value ? 1 : 0}`);
+          logger.api.debug(`Converting boolean field ${key}: ${value} to ${value ? 1 : 0}`);
           values.push(value ? 1 : 0);
         } else {
           values.push(value);
@@ -118,27 +119,27 @@ router.post('/', async (req, res) => {
       VALUES (${placeholders.join(', ')})
     `;
     
-    console.log('[Backend] Executing SQL query:', query);
-    console.log('[Backend] Query values:', JSON.stringify(values));
+    logger.api.debug('Executing SQL query:', query);
+    logger.api.debug('Query values:', JSON.stringify(values));
     
     try {
       await executeQuery(query, values);
-      console.log('[Backend] Insert query executed successfully');
+      logger.api.info('Insert query executed successfully');
       
       // Get the inserted hire
       const newHires = await executeQuery(`
         SELECT * FROM hires WHERE id = ?
       `, [id]);
       
-      console.log('[Backend] Query to retrieve new hire returned:', JSON.stringify(newHires));
+      logger.api.debug('Query to retrieve new hire returned:', JSON.stringify(newHires));
       
       if (newHires.length === 0) {
-        console.error('[Backend] Failed to retrieve newly created hire');
+        logger.api.error('Failed to retrieve newly created hire');
         return res.status(500).json({ error: 'Failed to retrieve newly created hire' });
       }
       
       const newHire = newHires[0];
-      console.log('[Backend] Retrieved newly created hire:', JSON.stringify(newHire));
+      logger.api.info('Retrieved newly created hire:', JSON.stringify(newHire));
       newHire.audit_logs = [];
       
       // Convert numeric values to booleans for the response
@@ -152,12 +153,12 @@ router.post('/', async (req, res) => {
         newHire.microsoft_365_license = newHire.microsoft_365_license === 1;
       }
       
-      console.log('[Backend] Sending response with new hire:', JSON.stringify(newHire));
+      logger.api.info('Sending response with new hire');
       return res.status(201).json(newHire);
     } catch (dbError) {
-      console.error('[Backend] Database error during insert:', dbError);
-      console.error('[Backend] SQL Query that failed:', query);
-      console.error('[Backend] SQL Parameters:', values);
+      logger.api.error('Database error during insert:', dbError);
+      logger.api.error('SQL Query that failed:', query);
+      logger.api.error('SQL Parameters:', values);
       
       // Check if it's a duplicate key error
       if (dbError.number === 2627 || dbError.code === '23505') {
@@ -166,10 +167,10 @@ router.post('/', async (req, res) => {
       throw dbError;
     }
   } catch (error) {
-    console.error('[Backend] Error creating hire in database:', error);
-    console.error('[Backend] Error details:', error.message);
+    logger.api.error('Error creating hire in database:', error);
+    logger.api.error('Error details:', error.message);
     if (error.stack) {
-      console.error('[Backend] Error stack:', error.stack);
+      logger.api.error('Error stack:', error.stack);
     }
     res.status(500).json({ error: 'Failed to create hire', message: error.message });
   }

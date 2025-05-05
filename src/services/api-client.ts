@@ -1,5 +1,6 @@
 
 import axios from 'axios';
+import logger from '@/utils/logger';
 
 // Create base API client
 const apiClient = axios.create({
@@ -17,9 +18,11 @@ apiClient.interceptors.request.use((config) => {
   }
   
   // Add logging for outgoing requests
-  console.log(`[API Client] ${config.method?.toUpperCase()} ${config.url}`, config.data ? 'with data:' : '');
-  console.log('[API Client] Request data:', config.data ? JSON.stringify(config.data) : 'No data');
-  console.log('[API Client] Request headers:', JSON.stringify(config.headers));
+  logger.api.info(`${config.method?.toUpperCase()} ${config.url}`);
+  if (config.data) {
+    logger.api.debug('Request data:', JSON.stringify(config.data));
+  }
+  logger.api.debug('Request headers:', JSON.stringify(config.headers));
   
   return config;
 });
@@ -28,9 +31,8 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => {
     // Log successful responses
-    console.log(`[API Client] Response from ${response.config.url}:`, 
-      response.status, response.statusText);
-    console.log('[API Client] Response data:', JSON.stringify(response.data));
+    logger.api.info(`Response from ${response.config.url}: ${response.status} ${response.statusText}`);
+    logger.api.debug('Response data:', JSON.stringify(response.data));
     return response;
   },
   (error) => {
@@ -39,13 +41,13 @@ apiClient.interceptors.response.use(
       // Handle specific error responses
       const { status, data, config } = error.response;
       
-      console.error(`[API Client] Error ${status} from ${config.url}:`, data);
-      console.error('[API Client] Request that failed:', config.method, config.url);
-      console.error('[API Client] Request data that failed:', config.data);
+      logger.api.error(`Error ${status} from ${config.url}:`, data);
+      logger.api.error('Request that failed:', config.method, config.url);
+      logger.api.debug('Request data that failed:', config.data);
       
       if (status === 401) {
         // Unauthorized - redirect to login
-        console.error('[API Client] Unauthorized access, redirecting to login');
+        logger.api.error('Unauthorized access, redirecting to login');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         if (!window.location.pathname.includes('/login')) {
@@ -53,7 +55,7 @@ apiClient.interceptors.response.use(
         }
       } else if (status === 503) {
         // Service unavailable - likely database connection issue
-        console.error('[API Client] Database connection error:', data.error || 'Service unavailable');
+        logger.api.error('Database connection error:', data.error || 'Service unavailable');
       }
       
       // Convert the error message from the server
@@ -63,11 +65,11 @@ apiClient.interceptors.response.use(
     
     // Handle network errors
     if (error.request && !error.response) {
-      console.error('[API Client] Network error - no response received:', error.request);
+      logger.api.error('Network error - no response received:', error.request);
       return Promise.reject(new Error('Network error - server may be down'));
     }
     
-    console.error('[API Client] Request error:', error);
+    logger.api.error('Request error:', error);
     return Promise.reject(error);
   }
 );

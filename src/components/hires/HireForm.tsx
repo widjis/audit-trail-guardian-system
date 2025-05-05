@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
+import logger from "@/utils/logger";
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -44,7 +45,7 @@ export function HireForm() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  console.log("[HireForm] Component rendered with id:", id, "isNewHire:", isNewHire);
+  logger.ui.debug("HireForm", "Component rendered with id:", id, "isNewHire:", isNewHire);
   
   // Fetch settings to get departments and account statuses
   const { data: settingsData } = useQuery({
@@ -53,26 +54,26 @@ export function HireForm() {
   });
 
   useEffect(() => {
-    console.log("[HireForm] useEffect triggered for id:", id);
+    logger.ui.debug("HireForm", "useEffect triggered for id:", id);
     if (!isNewHire && id) {
-      console.log("[HireForm] Fetching existing hire with id:", id);
+      logger.ui.info("HireForm", "Fetching existing hire with id:", id);
       fetchHire(id);
     } else {
-      console.log("[HireForm] Creating new hire, using empty form");
+      logger.ui.info("HireForm", "Creating new hire, using empty form");
     }
   }, [id, isNewHire]);
 
   const fetchHire = async (hireId: string) => {
     setIsFetching(true);
     try {
-      console.log("[HireForm] Calling API to fetch hire with ID:", hireId);
+      logger.ui.info("HireForm", "Calling API to fetch hire with ID:", hireId);
       const data = await hiresApi.getOne(hireId);
-      console.log("[HireForm] Fetched hire data:", data);
+      logger.ui.debug("HireForm", "Fetched hire data:", data);
       // Filter out id, created_at, and updated_at
       const { id, created_at, updated_at, ...hireData } = data;
       setHire(hireData);
     } catch (error) {
-      console.error("[HireForm] Error fetching hire:", error);
+      logger.ui.error("HireForm", "Error fetching hire:", error);
       toast({
         title: "Error",
         description: "Failed to fetch hire details",
@@ -86,17 +87,17 @@ export function HireForm() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    console.log(`[HireForm] Input changed: ${name} = ${value}`);
+    logger.ui.debug("HireForm", `Input changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
-    console.log(`[HireForm] Switch changed: ${name} = ${checked}`);
+    logger.ui.debug("HireForm", `Switch changed: ${name} = ${checked}`);
     setHire((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    console.log(`[HireForm] Select changed: ${name} = ${value}`);
+    logger.ui.debug("HireForm", `Select changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -104,25 +105,26 @@ export function HireForm() {
     e.preventDefault();
     setIsLoading(true);
     
-    console.log("[HireForm] Form submitted");
-    console.log("[HireForm] About to save hire data:", JSON.stringify(hire));
-    console.log("[HireForm] Is new hire?", isNewHire);
+    logger.ui.info("HireForm", "Form submitted");
+    logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hire));
+    logger.ui.debug("HireForm", "Is new hire?", isNewHire);
 
     try {
       if (isNewHire) {
-        console.log("[HireForm] Creating new hire with data:", JSON.stringify(hire));
+        logger.ui.info("HireForm", "Creating new hire");
+        logger.ui.debug("HireForm", "Create data:", JSON.stringify(hire));
         const result = await hiresApi.create(hire);
-        console.log("[HireForm] Create hire API call completed!");
-        console.log("[HireForm] Create hire result:", result);
+        logger.ui.info("HireForm", "Create hire API call completed!");
+        logger.ui.debug("HireForm", "Create hire result:", result);
         toast({
           title: "Success",
           description: "New hire added successfully",
         });
       } else if (id) {
-        console.log("[HireForm] Updating hire with ID:", id);
-        console.log("[HireForm] Update data:", JSON.stringify(hire));
+        logger.ui.info("HireForm", "Updating hire with ID:", id);
+        logger.ui.debug("HireForm", "Update data:", JSON.stringify(hire));
         const result = await hiresApi.update(id, hire);
-        console.log("[HireForm] Update hire result:", result);
+        logger.ui.debug("HireForm", "Update hire result:", result);
         toast({
           title: "Success",
           description: "Hire details updated successfully",
@@ -130,12 +132,12 @@ export function HireForm() {
       }
       navigate("/hires");
     } catch (error) {
-      console.error("[HireForm] Error saving hire:", error);
+      logger.ui.error("HireForm", "Error saving hire:", error);
       if (error instanceof Error) {
-        console.error("[HireForm] Error details:", error.message);
+        logger.ui.error("HireForm", "Error details:", error.message);
         
         if (error.stack) {
-          console.error("[HireForm] Error stack:", error.stack);
+          logger.ui.error("HireForm", "Error stack:", error.stack);
         }
       }
       
