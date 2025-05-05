@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
 import { MailingListSettings } from "@/components/settings/MailingListSettings";
 import { DepartmentListSettings } from "@/components/settings/DepartmentListSettings";
+import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSettings";
+import { Database } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -21,6 +23,10 @@ export default function Settings() {
             <TabsTrigger value="account-status">Account Status</TabsTrigger>
             <TabsTrigger value="mailing-list">Mailing List</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
+            <TabsTrigger value="database" className="flex items-center gap-1">
+              <Database className="h-4 w-4" />
+              <span>Database</span>
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="account-status" className="space-y-4">
@@ -33,6 +39,10 @@ export default function Settings() {
           
           <TabsContent value="departments" className="space-y-4">
             <DepartmentListSettings />
+          </TabsContent>
+          
+          <TabsContent value="database" className="space-y-4">
+            <DatabaseConfigSettings />
           </TabsContent>
         </Tabs>
       </div>
