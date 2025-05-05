@@ -18,7 +18,7 @@ export function Sidebar() {
   return (
     <div className="h-full min-h-screen flex flex-col bg-audit-blue text-white w-64 py-4">
       <div className="px-4 mb-6">
-        <h1 className="text-2xl font-bold">Audit Guardian</h1>
+        <h1 className="text-2xl font-bold">MTI Onboarding Workflow</h1>
         <p className="text-sm opacity-75">New Hire Management</p>
       </div>
 

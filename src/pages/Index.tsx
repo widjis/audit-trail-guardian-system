@@ -18,7 +18,7 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center bg-audit-gray">
       <div className="max-w-md w-full space-y-8 p-4 text-center">
         <div>
-          <h1 className="text-4xl font-bold text-audit-blue">Audit Guardian</h1>
+          <h1 className="text-4xl font-bold text-audit-blue">MTI Onboarding Workflow</h1>
           <p className="mt-4 text-xl text-gray-600">New Hire Audit Log Management System</p>
           <p className="mt-2 text-gray-500">
             Streamline your onboarding process with comprehensive audit trails and task management
