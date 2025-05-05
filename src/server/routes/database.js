@@ -189,11 +189,18 @@ router.post('/test-connection', async (req, res) => {
 // Get database schema
 router.get('/schema', (req, res) => {
   try {
+    // Create data directory if it doesn't exist
+    const dataDir = path.join(__dirname, '../data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
     if (fs.existsSync(SCHEMA_FILE_PATH)) {
       const schema = fs.readFileSync(SCHEMA_FILE_PATH, 'utf8');
       res.json({ schema });
     } else {
-      res.status(404).json({ error: 'Schema not found', schema: '' });
+      // Return empty schema instead of 404 error
+      res.json({ schema: '' });
     }
   } catch (error) {
     console.error('Error getting database schema:', error);
