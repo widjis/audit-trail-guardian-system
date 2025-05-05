@@ -5,11 +5,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
+import multer from 'multer';
+import csv from 'csv-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// Set up multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // Generate a unique ID
 const generateId = () => {
@@ -415,92 +421,195 @@ router.post('/:id/logs', async (req, res) => {
 });
 
 // Import hires
-router.post('/import', async (req, res) => {
+router.post('/import', upload.single('file'), async (req, res) => {
   try {
-    // Generate sample data for import (in a real app, this would process uploaded data)
-    const sampleData = Array(5).fill(null).map((_, index) => ({
-      id: generateId(),
-      name: `Employee ${index + 1}`,
-      title: `Position ${index + 1}`,
-      department: ["IT", "HR", "Finance", "Marketing", "Operations"][Math.floor(Math.random() * 5)],
-      email: `employee${index + 1}@example.com`,
-      direct_report: `Manager ${index % 3 + 1}`,
-      phone_number: `555-${100 + index}`,
-      mailing_list: "general,department",
-      remarks: "",
-      account_creation_status: Math.random() > 0.3 ? "Done" : "Pending",
-      license_assigned: Math.random() > 0.5,
-      status_srf: Math.random() > 0.5,
-      username: `user${index + 1}`,
-      password: "temporary",
-      on_site_date: new Date(Date.now() + 86400000 * (index + 5)).toISOString().split("T")[0],
-      microsoft_365_license: Math.random() > 0.3,
-      laptop_ready: Math.random() > 0.3 ? "Ready" : "In Progress",
-      note: "",
-      ict_support_pic: `Support ${index % 3 + 1}`,
-    }));
+    logger.api.info('POST /hires/import - Processing file import');
     
-    // Import each hire into the database
-    const importedHires = [];
-    const auditLogs = [];
-    
-    for (const hire of sampleData) {
-      const now = new Date().toISOString();
-      hire.created_at = now;
-      hire.updated_at = now;
-      
-      // Convert boolean values for SQL Server
-      const hireSql = {
-        ...hire,
-        license_assigned: hire.license_assigned ? 1 : 0,
-        status_srf: hire.status_srf ? 1 : 0,
-        microsoft_365_license: hire.microsoft_365_license ? 1 : 0
-      };
-      
-      // Build columns and values for SQL insert
-      const columns = Object.keys(hireSql);
-      const placeholders = Array(columns.length).fill('?');
-      const values = Object.values(hireSql);
-      
-      // Insert hire into database
-      const query = `
-        INSERT INTO hires (${columns.join(', ')})
-        VALUES (${placeholders.join(', ')})
-      `;
-      
-      await executeQuery(query, values);
-      
-      // Create an audit log for this hire
-      const logId = generateId();
-      const log = {
-        id: logId,
-        new_hire_id: hire.id,
-        action_type: "ACCOUNT_CREATION",
-        status: Math.random() > 0.7 ? "ERROR" : "SUCCESS",
-        message: Math.random() > 0.7 ? "User duplication in Active Directory" : "Account created successfully",
-        performed_by: "system import",
-        timestamp: now
-      };
-      
-      // Insert audit log into database
-      await executeQuery(`
-        INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [log.id, log.new_hire_id, log.action_type, log.status, log.message, log.performed_by, log.timestamp]);
-      
-      auditLogs.push(log);
-      importedHires.push({...hire, audit_logs: [log]});
+    if (!req.file) {
+      logger.api.warn('No file uploaded');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No file uploaded' 
+      });
     }
     
-    res.json({
-      success: true,
-      message: "Import successful",
-      rowsImported: sampleData.length
+    const fileBuffer = req.file.buffer;
+    const fileContent = fileBuffer.toString();
+    
+    // Get existing departments for validation
+    const departments = await executeQuery('SELECT name FROM departments');
+    const validDepartments = departments.map(d => d.name.toLowerCase());
+    
+    logger.api.info(`Found ${validDepartments.length} valid departments for validation`);
+    
+    const results = [];
+    const errors = [];
+    let rowCount = 0;
+    let successCount = 0;
+    
+    // Parse CSV
+    const parser = csv({ 
+      mapHeaders: ({ header }) => header.trim().toLowerCase(),
+      mapValues: ({ value }) => value ? value.trim() : value
     });
+    
+    // Process each row from the CSV
+    const rows = [];
+    let headerProcessed = false;
+    
+    // Create a readable stream from the buffer
+    const stream = require('stream');
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(fileBuffer);
+    
+    // Process data through the stream
+    await new Promise((resolve, reject) => {
+      bufferStream
+        .pipe(parser)
+        .on('data', (data) => {
+          rowCount++;
+          rows.push(data);
+        })
+        .on('end', resolve)
+        .on('error', (error) => {
+          logger.api.error('Error parsing CSV:', error);
+          reject(error);
+        });
+    });
+    
+    logger.api.info(`Parsed ${rows.length} rows from CSV`);
+    
+    // Process each row
+    for (const [index, row] of rows.entries()) {
+      try {
+        // Check required fields
+        const requiredFields = ['name', 'title', 'department', 'email', 'direct_report'];
+        const missingFields = requiredFields.filter(field => !row[field]);
+        
+        if (missingFields.length > 0) {
+          errors.push({
+            row: index + 2, // +2 because index is 0-based and we need to account for the header row
+            error: `Missing required fields: ${missingFields.join(', ')}`
+          });
+          continue;
+        }
+        
+        // Validate department
+        if (row.department && !validDepartments.includes(row.department.toLowerCase())) {
+          errors.push({
+            row: index + 2,
+            error: `Department "${row.department}" does not exist in the database`,
+            data: row
+          });
+          continue;
+        }
+        
+        // Generate ID and timestamps
+        const id = generateId();
+        const now = new Date().toISOString();
+        
+        // Convert boolean string values to actual booleans
+        const processedRow = {
+          id,
+          name: row.name,
+          title: row.title,
+          department: row.department,
+          email: row.email || null,
+          direct_report: row.direct_report || null,
+          phone_number: row.phone_number || null,
+          mailing_list: row.mailing_list || null,
+          remarks: row.remarks || null,
+          account_creation_status: row.account_creation_status || 'Pending',
+          license_assigned: convertToBoolean(row.license_assigned) ? 1 : 0,
+          status_srf: convertToBoolean(row.status_srf) ? 1 : 0,
+          username: row.username || null,
+          password: row.password || null,
+          on_site_date: row.on_site_date || null,
+          microsoft_365_license: convertToBoolean(row.microsoft_365_license) ? 1 : 0,
+          laptop_ready: row.laptop_ready || 'Pending',
+          note: row.note || null,
+          ict_support_pic: row.ict_support_pic || null,
+          created_at: now,
+          updated_at: now
+        };
+        
+        // Build columns and values for SQL insert
+        const columns = Object.keys(processedRow);
+        const placeholders = Array(columns.length).fill('?');
+        const values = Object.values(processedRow);
+        
+        // Construct and execute SQL query
+        const query = `
+          INSERT INTO hires (${columns.join(', ')})
+          VALUES (${placeholders.join(', ')})
+        `;
+        
+        await executeQuery(query, values);
+        
+        // Create an audit log for this import
+        const logId = generateId();
+        const log = {
+          id: logId,
+          new_hire_id: id,
+          action_type: "IMPORT",
+          status: "SUCCESS",
+          message: "Record imported from CSV",
+          performed_by: "system import",
+          timestamp: now
+        };
+        
+        // Insert audit log into database
+        await executeQuery(`
+          INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [log.id, log.new_hire_id, log.action_type, log.status, log.message, log.performed_by, log.timestamp]);
+        
+        successCount++;
+        results.push({ id, name: row.name, status: 'success' });
+      } catch (error) {
+        logger.api.error(`Error importing row ${index + 2}:`, error);
+        errors.push({
+          row: index + 2,
+          error: error.message,
+          data: row
+        });
+      }
+    }
+    
+    const response = {
+      success: successCount > 0,
+      message: successCount > 0 
+        ? `Successfully imported ${successCount} of ${rowCount} records` 
+        : 'Failed to import any records',
+      rowsImported: successCount,
+      totalRows: rowCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+    
+    logger.api.info(`Import completed: ${successCount} of ${rowCount} records imported successfully`);
+    if (errors.length > 0) {
+      logger.api.warn(`${errors.length} errors encountered during import`);
+    }
+    
+    res.status(response.success ? 200 : 400).json(response);
   } catch (error) {
-    console.error('Error importing hires to database:', error);
-    res.status(500).json({ error: 'Failed to import hires', message: error.message });
+    logger.api.error('Error during import:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to import hires', 
+      error: error.message 
+    });
   }
 });
+
+// Helper function to convert various boolean string representations to actual boolean
+function convertToBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value !== 'string') return false;
+  
+  const normalized = value.toLowerCase().trim();
+  return normalized === 'true' || normalized === 'yes' || normalized === '1' || normalized === 'y';
+}
 
 export default router;

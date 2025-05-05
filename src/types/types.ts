@@ -61,9 +61,16 @@ export interface AuthResponse {
   };
 }
 
+export interface ImportError {
+  row: number;
+  error: string;
+  data?: Record<string, any>;
+}
+
 export interface ImportResponse {
   success: boolean;
   message: string;
   rowsImported?: number;
-  errors?: string[];
+  totalRows?: number;
+  errors?: ImportError[];
 }

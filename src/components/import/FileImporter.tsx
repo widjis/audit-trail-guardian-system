@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,13 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
-import { Upload, AlertCircle, CheckCircle2, Download, FileText } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, Download, FileText, X } from "lucide-react";
+import { ImportResponse } from "@/types/types";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function FileImporter() {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string; rowsImported?: number } | null>(null);
+  const [result, setResult] = useState<ImportResponse | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,16 +49,12 @@ export function FileImporter() {
     setIsLoading(true);
     try {
       const response = await hiresApi.import(file);
-      setResult({
-        success: response.success,
-        message: response.message,
-        rowsImported: response.rowsImported,
-      });
+      setResult(response);
       
       if (response.success) {
         toast({
           title: "Import Successful",
-          description: `Successfully imported ${response.rowsImported} records`,
+          description: `Successfully imported ${response.rowsImported} of ${response.totalRows} records`,
         });
       } else {
         toast({
@@ -103,6 +102,11 @@ export function FileImporter() {
   const resetForm = () => {
     setFile(null);
     setResult(null);
+    // Reset file input
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   return (
@@ -110,7 +114,7 @@ export function FileImporter() {
       <CardHeader>
         <CardTitle className="text-xl">Import Data</CardTitle>
         <CardDescription>
-          Upload CSV or Excel files containing new hire audit records
+          Upload CSV or Excel files containing new hire records
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -166,6 +170,9 @@ export function FileImporter() {
                 {(file.size / 1024).toFixed(2)} KB
               </p>
             </div>
+            <Button variant="ghost" size="icon" onClick={resetForm} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         )}
 
@@ -180,29 +187,58 @@ export function FileImporter() {
               {result.success ? "Import Successful" : "Import Failed"}
             </AlertTitle>
             <AlertDescription>
-              {result.success 
-                ? `Successfully imported ${result.rowsImported} records`
-                : result.message}
+              {result.message}
             </AlertDescription>
           </Alert>
+        )}
+
+        {result && result.errors && result.errors.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-destructive">Import Errors</h3>
+            <ScrollArea className="h-[200px] w-full border rounded p-2">
+              <div className="space-y-2">
+                {result.errors.map((error, index) => (
+                  <div key={index} className="text-xs border-l-2 border-destructive pl-2 py-1">
+                    <p><strong>Row {error.row}:</strong> {error.error}</p>
+                    {error.data && (
+                      <p className="text-muted-foreground mt-1">
+                        Data: {Object.entries(error.data)
+                          .filter(([k, v]) => v)
+                          .map(([k, v]) => `${k}=${v}`)
+                          .join(', ')}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
         )}
 
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Required Column Mapping</h3>
           <div className="text-xs text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1">
-            <div>name</div>
-            <div>title</div>
-            <div>department</div>
-            <div>email</div>
-            <div>direct_report</div>
+            <div>name*</div>
+            <div>title*</div>
+            <div>department*</div>
+            <div>email*</div>
+            <div>direct_report*</div>
             <div>phone_number</div>
             <div>mailing_list</div>
             <div>account_creation_status</div>
+            <div>username</div>
+            <div>password</div>
             <div>on_site_date</div>
             <div>ict_support_pic</div>
+            <div>remarks</div>
+            <div>license_assigned</div>
+            <div>status_srf</div>
+            <div>microsoft_365_license</div>
+            <div>laptop_ready</div>
+            <div>note</div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Column headers in your file should match these names (case-insensitive)
+            * Required fields. Column headers in your file should match these names (case-insensitive)
           </p>
         </div>
       </CardContent>
@@ -214,8 +250,15 @@ export function FileImporter() {
         >
           Reset
         </Button>
-        <Button onClick={handleImport} disabled={!file || isLoading}>
-          {isLoading ? "Importing..." : "Import Data"}
+        <Button onClick={handleImport} disabled={!file || isLoading} className="gap-2">
+          {isLoading ? (
+            <>Importing...</>
+          ) : (
+            <>
+              <FileText className="h-4 w-4" />
+              Import Data
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>
