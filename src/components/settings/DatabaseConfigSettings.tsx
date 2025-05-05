@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertCircle, Database, Server, Table } from "lucide-react";
+import { AlertCircle, Database, Server, Table, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/services/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +29,13 @@ interface DatabaseConfig {
 export function DatabaseConfigSettings() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+  } | null>(null);
+  
   const [config, setConfig] = useState<DatabaseConfig>({
     type: "postgres",
     host: "",
@@ -82,6 +89,8 @@ export function DatabaseConfigSettings() {
       type,
       port: type === "postgres" ? "5432" : "1433"
     }));
+    // Clear the test result when the database type changes
+    setTestResult(null);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +99,8 @@ export function DatabaseConfigSettings() {
       ...prev,
       [name]: value,
     }));
+    // Clear the test result when any configuration changes
+    setTestResult(null);
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
@@ -97,6 +108,8 @@ export function DatabaseConfigSettings() {
       ...prev,
       [name]: checked,
     }));
+    // Clear the test result when any configuration changes
+    setTestResult(null);
   };
 
   const handleSchemaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -142,6 +155,45 @@ export function DatabaseConfigSettings() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    
+    try {
+      const response = await apiClient.post("/settings/database-config/test-connection", config);
+      setTestResult({
+        success: true,
+        message: response.data.message || "Connection successful!"
+      });
+      
+      toast({
+        title: "Success",
+        description: "Database connection test successful!",
+      });
+    } catch (error) {
+      console.error("Connection test failed:", error);
+      const errorMessage = 
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        error.message || 
+        "Unable to connect to database";
+      
+      setTestResult({
+        success: false,
+        message: "Connection failed",
+        error: errorMessage
+      });
+      
+      toast({
+        title: "Connection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -343,6 +395,48 @@ CREATE TABLE employees (
                           </div>
                         </div>
                       </>
+                    )}
+                  </div>
+                  
+                  {/* Test Connection Section */}
+                  <div className="pt-4 border-t">
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={handleTestConnection}
+                      disabled={isLoading || isTesting}
+                      className="flex items-center gap-2"
+                    >
+                      {isTesting ? "Testing..." : "Test Connection"}
+                    </Button>
+                    
+                    {testResult && (
+                      <div className={`mt-4 p-4 rounded-md ${
+                        testResult.success 
+                          ? "bg-green-50 border border-green-200 text-green-800" 
+                          : "bg-red-50 border border-red-200 text-red-800"
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          {testResult.success 
+                            ? <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" /> 
+                            : <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                          }
+                          <div>
+                            <p className="font-medium">
+                              {testResult.success 
+                                ? "Connection Successful" 
+                                : "Connection Failed"
+                              }
+                            </p>
+                            {testResult.message && (
+                              <p className="mt-1">{testResult.message}</p>
+                            )}
+                            {testResult.error && (
+                              <p className="mt-1 text-sm">{testResult.error}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

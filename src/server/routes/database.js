@@ -106,6 +106,86 @@ router.put('/', (req, res) => {
   }
 });
 
+// Test database connection
+router.post('/test-connection', async (req, res) => {
+  try {
+    const { type, host, port, database, username, password, instance, encrypt } = req.body;
+    
+    // Dynamic import of database drivers
+    let client;
+    let connected = false;
+    let error = null;
+    
+    try {
+      if (type === 'postgres') {
+        const { Pool } = await import('pg');
+        
+        const pool = new Pool({
+          host,
+          port: parseInt(port),
+          database,
+          user: username,
+          password,
+          // Short connection timeout for testing
+          connectionTimeoutMillis: 5000,
+        });
+        
+        // Test the connection
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+        connected = true;
+      } 
+      else if (type === 'mssql') {
+        const sql = await import('mssql');
+        
+        // Build connection string based on whether instance is provided
+        let server = host;
+        if (instance) {
+          server = `${host}\\${instance}`;
+        }
+        
+        await sql.connect({
+          server,
+          port: parseInt(port),
+          database,
+          user: username,
+          password,
+          options: {
+            encrypt: encrypt,
+            trustServerCertificate: true,
+            connectTimeout: 5000
+          }
+        });
+        
+        // Test the connection with a simple query
+        await sql.query`SELECT 1`;
+        connected = true;
+      }
+    } catch (err) {
+      console.error('Database connection test failed:', err);
+      error = err.message || 'Unknown error occurred';
+    }
+    
+    if (connected) {
+      res.json({ success: true, message: 'Database connection successful!' });
+    } else {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Database connection failed', 
+        error
+      });
+    }
+  } catch (error) {
+    console.error('Error testing database connection:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error testing database connection', 
+      error: error.message 
+    });
+  }
+});
+
 // Get database schema
 router.get('/schema', (req, res) => {
   try {
