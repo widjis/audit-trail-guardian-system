@@ -1,73 +1,57 @@
-# Welcome to your Lovable project
 
-## Project info
+# MTI Onboarding Workflow
 
-**URL**: https://lovable.dev/projects/81cd3c10-c54d-4597-be2f-3b0f539a3fdd
+This is an application for managing new hire onboarding workflow.
 
-## How can I edit this code?
+## Getting Started
 
-There are several ways of editing your application.
+### Prerequisites
+- Node.js (v14+)
 
-**Use Lovable**
+### Installation
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/81cd3c10-c54d-4597-be2f-3b0f539a3fdd) and start prompting.
+1. Install dependencies:
+```
+npm install
+```
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. Start the frontend development server:
+```
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+3. Start the backend server:
+```
+node src/server/start.js
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The frontend will be available at http://localhost:5173
+The backend API will be available at http://localhost:3001
 
-**Use GitHub Codespaces**
+## Features
+- New hire management
+- Audit logging
+- Customizable settings for account statuses, mailing lists, and departments
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Backend API Endpoints
 
-## What technologies are used for this project?
+### Authentication
+- POST /api/auth/login - Login
+- POST /api/auth/register - Register
+- POST /api/auth/verify-token - Verify token
 
-This project is built with:
+### New Hires
+- GET /api/hires - Get all hires
+- GET /api/hires/:id - Get a specific hire
+- POST /api/hires - Create a hire
+- PUT /api/hires/:id - Update a hire
+- DELETE /api/hires/:id - Delete a hire
+- POST /api/hires/import - Import hires
+- GET /api/hires/:id/logs - Get logs for a hire
+- POST /api/hires/:id/logs - Create a log for a hire
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/81cd3c10-c54d-4597-be2f-3b0f539a3fdd) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Settings
+- GET /api/settings - Get all settings
+- PUT /api/settings/account-status - Update account status settings
+- PUT /api/settings/mailing-lists - Update mailing list settings
+- PUT /api/settings/departments - Update department settings
