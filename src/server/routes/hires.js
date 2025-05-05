@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -42,7 +43,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Download CSV template
+// Download CSV template - moved BEFORE the /:id route to prevent route masking
 router.get('/template', (req, res) => {
   try {
     logger.api.info('GET /hires/template - Generating CSV template');
@@ -67,10 +68,10 @@ router.get('/template', (req, res) => {
       'note'
     ];
     
-    // Create CSV content with headers and one example row
+    // Create CSV content with headers
     let csvContent = headers.join(',') + '\n';
     
-    // Add an example row with sample data
+    // Add an example row with sample data - ensure proper CSV formatting with quotes for values that might contain commas
     const exampleData = [
       'John Doe',
       'Software Engineer',
@@ -78,7 +79,7 @@ router.get('/template', (req, res) => {
       'john.doe@example.com',
       'Jane Smith',
       '555-1234',
-      'engineering,all-staff',
+      'engineering,all-staff', // Enclosed in quotes to keep as one field
       'Pending',
       '2025-06-01',
       'Tech Support A',
@@ -90,7 +91,13 @@ router.get('/template', (req, res) => {
       'Needs dual monitors'
     ];
     
-    csvContent += exampleData.join(',');
+    // Properly format CSV row with quotes around fields that contain commas
+    const formattedRow = exampleData.map(field => {
+      // If field contains commas, enclose in quotes
+      return field.includes(',') ? `"${field}"` : field;
+    }).join(',');
+    
+    csvContent += formattedRow;
     
     // Set response headers
     res.setHeader('Content-Type', 'text/csv');
@@ -105,7 +112,7 @@ router.get('/template', (req, res) => {
   }
 });
 
-// Get a single hire by ID
+// Get a single hire by ID - must come AFTER the /template route
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   console.log(`[Backend] GET /hires/${id} - Fetching single hire`);
@@ -493,3 +500,4 @@ router.post('/import', async (req, res) => {
 });
 
 export default router;
+
