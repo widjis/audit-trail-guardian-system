@@ -1,26 +1,46 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Save, Edit, Trash } from "lucide-react";
+import { Plus, Save, Edit, Trash, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { settingsService } from "@/services/settings-service";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 export function DepartmentListSettings() {
-  const [departments, setDepartments] = useState([
-    { id: "1", name: "Engineering", code: "ENG" },
-    { id: "2", name: "Human Resources", code: "HR" },
-    { id: "3", name: "Finance", code: "FIN" },
-    { id: "4", name: "Marketing", code: "MKT" },
-    { id: "5", name: "Sales", code: "SLS" }
-  ]);
-  
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [newDeptName, setNewDeptName] = useState("");
   const [newDeptCode, setNewDeptCode] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCode, setEditCode] = useState("");
+  
+  // Fetch settings from the server
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsService.getSettings
+  });
+  
+  // Update departments when data is loaded
+  useEffect(() => {
+    if (data?.departments) {
+      setDepartments(data.departments);
+    }
+  }, [data]);
+  
+  // Save departments mutation
+  const saveDepartmentsMutation = useMutation({
+    mutationFn: settingsService.updateDepartments,
+    onSuccess: () => {
+      toast.success("Department settings saved successfully");
+    },
+    onError: (error) => {
+      toast.error("Failed to save department settings");
+      console.error("Error saving departments:", error);
+    }
+  });
 
   const handleAddDepartment = () => {
     if (!newDeptName.trim() || !newDeptCode.trim()) {
@@ -38,7 +58,7 @@ export function DepartmentListSettings() {
       return;
     }
     
-    const newId = String(Math.max(...departments.map(dept => Number(dept.id))) + 1);
+    const newId = String(Math.max(...departments.map(dept => Number(dept.id) || 0), 0) + 1);
     setDepartments([...departments, { 
       id: newId, 
       name: newDeptName.trim(), 
@@ -89,9 +109,29 @@ export function DepartmentListSettings() {
   };
 
   const handleSaveChanges = () => {
-    // In a real app, this would save to API
-    toast.success("Department settings saved successfully");
+    saveDepartmentsMutation.mutate(departments);
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center items-center py-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Loading settings...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <div className="text-red-500">Error loading settings. Please try again later.</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -191,9 +231,21 @@ export function DepartmentListSettings() {
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleSaveChanges}>
-          <Save className="h-4 w-4 mr-2" />
-          Save All Changes
+        <Button 
+          onClick={handleSaveChanges}
+          disabled={saveDepartmentsMutation.isPending}
+        >
+          {saveDepartmentsMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save All Changes
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>

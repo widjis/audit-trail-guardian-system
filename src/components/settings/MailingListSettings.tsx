@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,21 +7,48 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Save, Edit, Trash } from "lucide-react";
+import { Plus, Save, Edit, Trash, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { settingsService } from "@/services/settings-service";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 export function MailingListSettings() {
-  const [mailingLists, setMailingLists] = useState([
-    { id: "1", name: "General Updates", isDefault: true },
-    { id: "2", name: "Technical Team", isDefault: false },
-    { id: "3", name: "Marketing", isDefault: false },
-    { id: "4", name: "Management", isDefault: false }
-  ]);
-  
+  const [mailingLists, setMailingLists] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
   const [newListName, setNewListName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [useAsDropdown, setUseAsDropdown] = useState(true);
+  
+  // Fetch settings from the server
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsService.getSettings
+  });
+  
+  // Update settings when data is loaded
+  useEffect(() => {
+    if (data) {
+      if (data.mailingLists) {
+        setMailingLists(data.mailingLists);
+      }
+      if (data.mailingListDisplayAsDropdown !== undefined) {
+        setUseAsDropdown(data.mailingListDisplayAsDropdown);
+      }
+    }
+  }, [data]);
+  
+  // Save mailing lists mutation
+  const saveMailingListsMutation = useMutation({
+    mutationFn: (params: { lists: typeof mailingLists, dropdown: boolean }) => 
+      settingsService.updateMailingLists(params.lists, params.dropdown),
+    onSuccess: () => {
+      toast.success("Mailing list settings saved successfully");
+    },
+    onError: (error) => {
+      toast.error("Failed to save mailing list settings");
+      console.error("Error saving mailing lists:", error);
+    }
+  });
 
   const handleAddList = () => {
     if (!newListName.trim()) return;
@@ -31,7 +58,7 @@ export function MailingListSettings() {
       return;
     }
     
-    const newId = String(Math.max(...mailingLists.map(list => Number(list.id))) + 1);
+    const newId = String(Math.max(...mailingLists.map(list => Number(list.id)), 0) + 1);
     setMailingLists([...mailingLists, { 
       id: newId, 
       name: newListName.trim(), 
@@ -72,9 +99,32 @@ export function MailingListSettings() {
   };
 
   const handleSaveSettings = () => {
-    // In a real app, this would save to API
-    toast.success("Mailing list settings saved successfully");
+    saveMailingListsMutation.mutate({ 
+      lists: mailingLists, 
+      dropdown: useAsDropdown 
+    });
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center items-center py-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Loading settings...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <div className="text-red-500">Error loading settings. Please try again later.</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -176,9 +226,21 @@ export function MailingListSettings() {
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleSaveSettings}>
-          <Save className="h-4 w-4 mr-2" />
-          Save All Changes
+        <Button 
+          onClick={handleSaveSettings}
+          disabled={saveMailingListsMutation.isPending}
+        >
+          {saveMailingListsMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save All Changes
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>
