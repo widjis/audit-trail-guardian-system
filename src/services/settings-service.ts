@@ -21,7 +21,8 @@ interface SettingsData {
   mailingListDisplayAsDropdown?: boolean;
 }
 
-const SETTINGS_ENDPOINT = "/api/settings";
+// The API client already includes /api in its baseURL, so we don't need to include it again
+const SETTINGS_ENDPOINT = "/settings";
 
 export const settingsService = {
   // Get all settings
