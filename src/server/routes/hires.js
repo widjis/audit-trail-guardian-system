@@ -104,6 +104,7 @@ router.post('/', async (req, res) => {
         
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
+          console.log(`[Backend] Converting boolean field ${key}: ${value} to ${value ? 1 : 0}`);
           values.push(value ? 1 : 0);
         } else {
           values.push(value);
@@ -118,26 +119,52 @@ router.post('/', async (req, res) => {
     `;
     
     console.log('[Backend] Executing SQL query:', query);
-    console.log('[Backend] Query values:', values);
+    console.log('[Backend] Query values:', JSON.stringify(values));
     
-    await executeQuery(query, values);
-    console.log('[Backend] Insert query executed successfully');
-    
-    // Get the inserted hire
-    const newHires = await executeQuery(`
-      SELECT * FROM hires WHERE id = ?
-    `, [id]);
-    
-    if (newHires.length === 0) {
-      console.error('[Backend] Failed to retrieve newly created hire');
-      return res.status(500).json({ error: 'Failed to retrieve newly created hire' });
+    try {
+      await executeQuery(query, values);
+      console.log('[Backend] Insert query executed successfully');
+      
+      // Get the inserted hire
+      const newHires = await executeQuery(`
+        SELECT * FROM hires WHERE id = ?
+      `, [id]);
+      
+      console.log('[Backend] Query to retrieve new hire returned:', JSON.stringify(newHires));
+      
+      if (newHires.length === 0) {
+        console.error('[Backend] Failed to retrieve newly created hire');
+        return res.status(500).json({ error: 'Failed to retrieve newly created hire' });
+      }
+      
+      const newHire = newHires[0];
+      console.log('[Backend] Retrieved newly created hire:', JSON.stringify(newHire));
+      newHire.audit_logs = [];
+      
+      // Convert numeric values to booleans for the response
+      if (typeof newHire.license_assigned === 'number') {
+        newHire.license_assigned = newHire.license_assigned === 1;
+      }
+      if (typeof newHire.status_srf === 'number') {
+        newHire.status_srf = newHire.status_srf === 1;
+      }
+      if (typeof newHire.microsoft_365_license === 'number') {
+        newHire.microsoft_365_license = newHire.microsoft_365_license === 1;
+      }
+      
+      console.log('[Backend] Sending response with new hire:', JSON.stringify(newHire));
+      return res.status(201).json(newHire);
+    } catch (dbError) {
+      console.error('[Backend] Database error during insert:', dbError);
+      console.error('[Backend] SQL Query that failed:', query);
+      console.error('[Backend] SQL Parameters:', values);
+      
+      // Check if it's a duplicate key error
+      if (dbError.number === 2627 || dbError.code === '23505') {
+        return res.status(409).json({ error: 'A hire with this ID already exists' });
+      }
+      throw dbError;
     }
-    
-    const newHire = newHires[0];
-    console.log('[Backend] Retrieved newly created hire:', newHire);
-    newHire.audit_logs = [];
-    
-    res.status(201).json(newHire);
   } catch (error) {
     console.error('[Backend] Error creating hire in database:', error);
     console.error('[Backend] Error details:', error.message);

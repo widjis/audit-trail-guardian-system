@@ -1,6 +1,6 @@
-
 import { AuthResponse, ImportResponse, LoginCredentials, NewHire, AuditLog } from "../types/types";
 import { toast } from "../components/ui/use-toast";
+import apiClient from './api-client';
 
 // Mock database
 let newHires: NewHire[] = [];
@@ -146,143 +146,82 @@ export const auditApi = {
 // New Hires API
 export const hiresApi = {
   getAll: async (): Promise<NewHire[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(newHires);
-      }, 500);
-    });
+    console.log('[hiresApi] Getting all hires');
+    try {
+      const response = await apiClient.get('/hires');
+      console.log('[hiresApi] Got all hires response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[hiresApi] Error getting all hires:', error);
+      throw error;
+    }
   },
 
   getOne: async (id: string): Promise<NewHire> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const hire = newHires.find((h) => h.id === id);
-        if (hire) {
-          resolve(hire);
-        } else {
-          reject(new Error("New hire not found"));
-        }
-      }, 300);
-    });
+    console.log('[hiresApi] Getting hire with ID:', id);
+    try {
+      const response = await apiClient.get(`/hires/${id}`);
+      console.log('[hiresApi] Got hire with ID:', id, 'Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`[hiresApi] Error getting hire with ID ${id}:`, error);
+      throw error;
+    }
   },
 
   create: async (hire: Omit<NewHire, "id">): Promise<NewHire> => {
-    const newHire = {
-      ...hire,
-      id: generateId(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        newHires.push(newHire);
-        resolve(newHire);
-      }, 500);
-    });
+    console.log('[hiresApi] Creating new hire:', JSON.stringify(hire));
+    try {
+      const response = await apiClient.post('/hires', hire);
+      console.log('[hiresApi] Create hire response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[hiresApi] Error creating hire:', error);
+      throw error;
+    }
   },
 
   update: async (id: string, hire: Partial<NewHire>): Promise<NewHire> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const index = newHires.findIndex((h) => h.id === id);
-        if (index !== -1) {
-          newHires[index] = {
-            ...newHires[index],
-            ...hire,
-            updated_at: new Date().toISOString(),
-          };
-          resolve(newHires[index]);
-        } else {
-          reject(new Error("New hire not found"));
-        }
-      }, 500);
-    });
+    console.log('[hiresApi] Updating hire with ID:', id, 'Data:', JSON.stringify(hire));
+    try {
+      const response = await apiClient.put(`/hires/${id}`, hire);
+      console.log('[hiresApi] Update hire response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`[hiresApi] Error updating hire with ID ${id}:`, error);
+      throw error;
+    }
   },
 
   delete: async (id: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const initialLength = newHires.length;
-        newHires = newHires.filter((h) => h.id !== id);
-        
-        if (newHires.length < initialLength) {
-          resolve();
-        } else {
-          reject(new Error("New hire not found"));
-        }
-      }, 500);
-    });
+    console.log('[hiresApi] Deleting hire with ID:', id);
+    try {
+      await apiClient.delete(`/hires/${id}`);
+      console.log('[hiresApi] Hire deleted successfully');
+    } catch (error) {
+      console.error(`[hiresApi] Error deleting hire with ID ${id}:`, error);
+      throw error;
+    }
   },
 
   import: async (file: File): Promise<ImportResponse> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // In a real implementation, this would parse the file
-        // and validate its contents against the schema
-        
-        // For this mock, we'll generate some sample data
-        const sampleData: NewHire[] = Array(5).fill(null).map((_, index) => ({
-          id: generateId(),
-          name: `Employee ${index + 1}`,
-          title: `Position ${index + 1}`,
-          department: ["IT", "HR", "Finance", "Marketing", "Operations"][Math.floor(Math.random() * 5)],
-          email: `employee${index + 1}@example.com`,
-          direct_report: `Manager ${index % 3 + 1}`,
-          phone_number: `555-${100 + index}`,
-          mailing_list: "general,department",
-          remarks: "",
-          account_creation_status: Math.random() > 0.3 ? "Done" : "Pending",
-          license_assigned: Math.random() > 0.5,
-          status_srf: Math.random() > 0.5,
-          username: `user${index + 1}`,
-          password: "temporary",
-          on_site_date: new Date(Date.now() + 86400000 * (index + 5)).toISOString().split("T")[0],
-          microsoft_365_license: Math.random() > 0.3,
-          laptop_ready: Math.random() > 0.3 ? "Ready" : "In Progress",
-          note: "",
-          ict_support_pic: `Support ${index % 3 + 1}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          audit_logs: [
-            {
-              id: generateId(),
-              new_hire_id: "",  // Will be updated below
-              action_type: "ACCOUNT_CREATION",
-              status: Math.random() > 0.7 ? "ERROR" : "SUCCESS",
-              message: Math.random() > 0.7 ? "User duplication in Active Directory" : "Account created successfully",
-              performed_by: "n8n workflow",
-              timestamp: new Date().toISOString()
-            }
-          ]
-        }));
-        
-        // Update the new_hire_id in audit logs
-        sampleData.forEach(hire => {
-          if (hire.audit_logs && hire.audit_logs.length > 0) {
-            hire.audit_logs.forEach(log => {
-              log.new_hire_id = hire.id;
-            });
-          }
-        });
-        
-        // Add the sample data to our mock database
-        newHires = [...newHires, ...sampleData];
-        
-        // Add audit logs to our central store
-        sampleData.forEach(hire => {
-          if (hire.audit_logs && hire.audit_logs.length > 0) {
-            auditLogs = [...auditLogs, ...hire.audit_logs];
-          }
-        });
-        
-        resolve({
-          success: true,
-          message: "Import successful",
-          rowsImported: sampleData.length,
-        });
-      }, 1500);
-    });
+    console.log('[hiresApi] Importing hires from file');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await apiClient.post('/hires/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('[hiresApi] Import response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[hiresApi] Error importing hires:', error);
+      throw error;
+    }
   },
 };
 

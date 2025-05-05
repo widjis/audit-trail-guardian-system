@@ -18,9 +18,8 @@ apiClient.interceptors.request.use((config) => {
   
   // Add logging for outgoing requests
   console.log(`[API Client] ${config.method?.toUpperCase()} ${config.url}`, config.data ? 'with data:' : '');
-  if (config.data) {
-    console.log('[API Client] Request data:', config.data);
-  }
+  console.log('[API Client] Request data:', config.data ? JSON.stringify(config.data) : 'No data');
+  console.log('[API Client] Request headers:', JSON.stringify(config.headers));
   
   return config;
 });
@@ -31,7 +30,7 @@ apiClient.interceptors.response.use(
     // Log successful responses
     console.log(`[API Client] Response from ${response.config.url}:`, 
       response.status, response.statusText);
-    console.log('[API Client] Response data:', response.data);
+    console.log('[API Client] Response data:', JSON.stringify(response.data));
     return response;
   },
   (error) => {
@@ -41,6 +40,8 @@ apiClient.interceptors.response.use(
       const { status, data, config } = error.response;
       
       console.error(`[API Client] Error ${status} from ${config.url}:`, data);
+      console.error('[API Client] Request that failed:', config.method, config.url);
+      console.error('[API Client] Request data that failed:', config.data);
       
       if (status === 401) {
         // Unauthorized - redirect to login

@@ -44,6 +44,8 @@ export function HireForm() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  console.log("[HireForm] Component rendered with id:", id, "isNewHire:", isNewHire);
+  
   // Fetch settings to get departments and account statuses
   const { data: settingsData } = useQuery({
     queryKey: ['settings'],
@@ -51,21 +53,26 @@ export function HireForm() {
   });
 
   useEffect(() => {
+    console.log("[HireForm] useEffect triggered for id:", id);
     if (!isNewHire && id) {
+      console.log("[HireForm] Fetching existing hire with id:", id);
       fetchHire(id);
+    } else {
+      console.log("[HireForm] Creating new hire, using empty form");
     }
   }, [id, isNewHire]);
 
   const fetchHire = async (hireId: string) => {
     setIsFetching(true);
     try {
+      console.log("[HireForm] Calling API to fetch hire with ID:", hireId);
       const data = await hiresApi.getOne(hireId);
-      console.log("[Frontend] Fetched hire data:", data);
+      console.log("[HireForm] Fetched hire data:", data);
       // Filter out id, created_at, and updated_at
       const { id, created_at, updated_at, ...hireData } = data;
       setHire(hireData);
     } catch (error) {
-      console.error("[Frontend] Error fetching hire:", error);
+      console.error("[HireForm] Error fetching hire:", error);
       toast({
         title: "Error",
         description: "Failed to fetch hire details",
@@ -79,14 +86,17 @@ export function HireForm() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log(`[HireForm] Input changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
+    console.log(`[HireForm] Switch changed: ${name} = ${checked}`);
     setHire((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
+    console.log(`[HireForm] Select changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -94,23 +104,25 @@ export function HireForm() {
     e.preventDefault();
     setIsLoading(true);
     
-    console.log("[Frontend] About to save hire data:", hire);
-    console.log("[Frontend] Is new hire?", isNewHire);
+    console.log("[HireForm] Form submitted");
+    console.log("[HireForm] About to save hire data:", JSON.stringify(hire));
+    console.log("[HireForm] Is new hire?", isNewHire);
 
     try {
       if (isNewHire) {
-        console.log("[Frontend] Creating new hire with data:", hire);
+        console.log("[HireForm] Creating new hire with data:", JSON.stringify(hire));
         const result = await hiresApi.create(hire);
-        console.log("[Frontend] Create hire result:", result);
+        console.log("[HireForm] Create hire API call completed!");
+        console.log("[HireForm] Create hire result:", result);
         toast({
           title: "Success",
           description: "New hire added successfully",
         });
       } else if (id) {
-        console.log("[Frontend] Updating hire with ID:", id);
-        console.log("[Frontend] Update data:", hire);
+        console.log("[HireForm] Updating hire with ID:", id);
+        console.log("[HireForm] Update data:", JSON.stringify(hire));
         const result = await hiresApi.update(id, hire);
-        console.log("[Frontend] Update hire result:", result);
+        console.log("[HireForm] Update hire result:", result);
         toast({
           title: "Success",
           description: "Hire details updated successfully",
@@ -118,18 +130,18 @@ export function HireForm() {
       }
       navigate("/hires");
     } catch (error) {
-      console.error("[Frontend] Error saving hire:", error);
+      console.error("[HireForm] Error saving hire:", error);
       if (error instanceof Error) {
-        console.error("[Frontend] Error details:", error.message);
+        console.error("[HireForm] Error details:", error.message);
         
         if (error.stack) {
-          console.error("[Frontend] Error stack:", error.stack);
+          console.error("[HireForm] Error stack:", error.stack);
         }
       }
       
       toast({
         title: "Error",
-        description: "Failed to save hire details",
+        description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {

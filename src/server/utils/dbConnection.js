@@ -25,6 +25,9 @@ const dbType = process.env.DB_TYPE || 'mssql';
  */
 export const initDbConnection = async () => {
   try {
+    console.log('[Database] Initializing database connection...');
+    console.log(`[Database] Using database type: ${dbType}`);
+
     // Based on the database type, initialize the appropriate connection
     if (dbType === 'postgres') {
       const { Pool } = await import('pg');
@@ -65,8 +68,13 @@ export const initDbConnection = async () => {
       };
       console.log('[Database] Attempting MSSQL connection with config:', JSON.stringify(logConfig));
       
-      dbPool = await new mssql.default.ConnectionPool(config).connect();
-      console.log('[Database] MSSQL connection pool successfully initialized');
+      try {
+        dbPool = await new mssql.default.ConnectionPool(config).connect();
+        console.log('[Database] MSSQL connection pool successfully initialized');
+      } catch (err) {
+        console.error('[Database] MSSQL connection failed:', err);
+        throw err;
+      }
     }
     
     return true;
@@ -104,7 +112,7 @@ export const executeQuery = async (query, params = []) => {
   
   try {
     console.log(`[Database] Executing query: ${query}`);
-    console.log(`[Database] With params:`, params);
+    console.log(`[Database] With params:`, JSON.stringify(params));
     
     if (dbType === 'postgres') {
       console.time('[Database] Query execution time');
@@ -134,22 +142,32 @@ export const executeQuery = async (query, params = []) => {
       
       console.log('[Database] Final SQL query:', query);
       console.time('[Database] Query execution time');
-      const result = await request.query(query);
-      console.timeEnd('[Database] Query execution time');
       
-      const rowCount = result.recordset ? result.recordset.length : 0;
-      console.log(`[Database] Query executed successfully, returned ${rowCount} rows`);
-      
-      if (rowCount > 0 && rowCount <= 3) {
-        console.log('[Database] Sample of returned data:', JSON.stringify(result.recordset.slice(0, 3)));
+      let result;
+      try {
+        result = await request.query(query);
+        console.timeEnd('[Database] Query execution time');
+        
+        const rowCount = result.recordset ? result.recordset.length : 0;
+        console.log(`[Database] Query executed successfully, returned ${rowCount} rows`);
+        
+        if (rowCount > 0 && rowCount <= 3) {
+          console.log('[Database] Sample of returned data:', JSON.stringify(result.recordset.slice(0, 3)));
+        }
+        
+        return result.recordset;
+      } catch (err) {
+        console.error('[Database] SQL query execution error:', err);
+        console.error('[Database] Error SQL state:', err.code);
+        console.error('[Database] Error SQL number:', err.number);
+        console.error('[Database] Error line number:', err.lineNumber);
+        throw err;
       }
-      
-      return result.recordset;
     }
   } catch (error) {
     console.error('[Database] Database query execution error:', error);
     console.error('[Database] Query that failed:', query);
-    console.error('[Database] Parameters:', params);
+    console.error('[Database] Parameters:', JSON.stringify(params));
     throw error;
   }
 };
