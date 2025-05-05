@@ -2,12 +2,15 @@
 import express from 'express';
 import { executeQuery } from '../utils/dbConnection.js';
 import { initializeSchema } from '../utils/schemaInit.js';
+import bcrypt from 'bcrypt';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
+const SALT_ROUNDS = 10;
 
 // Initialize schema on module load
 initializeSchema().catch(err => {
-  console.error('Failed to initialize schema:', err);
+  logger.db.error('Failed to initialize schema:', err);
 });
 
 // Get all users
@@ -16,7 +19,7 @@ router.get('/', async (req, res) => {
     const users = await executeQuery('SELECT id, username, role FROM users');
     res.json(users);
   } catch (error) {
-    console.error('Failed to get users from database:', error);
+    logger.api.error('Failed to get users from database:', error);
     res.status(500).json({ error: 'Database error: Failed to retrieve users' });
   }
 });
@@ -28,7 +31,7 @@ router.get('/support', async (req, res) => {
     const supportUsers = await executeQuery(query);
     res.json(supportUsers);
   } catch (error) {
-    console.error('Failed to get support users from database:', error);
+    logger.api.error('Failed to get support users from database:', error);
     res.status(500).json({ error: 'Database error: Failed to retrieve support users' });
   }
 });
@@ -54,19 +57,23 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ error: 'Username already exists' });
     }
     
-    console.log('Creating new user in database:', { id: user.id, username: user.username, role: user.role });
+    logger.api.info('Creating new user in database:', { id: user.id, username: user.username, role: user.role });
     
-    // Insert user into database
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(user.password, SALT_ROUNDS);
+    logger.api.debug('Password hashed successfully');
+    
+    // Insert user into database with hashed password
     const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
-    await executeQuery(query, [user.id, user.username, user.password, user.role]);
+    await executeQuery(query, [user.id, user.username, hashedPassword, user.role]);
     
-    console.log('User successfully created in database');
+    logger.api.info('User successfully created in database');
     
     // Return the created user without password
     const { password, ...userWithoutPassword } = user;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
-    console.error('Failed to create user in database:', error);
+    logger.api.error('Failed to create user in database:', error);
     res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
@@ -97,7 +104,7 @@ router.put('/:id', async (req, res) => {
     
     res.json({ id, username, role });
   } catch (error) {
-    console.error('Failed to update user in database:', error);
+    logger.api.error('Failed to update user in database:', error);
     res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
@@ -124,7 +131,7 @@ router.delete('/:id', async (req, res) => {
     
     res.status(204).send();
   } catch (error) {
-    console.error('Failed to delete user from database:', error);
+    logger.api.error('Failed to delete user from database:', error);
     res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
@@ -145,12 +152,16 @@ router.post('/:id/reset-password', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    logger.api.debug('Password reset: new password hashed successfully');
+    
     // Update password in database
-    await executeQuery('UPDATE users SET password = ? WHERE id = ?', [password, id]);
+    await executeQuery('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to reset password in database:', error);
+    logger.api.error('Failed to reset password in database:', error);
     res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });

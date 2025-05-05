@@ -3,13 +3,14 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { executeQuery } from '../utils/dbConnection.js';
+import bcrypt from 'bcrypt';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-
-const USERS_FILE = path.join(__dirname, '../data/users.json');
 
 // Generate a unique ID
 const generateId = () => {
@@ -22,65 +23,83 @@ const generateToken = (userId, username, role) => {
 };
 
 // Login route
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-  
-  const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  const user = users.find(u => u.username === username && u.password === password);
-  
-  if (user) {
-    const token = generateToken(user.id, user.username, user.role);
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role
-      }
-    });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // Get user from database
+    const users = await executeQuery('SELECT * FROM users WHERE username = ?', [username]);
+    
+    if (users.length === 0) {
+      logger.api.warn(`Login attempt for non-existent user: ${username}`);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    const user = users[0];
+    
+    // Compare password with hash
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    
+    if (passwordMatch) {
+      logger.api.info(`User logged in successfully: ${username}`);
+      const token = generateToken(user.id, user.username, user.role);
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      });
+    } else {
+      logger.api.warn(`Failed login attempt for user: ${username}`);
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  } catch (error) {
+    logger.api.error('Error during login:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Register route
-router.post('/register', (req, res) => {
-  const { username, password } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-  
-  let users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  const existingUser = users.find(u => u.username === username);
-  
-  if (existingUser) {
-    return res.status(400).json({ error: 'Username already exists' });
-  }
-  
-  const newUser = {
-    id: generateId(),
-    username,
-    password,
-    role: 'user'
-  };
-  
-  users.push(newUser);
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-  
-  const token = generateToken(newUser.id, newUser.username, newUser.role);
-  res.status(201).json({
-    token,
-    user: {
-      id: newUser.id,
-      username: newUser.username,
-      role: newUser.role
+router.post('/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
-  });
+    
+    // Check if username already exists
+    const existingUsers = await executeQuery('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    
+    const userId = generateId();
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Insert new user
+    const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
+    await executeQuery(query, [userId, username, hashedPassword, 'user']);
+    
+    const token = generateToken(userId, username, 'user');
+    res.status(201).json({
+      token,
+      user: {
+        id: userId,
+        username,
+        role: 'user'
+      }
+    });
+  } catch (error) {
+    logger.api.error('Error during registration:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Verify token route
