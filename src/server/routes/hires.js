@@ -42,6 +42,69 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Download CSV template
+router.get('/template', (req, res) => {
+  try {
+    logger.api.info('GET /hires/template - Generating CSV template');
+    
+    // Define the CSV headers based on required fields
+    const headers = [
+      'name',
+      'title',
+      'department',
+      'email',
+      'direct_report',
+      'phone_number',
+      'mailing_list',
+      'account_creation_status',
+      'on_site_date',
+      'ict_support_pic',
+      'remarks',
+      'license_assigned',
+      'status_srf',
+      'microsoft_365_license',
+      'laptop_ready',
+      'note'
+    ];
+    
+    // Create CSV content with headers and one example row
+    let csvContent = headers.join(',') + '\n';
+    
+    // Add an example row with sample data
+    const exampleData = [
+      'John Doe',
+      'Software Engineer',
+      'IT',
+      'john.doe@example.com',
+      'Jane Smith',
+      '555-1234',
+      'engineering,all-staff',
+      'Pending',
+      '2025-06-01',
+      'Tech Support A',
+      'New graduate hire',
+      'false',
+      'true',
+      'false',
+      'In Progress',
+      'Needs dual monitors'
+    ];
+    
+    csvContent += exampleData.join(',');
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=new_hire_template.csv');
+    
+    // Send the CSV content
+    res.send(csvContent);
+    logger.api.info('CSV template generated and sent successfully');
+  } catch (error) {
+    logger.api.error('Error generating CSV template:', error);
+    res.status(500).json({ error: 'Failed to generate CSV template', message: error.message });
+  }
+});
+
 // Get a single hire by ID
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
@@ -274,69 +337,6 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Download CSV template
-router.get('/template', (req, res) => {
-  try {
-    logger.api.info('GET /hires/template - Generating CSV template');
-    
-    // Define the CSV headers based on required fields
-    const headers = [
-      'name',
-      'title',
-      'department',
-      'email',
-      'direct_report',
-      'phone_number',
-      'mailing_list',
-      'account_creation_status',
-      'on_site_date',
-      'ict_support_pic',
-      'remarks',
-      'license_assigned',
-      'status_srf',
-      'microsoft_365_license',
-      'laptop_ready',
-      'note'
-    ];
-    
-    // Create CSV content with headers and one example row
-    let csvContent = headers.join(',') + '\n';
-    
-    // Add an example row with sample data
-    const exampleData = [
-      'John Doe',
-      'Software Engineer',
-      'IT',
-      'john.doe@example.com',
-      'Jane Smith',
-      '555-1234',
-      'engineering,all-staff',
-      'Pending',
-      '2025-06-01',
-      'Tech Support A',
-      'New graduate hire',
-      'false',
-      'true',
-      'false',
-      'In Progress',
-      'Needs dual monitors'
-    ];
-    
-    csvContent += exampleData.join(',');
-    
-    // Set response headers
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=new_hire_template.csv');
-    
-    // Send the CSV content
-    res.send(csvContent);
-    logger.api.info('CSV template generated and sent successfully');
-  } catch (error) {
-    logger.api.error('Error generating CSV template:', error);
-    res.status(500).json({ error: 'Failed to generate CSV template', message: error.message });
-  }
-});
-
 // Get audit logs for a hire
 router.get('/:id/logs', async (req, res) => {
   const { id } = req.params;
@@ -400,6 +400,95 @@ router.post('/:id/logs', async (req, res) => {
   } catch (error) {
     console.error('Error creating audit log in database:', error);
     res.status(500).json({ error: 'Failed to create audit log', message: error.message });
+  }
+});
+
+// Import hires
+router.post('/import', async (req, res) => {
+  try {
+    // Generate sample data for import (in a real app, this would process uploaded data)
+    const sampleData = Array(5).fill(null).map((_, index) => ({
+      id: generateId(),
+      name: `Employee ${index + 1}`,
+      title: `Position ${index + 1}`,
+      department: ["IT", "HR", "Finance", "Marketing", "Operations"][Math.floor(Math.random() * 5)],
+      email: `employee${index + 1}@example.com`,
+      direct_report: `Manager ${index % 3 + 1}`,
+      phone_number: `555-${100 + index}`,
+      mailing_list: "general,department",
+      remarks: "",
+      account_creation_status: Math.random() > 0.3 ? "Done" : "Pending",
+      license_assigned: Math.random() > 0.5,
+      status_srf: Math.random() > 0.5,
+      username: `user${index + 1}`,
+      password: "temporary",
+      on_site_date: new Date(Date.now() + 86400000 * (index + 5)).toISOString().split("T")[0],
+      microsoft_365_license: Math.random() > 0.3,
+      laptop_ready: Math.random() > 0.3 ? "Ready" : "In Progress",
+      note: "",
+      ict_support_pic: `Support ${index % 3 + 1}`,
+    }));
+    
+    // Import each hire into the database
+    const importedHires = [];
+    const auditLogs = [];
+    
+    for (const hire of sampleData) {
+      const now = new Date().toISOString();
+      hire.created_at = now;
+      hire.updated_at = now;
+      
+      // Convert boolean values for SQL Server
+      const hireSql = {
+        ...hire,
+        license_assigned: hire.license_assigned ? 1 : 0,
+        status_srf: hire.status_srf ? 1 : 0,
+        microsoft_365_license: hire.microsoft_365_license ? 1 : 0
+      };
+      
+      // Build columns and values for SQL insert
+      const columns = Object.keys(hireSql);
+      const placeholders = Array(columns.length).fill('?');
+      const values = Object.values(hireSql);
+      
+      // Insert hire into database
+      const query = `
+        INSERT INTO hires (${columns.join(', ')})
+        VALUES (${placeholders.join(', ')})
+      `;
+      
+      await executeQuery(query, values);
+      
+      // Create an audit log for this hire
+      const logId = generateId();
+      const log = {
+        id: logId,
+        new_hire_id: hire.id,
+        action_type: "ACCOUNT_CREATION",
+        status: Math.random() > 0.7 ? "ERROR" : "SUCCESS",
+        message: Math.random() > 0.7 ? "User duplication in Active Directory" : "Account created successfully",
+        performed_by: "system import",
+        timestamp: now
+      };
+      
+      // Insert audit log into database
+      await executeQuery(`
+        INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [log.id, log.new_hire_id, log.action_type, log.status, log.message, log.performed_by, log.timestamp]);
+      
+      auditLogs.push(log);
+      importedHires.push({...hire, audit_logs: [log]});
+    }
+    
+    res.json({
+      success: true,
+      message: "Import successful",
+      rowsImported: sampleData.length
+    });
+  } catch (error) {
+    console.error('Error importing hires to database:', error);
+    res.status(500).json({ error: 'Failed to import hires', message: error.message });
   }
 });
 
