@@ -7,27 +7,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertCircle, Database, Server, Table } from "lucide-react";
 import apiClient from "@/services/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
 interface DatabaseConfig {
+  type: "postgres" | "mssql";
   host: string;
   port: string;
   database: string;
   username: string;
   password: string;
+  instance?: string;
+  encrypt?: boolean;
 }
 
 export function DatabaseConfigSettings() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState<DatabaseConfig>({
+    type: "postgres",
     host: "",
     port: "5432",
     database: "",
     username: "",
-    password: ""
+    password: "",
+    instance: "",
+    encrypt: false
   });
   
   const [schema, setSchema] = useState("");
@@ -66,11 +76,26 @@ export function DatabaseConfigSettings() {
     fetchDatabaseConfig();
   }, [toast]);
 
+  const handleTypeChange = (type: "postgres" | "mssql") => {
+    setConfig(prev => ({
+      ...prev,
+      type,
+      port: type === "postgres" ? "5432" : "1433"
+    }));
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setConfig((prev) => ({
+    setConfig(prev => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      [name]: checked,
     }));
   };
 
@@ -120,7 +145,9 @@ export function DatabaseConfigSettings() {
     }
   };
 
-  const sampleSchema = `-- Sample Schema
+  const getSchemaTemplate = () => {
+    if (config.type === 'postgres') {
+      return `-- PostgreSQL Sample Schema
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(100) NOT NULL,
@@ -142,6 +169,34 @@ CREATE TABLE IF NOT EXISTS employees (
   department_id INTEGER REFERENCES departments(id),
   hire_date DATE NOT NULL
 );`;
+    } else {
+      return `-- MS SQL Server Sample Schema
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+CREATE TABLE users (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  username NVARCHAR(100) NOT NULL,
+  email NVARCHAR(255) NOT NULL UNIQUE,
+  password NVARCHAR(255) NOT NULL,
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U')
+CREATE TABLE departments (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  name NVARCHAR(100) NOT NULL,
+  code NVARCHAR(10) NOT NULL UNIQUE
+);
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U')
+CREATE TABLE employees (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  name NVARCHAR(255) NOT NULL,
+  email NVARCHAR(255) NOT NULL UNIQUE,
+  department_id INT FOREIGN KEY REFERENCES departments(id),
+  hire_date DATE NOT NULL
+);`;
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -177,67 +232,118 @@ CREATE TABLE IF NOT EXISTS employees (
                     These settings will be stored in environment variables. After saving, a server restart might be required for changes to take effect.
                   </AlertDescription>
                 </Alert>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Database Type</Label>
+                    <RadioGroup 
+                      value={config.type} 
+                      onValueChange={(value) => handleTypeChange(value as "postgres" | "mssql")}
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="postgres" id="postgres" />
+                        <Label htmlFor="postgres">PostgreSQL</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="mssql" id="mssql" />
+                        <Label htmlFor="mssql">MS SQL Server</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="host">Database Host</Label>
-                    <Input 
-                      id="host"
-                      name="host"
-                      value={config.host}
-                      onChange={handleChange}
-                      placeholder="localhost"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="port">Port</Label>
-                    <Input 
-                      id="port"
-                      name="port"
-                      value={config.port}
-                      onChange={handleChange}
-                      placeholder="5432"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="database">Database Name</Label>
-                    <Input 
-                      id="database"
-                      name="database"
-                      value={config.database}
-                      onChange={handleChange}
-                      placeholder="my_database"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input 
-                      id="username"
-                      name="username"
-                      value={config.username}
-                      onChange={handleChange}
-                      placeholder="postgres"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input 
-                      id="password"
-                      name="password"
-                      type="password"
-                      value={config.password}
-                      onChange={handleChange}
-                      placeholder="********"
-                      disabled={isLoading}
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="host">Database Host</Label>
+                      <Input 
+                        id="host"
+                        name="host"
+                        value={config.host}
+                        onChange={handleChange}
+                        placeholder={config.type === "postgres" ? "localhost" : "localhost\\SQLEXPRESS"}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="port">Port</Label>
+                      <Input 
+                        id="port"
+                        name="port"
+                        value={config.port}
+                        onChange={handleChange}
+                        placeholder={config.type === "postgres" ? "5432" : "1433"}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="database">Database Name</Label>
+                      <Input 
+                        id="database"
+                        name="database"
+                        value={config.database}
+                        onChange={handleChange}
+                        placeholder="my_database"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input 
+                        id="username"
+                        name="username"
+                        value={config.username}
+                        onChange={handleChange}
+                        placeholder={config.type === "postgres" ? "postgres" : "sa"}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input 
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={config.password}
+                        onChange={handleChange}
+                        placeholder="********"
+                        disabled={isLoading}
+                      />
+                    </div>
+
+                    {config.type === "mssql" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="instance">Instance Name (optional)</Label>
+                          <Input 
+                            id="instance"
+                            name="instance"
+                            value={config.instance}
+                            onChange={handleChange}
+                            placeholder="SQLEXPRESS"
+                            disabled={isLoading}
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Leave empty if not using a named instance
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2 flex items-center pt-6">
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="encrypt"
+                              checked={config.encrypt}
+                              onCheckedChange={(checked) => handleSwitchChange('encrypt', checked)}
+                              disabled={isLoading}
+                            />
+                            <Label htmlFor="encrypt">Encrypt Connection</Label>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -273,7 +379,7 @@ CREATE TABLE IF NOT EXISTS employees (
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Schema Format</AlertTitle>
                   <AlertDescription>
-                    Enter SQL statements to initialize your database schema. These will be executed when initializing the database. Use standard SQL CREATE TABLE statements.
+                    Enter SQL statements to initialize your database schema. The syntax will vary slightly between PostgreSQL and MS SQL Server.
                   </AlertDescription>
                 </Alert>
                 
@@ -283,7 +389,7 @@ CREATE TABLE IF NOT EXISTS employees (
                     id="schema"
                     value={schema}
                     onChange={handleSchemaChange}
-                    placeholder={sampleSchema}
+                    placeholder={getSchemaTemplate()}
                     className="font-mono text-sm h-[400px]"
                     disabled={isLoading}
                   />
@@ -294,10 +400,10 @@ CREATE TABLE IF NOT EXISTS employees (
                 <Button 
                   type="button" 
                   variant="outline"
-                  onClick={() => setSchema(sampleSchema)}
+                  onClick={() => setSchema(getSchemaTemplate())}
                   disabled={isLoading}
                 >
-                  Load Sample Schema
+                  Load {config.type === 'postgres' ? 'PostgreSQL' : 'SQL Server'} Sample Schema
                 </Button>
                 <Button 
                   type="submit" 
