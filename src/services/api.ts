@@ -1,5 +1,5 @@
 
-import { AuthResponse, ImportResponse, LoginCredentials, NewHire } from "../types/types";
+import { AuthResponse, ImportResponse, LoginCredentials, NewHire, AuditLog } from "../types/types";
 import { toast } from "../components/ui/use-toast";
 
 // Mock database
@@ -13,6 +13,7 @@ let users = [
     role: "admin",
   },
 ];
+let auditLogs: AuditLog[] = [];
 
 // Helper to generate UUID
 const generateId = () => {
@@ -92,6 +93,54 @@ export const authApi = {
       return false;
     }
   },
+};
+
+// Audit Logs API
+export const auditApi = {
+  // Create a new audit log entry
+  createLog: async (auditLog: Omit<AuditLog, "id" | "timestamp">): Promise<AuditLog> => {
+    const newLog = {
+      ...auditLog,
+      id: generateId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        auditLogs.push(newLog);
+        
+        // Associate the log with the new hire
+        const hireIndex = newHires.findIndex(h => h.id === auditLog.new_hire_id);
+        if (hireIndex !== -1) {
+          if (!newHires[hireIndex].audit_logs) {
+            newHires[hireIndex].audit_logs = [];
+          }
+          newHires[hireIndex].audit_logs!.push(newLog);
+        }
+        
+        resolve(newLog);
+      }, 300);
+    });
+  },
+
+  // Get all logs for a specific new hire
+  getLogsForHire: async (hireId: string): Promise<AuditLog[]> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const logs = auditLogs.filter(log => log.new_hire_id === hireId);
+        resolve(logs);
+      }, 300);
+    });
+  },
+
+  // Get all logs
+  getAllLogs: async (): Promise<AuditLog[]> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(auditLogs);
+      }, 300);
+    });
+  }
 };
 
 // New Hires API
@@ -195,10 +244,37 @@ export const hiresApi = {
           ict_support_pic: `Support ${index % 3 + 1}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          audit_logs: [
+            {
+              id: generateId(),
+              new_hire_id: "",  // Will be updated below
+              action_type: "ACCOUNT_CREATION",
+              status: Math.random() > 0.7 ? "ERROR" : "SUCCESS",
+              message: Math.random() > 0.7 ? "User duplication in Active Directory" : "Account created successfully",
+              performed_by: "n8n workflow",
+              timestamp: new Date().toISOString()
+            }
+          ]
         }));
+        
+        // Update the new_hire_id in audit logs
+        sampleData.forEach(hire => {
+          if (hire.audit_logs && hire.audit_logs.length > 0) {
+            hire.audit_logs.forEach(log => {
+              log.new_hire_id = hire.id;
+            });
+          }
+        });
         
         // Add the sample data to our mock database
         newHires = [...newHires, ...sampleData];
+        
+        // Add audit logs to our central store
+        sampleData.forEach(hire => {
+          if (hire.audit_logs && hire.audit_logs.length > 0) {
+            auditLogs = [...auditLogs, ...hire.audit_logs];
+          }
+        });
         
         resolve({
           success: true,

@@ -21,6 +21,18 @@ export interface NewHire {
   ict_support_pic: string;
   created_at?: string;
   updated_at?: string;
+  audit_logs?: AuditLog[];
+}
+
+export interface AuditLog {
+  id: string;
+  new_hire_id: string;
+  action_type: string; // e.g., "AD_USER_CREATION", "LICENSE_ASSIGNMENT", "EQUIPMENT_PROVISION"
+  status: "SUCCESS" | "ERROR" | "WARNING" | "INFO";
+  message: string; // e.g., "User duplication", "Report Manager Not found"
+  details?: string; // Additional details or stack trace
+  performed_by?: string; // User or system that performed the action
+  timestamp: string;
 }
 
 export interface User {
