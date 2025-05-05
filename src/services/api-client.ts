@@ -33,11 +33,20 @@ apiClient.interceptors.response.use(
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
+      } else if (status === 503) {
+        // Service unavailable - likely database connection issue
+        console.error('Database connection error:', data.error || 'Service unavailable');
       }
       
       // Convert the error message from the server
       const message = data.error || 'An unexpected error occurred';
       return Promise.reject(new Error(message));
+    }
+    
+    // Handle network errors
+    if (error.request && !error.response) {
+      console.error('Network error - server may be down');
+      return Promise.reject(new Error('Network error - server may be down'));
     }
     
     return Promise.reject(error);

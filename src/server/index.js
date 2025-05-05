@@ -5,6 +5,8 @@ import bodyParser from 'body-parser';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initDbConnection } from './utils/dbConnection.js';
+import { initializeSchema } from './utils/schemaInit.js';
 
 // Get current directory path using ES module approach
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +90,22 @@ const generateId = () => {
 const generateToken = (userId, username, role) => {
   return Buffer.from(JSON.stringify({ userId, username, role, exp: Date.now() + 3600000 })).toString('base64');
 };
+
+// Initialize database connection
+(async () => {
+  try {
+    const dbConnected = await initDbConnection();
+    console.log(`Database connection ${dbConnected ? 'successful' : 'failed'}`);
+    
+    if (dbConnected) {
+      // Initialize schema if database is connected
+      const schemaInitialized = await initializeSchema();
+      console.log(`Schema initialization ${schemaInitialized ? 'successful' : 'failed or not needed'}`);
+    }
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
+})();
 
 // API Routes
 // Import API route modules (converting to ES module imports)

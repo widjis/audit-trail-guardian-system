@@ -3,139 +3,247 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { executeQuery } from '../utils/dbConnection.js';
+import { initializeSchema } from '../utils/schemaInit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const USERS_FILE = path.join(__dirname, '../data/users.json');
 
 const router = express.Router();
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+// Initialize schema on module load
+initializeSchema().catch(err => {
+  console.error('Failed to initialize schema:', err);
+});
 
-// Generate a unique ID
-const generateId = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+// Fallback method to read users from JSON if database fails
+const getUsersFromFile = () => {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error reading users file:', error);
+    return [];
+  }
 };
 
-// Helper function to read users
-const getUsers = () => {
-  return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+// Fallback method to write users to JSON if database fails
+const writeUsersToFile = (users) => {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing users file:', error);
+    return false;
+  }
 };
 
-// Helper function to write users
-const saveUsers = (users) => {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-};
+// Get all users
+router.get('/', async (req, res) => {
+  try {
+    const users = await executeQuery('SELECT id, username, role FROM users');
+    res.json(users);
+  } catch (error) {
+    console.error('Failed to get users from database:', error);
+    
+    // Fallback to file
+    const users = getUsersFromFile();
+    res.json(users);
+  }
+});
 
 // Get all support accounts
-router.get('/support', (req, res) => {
+router.get('/support', async (req, res) => {
   try {
-    const users = getUsers();
-    const supportUsers = users.filter(user => user.role === 'support' || user.role === 'admin');
-    
-    // Don't send passwords in response
-    const sanitizedUsers = supportUsers.map(({ password, ...user }) => user);
-    
-    res.json(sanitizedUsers);
+    const query = "SELECT id, username, role FROM users WHERE role = 'support'";
+    const supportUsers = await executeQuery(query);
+    res.json(supportUsers);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve support accounts' });
+    console.error('Failed to get support users from database:', error);
+    
+    // Fallback to file
+    const users = getUsersFromFile();
+    const supportUsers = users.filter(user => user.role === 'support');
+    res.json(supportUsers);
   }
 });
 
-// Create a new account
-router.post('/', (req, res) => {
+// Create a new user
+router.post('/', async (req, res) => {
   try {
-    const { username, password, role = 'support' } = req.body;
+    const user = req.body;
     
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+    // Generate a unique ID if not provided
+    if (!user.id) {
+      user.id = Math.random().toString(36).substring(2, 15);
     }
     
-    const users = getUsers();
-    const existingUser = users.find(u => u.username === username);
-    
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
+    // Ensure role is set
+    if (!user.role) {
+      user.role = 'support';
     }
     
-    const newUser = {
-      id: generateId(),
-      username,
-      password,
-      role
-    };
+    // Check if username already exists
+    const existingUsers = await executeQuery('SELECT id FROM users WHERE username = ?', [user.username]);
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
     
-    users.push(newUser);
-    saveUsers(users);
+    // Insert user into database
+    const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
+    await executeQuery(query, [user.id, user.username, user.password, user.role]);
     
-    const { password: _, ...userWithoutPassword } = newUser;
+    // Return the created user without password
+    const { password, ...userWithoutPassword } = user;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create account' });
+    console.error('Failed to create user in database:', error);
+    
+    // Fallback to file
+    try {
+      let users = getUsersFromFile();
+      
+      // Check if username already exists
+      if (users.some(u => u.username === req.body.username)) {
+        return res.status(409).json({ error: 'Username already exists' });
+      }
+      
+      const user = {
+        id: req.body.id || Math.random().toString(36).substring(2, 15),
+        username: req.body.username,
+        password: req.body.password,
+        role: req.body.role || 'support'
+      };
+      
+      users.push(user);
+      writeUsersToFile(users);
+      
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (fallbackError) {
+      console.error('File fallback also failed:', fallbackError);
+      res.status(500).json({ error: 'Failed to create user' });
+    }
   }
 });
 
-// Update an existing account
-router.put('/:id', (req, res) => {
+// Update an existing user
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { username } = req.body;
+    const { username, role } = req.body;
     
-    if (!username) {
-      return res.status(400).json({ error: 'Username is required' });
-    }
-    
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
-    
-    if (userIndex === -1) {
+    // Check if user exists
+    const existingUsers = await executeQuery('SELECT id FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Check if new username is already taken by another user
-    const existingUser = users.find(u => u.username === username && u.id !== id);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
+    // Check if new username conflicts with another user
+    if (username) {
+      const usernameCheck = await executeQuery('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
+      if (usernameCheck.length > 0) {
+        return res.status(409).json({ error: 'Username already exists' });
+      }
     }
     
-    // Update user, preserving password and role
-    users[userIndex] = {
-      ...users[userIndex],
-      username
-    };
+    // Update user in database
+    const query = 'UPDATE users SET username = ?, role = ? WHERE id = ?';
+    await executeQuery(query, [username, role, id]);
     
-    saveUsers(users);
-    
-    const { password: _, ...userWithoutPassword } = users[userIndex];
-    res.json(userWithoutPassword);
+    res.json({ id, username, role });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update account' });
+    console.error('Failed to update user in database:', error);
+    
+    // Fallback to file
+    try {
+      let users = getUsersFromFile();
+      const index = users.findIndex(u => u.id === req.params.id);
+      
+      if (index === -1) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Check if new username conflicts
+      if (req.body.username) {
+        const usernameExists = users.some(u => u.username === req.body.username && u.id !== req.params.id);
+        if (usernameExists) {
+          return res.status(409).json({ error: 'Username already exists' });
+        }
+      }
+      
+      users[index] = { 
+        ...users[index],
+        username: req.body.username || users[index].username,
+        role: req.body.role || users[index].role
+      };
+      
+      writeUsersToFile(users);
+      
+      const { password, ...userWithoutPassword } = users[index];
+      res.json(userWithoutPassword);
+    } catch (fallbackError) {
+      console.error('File fallback also failed:', fallbackError);
+      res.status(500).json({ error: 'Failed to update user' });
+    }
   }
 });
 
-// Delete an account
-router.delete('/:id', (req, res) => {
+// Delete a user
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const users = getUsers();
-    const initialLength = users.length;
-    
-    // Filter out the user to delete
-    const updatedUsers = users.filter(u => u.id !== id);
-    
-    if (updatedUsers.length === initialLength) {
+    // Check if user exists and is not the admin account
+    const existingUsers = await executeQuery('SELECT id, role FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    saveUsers(updatedUsers);
-    res.status(200).json({ success: true });
+    // Don't allow deleting the admin account
+    const user = existingUsers[0];
+    if (user.role === 'admin' && user.id === '1') {
+      return res.status(403).json({ error: 'Cannot delete the admin account' });
+    }
+    
+    // Delete user from database
+    await executeQuery('DELETE FROM users WHERE id = ?', [id]);
+    
+    res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete account' });
+    console.error('Failed to delete user from database:', error);
+    
+    // Fallback to file
+    try {
+      let users = getUsersFromFile();
+      const index = users.findIndex(u => u.id === req.params.id);
+      
+      if (index === -1) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Don't allow deleting the admin account
+      if (users[index].role === 'admin' && users[index].id === '1') {
+        return res.status(403).json({ error: 'Cannot delete the admin account' });
+      }
+      
+      users.splice(index, 1);
+      writeUsersToFile(users);
+      
+      res.status(204).send();
+    } catch (fallbackError) {
+      console.error('File fallback also failed:', fallbackError);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
   }
 });
 
 // Reset password
-router.post('/:id/reset-password', (req, res) => {
+router.post('/:id/reset-password', async (req, res) => {
   try {
     const { id } = req.params;
     const { password } = req.body;
@@ -144,23 +252,36 @@ router.post('/:id/reset-password', (req, res) => {
       return res.status(400).json({ error: 'Password is required' });
     }
     
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
-    
-    if (userIndex === -1) {
+    // Check if user exists
+    const existingUsers = await executeQuery('SELECT id FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Update password
-    users[userIndex] = {
-      ...users[userIndex],
-      password
-    };
+    // Update password in database
+    await executeQuery('UPDATE users SET password = ? WHERE id = ?', [password, id]);
     
-    saveUsers(users);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to reset password' });
+    console.error('Failed to reset password in database:', error);
+    
+    // Fallback to file
+    try {
+      let users = getUsersFromFile();
+      const index = users.findIndex(u => u.id === req.params.id);
+      
+      if (index === -1) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      users[index].password = req.body.password;
+      writeUsersToFile(users);
+      
+      res.json({ success: true });
+    } catch (fallbackError) {
+      console.error('File fallback also failed:', fallbackError);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
   }
 });
 

@@ -38,12 +38,13 @@ export interface AuditLog {
 export interface User {
   id: string;
   username: string;
-  password: string;
+  password?: string; // Make password optional since it shouldn't be returned in most API responses
   role: string;
 }
 
 export interface UserAccount extends User {
   // Additional properties specific to ICT support accounts can be added here
+  // The properties have been updated to match the database schema
 }
 
 export interface LoginCredentials {
@@ -66,4 +67,3 @@ export interface ImportResponse {
   rowsImported?: number;
   errors?: string[];
 }
-
