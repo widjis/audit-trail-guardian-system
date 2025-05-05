@@ -18,10 +18,12 @@ const generateId = () => {
 // Get all hires
 router.get('/', async (req, res) => {
   try {
+    console.log('[Backend] GET /hires - Fetching all hires');
     // Query all hires from database
     const hires = await executeQuery(`
       SELECT * FROM hires ORDER BY created_at DESC
     `);
+    console.log(`[Backend] Retrieved ${hires.length} hires from database`);
     
     // Get audit logs for each hire
     for (const hire of hires) {
@@ -30,11 +32,12 @@ router.get('/', async (req, res) => {
       `, [hire.id]);
       
       hire.audit_logs = auditLogs;
+      console.log(`[Backend] Retrieved ${auditLogs.length} audit logs for hire ${hire.id}`);
     }
     
     res.json(hires);
   } catch (error) {
-    console.error('Error fetching hires from database:', error);
+    console.error('[Backend] Error fetching hires from database:', error);
     res.status(500).json({ error: 'Failed to get hires', message: error.message });
   }
 });
@@ -42,6 +45,7 @@ router.get('/', async (req, res) => {
 // Get a single hire by ID
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
+  console.log(`[Backend] GET /hires/${id} - Fetching single hire`);
   
   try {
     const hires = await executeQuery(`
@@ -49,21 +53,24 @@ router.get('/:id', async (req, res) => {
     `, [id]);
     
     if (hires.length === 0) {
+      console.log(`[Backend] Hire with ID ${id} not found`);
       return res.status(404).json({ error: 'New hire not found' });
     }
     
     const hire = hires[0];
+    console.log(`[Backend] Retrieved hire: ${hire.name} (${hire.id})`);
     
     // Get audit logs for this hire
     const auditLogs = await executeQuery(`
       SELECT * FROM audit_logs WHERE new_hire_id = ? ORDER BY timestamp DESC
     `, [id]);
     
+    console.log(`[Backend] Retrieved ${auditLogs.length} audit logs for hire ${id}`);
     hire.audit_logs = auditLogs;
     
     res.json(hire);
   } catch (error) {
-    console.error('Error fetching hire from database:', error);
+    console.error(`[Backend] Error fetching hire ${id} from database:`, error);
     res.status(500).json({ error: 'Failed to get hire', message: error.message });
   }
 });
@@ -71,14 +78,18 @@ router.get('/:id', async (req, res) => {
 // Create a new hire
 router.post('/', async (req, res) => {
   const hireData = req.body;
+  console.log('[Backend] POST /hires - Creating new hire');
+  console.log('[Backend] Received hire data:', JSON.stringify(hireData, null, 2));
   
   if (!hireData.name) {
+    console.log('[Backend] Validation error: Name is required');
     return res.status(400).json({ error: 'Name is required' });
   }
   
   try {
     const id = generateId();
     const now = new Date().toISOString();
+    console.log(`[Backend] Generated ID: ${id}, timestamp: ${now}`);
     
     // Build columns and values for SQL insert
     const columns = ['id', 'created_at', 'updated_at'];
@@ -106,19 +117,33 @@ router.post('/', async (req, res) => {
       VALUES (${placeholders.join(', ')})
     `;
     
+    console.log('[Backend] Executing SQL query:', query);
+    console.log('[Backend] Query values:', values);
+    
     await executeQuery(query, values);
+    console.log('[Backend] Insert query executed successfully');
     
     // Get the inserted hire
     const newHires = await executeQuery(`
       SELECT * FROM hires WHERE id = ?
     `, [id]);
     
+    if (newHires.length === 0) {
+      console.error('[Backend] Failed to retrieve newly created hire');
+      return res.status(500).json({ error: 'Failed to retrieve newly created hire' });
+    }
+    
     const newHire = newHires[0];
+    console.log('[Backend] Retrieved newly created hire:', newHire);
     newHire.audit_logs = [];
     
     res.status(201).json(newHire);
   } catch (error) {
-    console.error('Error creating hire in database:', error);
+    console.error('[Backend] Error creating hire in database:', error);
+    console.error('[Backend] Error details:', error.message);
+    if (error.stack) {
+      console.error('[Backend] Error stack:', error.stack);
+    }
     res.status(500).json({ error: 'Failed to create hire', message: error.message });
   }
 });

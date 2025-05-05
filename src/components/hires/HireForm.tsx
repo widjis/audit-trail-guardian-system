@@ -60,11 +60,12 @@ export function HireForm() {
     setIsFetching(true);
     try {
       const data = await hiresApi.getOne(hireId);
+      console.log("[Frontend] Fetched hire data:", data);
       // Filter out id, created_at, and updated_at
       const { id, created_at, updated_at, ...hireData } = data;
       setHire(hireData);
     } catch (error) {
-      console.error("Error fetching hire:", error);
+      console.error("[Frontend] Error fetching hire:", error);
       toast({
         title: "Error",
         description: "Failed to fetch hire details",
@@ -92,16 +93,24 @@ export function HireForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    console.log("[Frontend] About to save hire data:", hire);
+    console.log("[Frontend] Is new hire?", isNewHire);
 
     try {
       if (isNewHire) {
-        await hiresApi.create(hire);
+        console.log("[Frontend] Creating new hire with data:", hire);
+        const result = await hiresApi.create(hire);
+        console.log("[Frontend] Create hire result:", result);
         toast({
           title: "Success",
           description: "New hire added successfully",
         });
       } else if (id) {
-        await hiresApi.update(id, hire);
+        console.log("[Frontend] Updating hire with ID:", id);
+        console.log("[Frontend] Update data:", hire);
+        const result = await hiresApi.update(id, hire);
+        console.log("[Frontend] Update hire result:", result);
         toast({
           title: "Success",
           description: "Hire details updated successfully",
@@ -109,7 +118,15 @@ export function HireForm() {
       }
       navigate("/hires");
     } catch (error) {
-      console.error("Error saving hire:", error);
+      console.error("[Frontend] Error saving hire:", error);
+      if (error instanceof Error) {
+        console.error("[Frontend] Error details:", error.message);
+        
+        if (error.stack) {
+          console.error("[Frontend] Error stack:", error.stack);
+        }
+      }
+      
       toast({
         title: "Error",
         description: "Failed to save hire details",

@@ -35,7 +35,7 @@ export const initDbConnection = async () => {
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
       });
-      console.log('PostgreSQL connection pool initialized');
+      console.log('[Database] PostgreSQL connection pool initialized');
     } else if (dbType === 'mssql') {
       const mssql = await import('mssql');
       
@@ -63,15 +63,15 @@ export const initDbConnection = async () => {
         ...config,
         password: '********' // Hide actual password
       };
-      console.log('Attempting MSSQL connection with config:', JSON.stringify(logConfig));
+      console.log('[Database] Attempting MSSQL connection with config:', JSON.stringify(logConfig));
       
       dbPool = await new mssql.default.ConnectionPool(config).connect();
-      console.log('MSSQL connection pool successfully initialized');
+      console.log('[Database] MSSQL connection pool successfully initialized');
     }
     
     return true;
   } catch (error) {
-    console.error('Failed to initialize database connection:', error);
+    console.error('[Database] Failed to initialize database connection:', error);
     return false;
   }
 };
@@ -81,7 +81,7 @@ export const initDbConnection = async () => {
  */
 export const getDbPool = () => {
   if (!dbPool) {
-    console.warn('Database pool not initialized yet, attempting to initialize');
+    console.warn('[Database] Database pool not initialized yet, attempting to initialize');
     initDbConnection();
   }
   return dbPool;
@@ -95,7 +95,7 @@ export const getDbPool = () => {
  */
 export const executeQuery = async (query, params = []) => {
   if (!dbPool) {
-    console.log('Database pool not initialized, attempting to connect...');
+    console.log('[Database] Database pool not initialized, attempting to connect...');
     const connected = await initDbConnection();
     if (!connected) {
       throw new Error('Database connection not available');
@@ -103,12 +103,14 @@ export const executeQuery = async (query, params = []) => {
   }
   
   try {
-    console.log(`Executing query: ${query}`);
-    console.log(`With params:`, params);
+    console.log(`[Database] Executing query: ${query}`);
+    console.log(`[Database] With params:`, params);
     
     if (dbType === 'postgres') {
+      console.time('[Database] Query execution time');
       const result = await dbPool.query(query, params);
-      console.log(`Query executed successfully, returned ${result.rows.length} rows`);
+      console.timeEnd('[Database] Query execution time');
+      console.log(`[Database] Query executed successfully, returned ${result.rows.length} rows`);
       return result.rows;
     } else if (dbType === 'mssql') {
       const request = dbPool.request();
@@ -116,7 +118,10 @@ export const executeQuery = async (query, params = []) => {
       // Add parameters to the request
       if (params && params.length > 0) {
         params.forEach((param, index) => {
-          request.input(`param${index}`, param);
+          const paramValue = param === undefined ? null : param;
+          console.log(`[Database] Setting parameter param${index} =`, 
+            typeof paramValue === 'object' ? JSON.stringify(paramValue) : paramValue);
+          request.input(`param${index}`, paramValue);
         });
         
         // Replace ? placeholders with @paramX
@@ -127,17 +132,29 @@ export const executeQuery = async (query, params = []) => {
         query = parsedQuery;
       }
       
+      console.log('[Database] Final SQL query:', query);
+      console.time('[Database] Query execution time');
       const result = await request.query(query);
-      console.log(`Query executed successfully, returned ${result.recordset ? result.recordset.length : 0} rows`);
+      console.timeEnd('[Database] Query execution time');
+      
+      const rowCount = result.recordset ? result.recordset.length : 0;
+      console.log(`[Database] Query executed successfully, returned ${rowCount} rows`);
+      
+      if (rowCount > 0 && rowCount <= 3) {
+        console.log('[Database] Sample of returned data:', JSON.stringify(result.recordset.slice(0, 3)));
+      }
+      
       return result.recordset;
     }
   } catch (error) {
-    console.error('Database query execution error:', error);
+    console.error('[Database] Database query execution error:', error);
+    console.error('[Database] Query that failed:', query);
+    console.error('[Database] Parameters:', params);
     throw error;
   }
 };
 
 // Initialize connection on module load
 initDbConnection().catch(err => {
-  console.error('Failed to initialize database on startup:', err);
+  console.error('[Database] Failed to initialize database on startup:', err);
 });
