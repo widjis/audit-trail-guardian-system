@@ -13,6 +13,7 @@ const router = express.Router();
 // Path to store database config (separate from .env for security)
 const ENV_FILE_PATH = path.join(__dirname, '../../../.env');
 const ENV_EXAMPLE_PATH = path.join(__dirname, '../../../.env.example');
+const SCHEMA_FILE_PATH = path.join(__dirname, '../data/dbSchema.sql');
 
 // Default database config keys
 const DB_CONFIG_KEYS = [
@@ -89,6 +90,50 @@ router.put('/', (req, res) => {
   } catch (error) {
     console.error('Error updating database config:', error);
     res.status(500).json({ error: 'Failed to update database configuration' });
+  }
+});
+
+// Get database schema
+router.get('/schema', (req, res) => {
+  try {
+    if (fs.existsSync(SCHEMA_FILE_PATH)) {
+      const schema = fs.readFileSync(SCHEMA_FILE_PATH, 'utf8');
+      res.json({ schema });
+    } else {
+      res.status(404).json({ error: 'Schema not found', schema: '' });
+    }
+  } catch (error) {
+    console.error('Error getting database schema:', error);
+    res.status(500).json({ error: 'Failed to get database schema' });
+  }
+});
+
+// Update database schema
+router.put('/schema', (req, res) => {
+  try {
+    const { schema } = req.body;
+    
+    if (!schema) {
+      return res.status(400).json({ error: 'Schema content is required' });
+    }
+    
+    // Ensure the data directory exists
+    const dataDir = path.join(__dirname, '../data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    // Write schema to file
+    fs.writeFileSync(SCHEMA_FILE_PATH, schema, 'utf8');
+    
+    res.json({ 
+      success: true, 
+      message: 'Database schema updated successfully',
+      filePath: SCHEMA_FILE_PATH
+    });
+  } catch (error) {
+    console.error('Error updating database schema:', error);
+    res.status(500).json({ error: 'Failed to update database schema' });
   }
 });
 
