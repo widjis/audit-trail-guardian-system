@@ -1,14 +1,7 @@
 
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
 import { initializeSchema } from '../utils/schemaInit.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const USERS_FILE = path.join(__dirname, '../data/users.json');
 
 const router = express.Router();
 
@@ -17,31 +10,6 @@ initializeSchema().catch(err => {
   console.error('Failed to initialize schema:', err);
 });
 
-// Fallback method to read users from JSON if database fails
-const getUsersFromFile = () => {
-  try {
-    if (fs.existsSync(USERS_FILE)) {
-      const data = fs.readFileSync(USERS_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-    return [];
-  } catch (error) {
-    console.error('Error reading users file:', error);
-    return [];
-  }
-};
-
-// Fallback method to write users to JSON if database fails
-const writeUsersToFile = (users) => {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error('Error writing users file:', error);
-    return false;
-  }
-};
-
 // Get all users
 router.get('/', async (req, res) => {
   try {
@@ -49,10 +17,7 @@ router.get('/', async (req, res) => {
     res.json(users);
   } catch (error) {
     console.error('Failed to get users from database:', error);
-    
-    // Fallback to file
-    const users = getUsersFromFile();
-    res.json(users);
+    res.status(500).json({ error: 'Database error: Failed to retrieve users' });
   }
 });
 
@@ -64,11 +29,7 @@ router.get('/support', async (req, res) => {
     res.json(supportUsers);
   } catch (error) {
     console.error('Failed to get support users from database:', error);
-    
-    // Fallback to file
-    const users = getUsersFromFile();
-    const supportUsers = users.filter(user => user.role === 'support');
-    res.json(supportUsers);
+    res.status(500).json({ error: 'Database error: Failed to retrieve support users' });
   }
 });
 
@@ -93,41 +54,20 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ error: 'Username already exists' });
     }
     
+    console.log('Creating new user in database:', { id: user.id, username: user.username, role: user.role });
+    
     // Insert user into database
     const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
     await executeQuery(query, [user.id, user.username, user.password, user.role]);
+    
+    console.log('User successfully created in database');
     
     // Return the created user without password
     const { password, ...userWithoutPassword } = user;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
     console.error('Failed to create user in database:', error);
-    
-    // Fallback to file
-    try {
-      let users = getUsersFromFile();
-      
-      // Check if username already exists
-      if (users.some(u => u.username === req.body.username)) {
-        return res.status(409).json({ error: 'Username already exists' });
-      }
-      
-      const user = {
-        id: req.body.id || Math.random().toString(36).substring(2, 15),
-        username: req.body.username,
-        password: req.body.password,
-        role: req.body.role || 'support'
-      };
-      
-      users.push(user);
-      writeUsersToFile(users);
-      
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
-    } catch (fallbackError) {
-      console.error('File fallback also failed:', fallbackError);
-      res.status(500).json({ error: 'Failed to create user' });
-    }
+    res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
 
@@ -158,38 +98,7 @@ router.put('/:id', async (req, res) => {
     res.json({ id, username, role });
   } catch (error) {
     console.error('Failed to update user in database:', error);
-    
-    // Fallback to file
-    try {
-      let users = getUsersFromFile();
-      const index = users.findIndex(u => u.id === req.params.id);
-      
-      if (index === -1) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // Check if new username conflicts
-      if (req.body.username) {
-        const usernameExists = users.some(u => u.username === req.body.username && u.id !== req.params.id);
-        if (usernameExists) {
-          return res.status(409).json({ error: 'Username already exists' });
-        }
-      }
-      
-      users[index] = { 
-        ...users[index],
-        username: req.body.username || users[index].username,
-        role: req.body.role || users[index].role
-      };
-      
-      writeUsersToFile(users);
-      
-      const { password, ...userWithoutPassword } = users[index];
-      res.json(userWithoutPassword);
-    } catch (fallbackError) {
-      console.error('File fallback also failed:', fallbackError);
-      res.status(500).json({ error: 'Failed to update user' });
-    }
+    res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
 
@@ -216,29 +125,7 @@ router.delete('/:id', async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error('Failed to delete user from database:', error);
-    
-    // Fallback to file
-    try {
-      let users = getUsersFromFile();
-      const index = users.findIndex(u => u.id === req.params.id);
-      
-      if (index === -1) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // Don't allow deleting the admin account
-      if (users[index].role === 'admin' && users[index].id === '1') {
-        return res.status(403).json({ error: 'Cannot delete the admin account' });
-      }
-      
-      users.splice(index, 1);
-      writeUsersToFile(users);
-      
-      res.status(204).send();
-    } catch (fallbackError) {
-      console.error('File fallback also failed:', fallbackError);
-      res.status(500).json({ error: 'Failed to delete user' });
-    }
+    res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
 
@@ -264,24 +151,7 @@ router.post('/:id/reset-password', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to reset password in database:', error);
-    
-    // Fallback to file
-    try {
-      let users = getUsersFromFile();
-      const index = users.findIndex(u => u.id === req.params.id);
-      
-      if (index === -1) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      users[index].password = req.body.password;
-      writeUsersToFile(users);
-      
-      res.json({ success: true });
-    } catch (fallbackError) {
-      console.error('File fallback also failed:', fallbackError);
-      res.status(500).json({ error: 'Failed to reset password' });
-    }
+    res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
 

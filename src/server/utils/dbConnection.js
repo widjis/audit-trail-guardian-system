@@ -58,8 +58,15 @@ export const initDbConnection = async () => {
         }
       };
       
+      // Log the connection configuration (excluding password)
+      const logConfig = {
+        ...config,
+        password: '********' // Hide actual password
+      };
+      console.log('Attempting MSSQL connection with config:', JSON.stringify(logConfig));
+      
       dbPool = await new mssql.default.ConnectionPool(config).connect();
-      console.log('MSSQL connection pool initialized');
+      console.log('MSSQL connection pool successfully initialized');
     }
     
     return true;
@@ -73,6 +80,10 @@ export const initDbConnection = async () => {
  * Get the database connection pool
  */
 export const getDbPool = () => {
+  if (!dbPool) {
+    console.warn('Database pool not initialized yet, attempting to initialize');
+    initDbConnection();
+  }
   return dbPool;
 };
 
@@ -84,6 +95,7 @@ export const getDbPool = () => {
  */
 export const executeQuery = async (query, params = []) => {
   if (!dbPool) {
+    console.log('Database pool not initialized, attempting to connect...');
     const connected = await initDbConnection();
     if (!connected) {
       throw new Error('Database connection not available');
@@ -91,8 +103,12 @@ export const executeQuery = async (query, params = []) => {
   }
   
   try {
+    console.log(`Executing query: ${query}`);
+    console.log(`With params:`, params);
+    
     if (dbType === 'postgres') {
       const result = await dbPool.query(query, params);
+      console.log(`Query executed successfully, returned ${result.rows.length} rows`);
       return result.rows;
     } else if (dbType === 'mssql') {
       const request = dbPool.request();
@@ -112,6 +128,7 @@ export const executeQuery = async (query, params = []) => {
       }
       
       const result = await request.query(query);
+      console.log(`Query executed successfully, returned ${result.recordset ? result.recordset.length : 0} rows`);
       return result.recordset;
     }
   } catch (error) {

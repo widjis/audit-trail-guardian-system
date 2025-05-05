@@ -22,5 +22,17 @@ BEGIN
 END
 ELSE
 BEGIN
+    -- Check if admin user exists, if not create it
+    IF NOT EXISTS (SELECT * FROM users WHERE id = '1' AND role = 'admin')
+    BEGIN
+        INSERT INTO users (id, username, password, role)
+        VALUES ('1', 'admin', 'password123', 'admin');
+        PRINT 'Admin user created successfully';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Admin user already exists';
+    END
+    
     PRINT 'Users table already exists';
 END
