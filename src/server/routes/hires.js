@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -457,10 +456,11 @@ router.post('/import', upload.single('file'), async (req, res) => {
     const rows = [];
     let headerProcessed = false;
     
-    // Create a readable stream from the buffer
-    const stream = require('stream');
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileBuffer);
+    // Create a readable stream from the buffer using the native Node.js stream module
+    import { Readable } from 'stream';
+    const bufferStream = new Readable();
+    bufferStream.push(fileBuffer);
+    bufferStream.push(null); // Signal the end of the stream
     
     // Process data through the stream
     await new Promise((resolve, reject) => {
