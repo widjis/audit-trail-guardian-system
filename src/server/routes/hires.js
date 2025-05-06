@@ -6,6 +6,7 @@ import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
 import multer from 'multer';
 import csv from 'csv-parser';
+import { Readable } from 'stream';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -457,7 +458,6 @@ router.post('/import', upload.single('file'), async (req, res) => {
     let headerProcessed = false;
     
     // Create a readable stream from the buffer using the native Node.js stream module
-    import { Readable } from 'stream';
     const bufferStream = new Readable();
     bufferStream.push(fileBuffer);
     bufferStream.push(null); // Signal the end of the stream
