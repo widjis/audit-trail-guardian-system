@@ -1,4 +1,5 @@
 
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -129,14 +130,11 @@ router.put('/departments', async (req, res) => {
     }
 
     try {
-      // Start a transaction to update departments
-      await executeQuery('BEGIN TRANSACTION');
-      
       // Get existing departments from database to determine what to insert/update/delete
       const existingDepartments = await executeQuery('SELECT id FROM departments');
       const existingIds = existingDepartments.map(dept => dept.id);
       
-      // Process each department
+      // Process each department without using transactions
       for (const dept of departments) {
         if (existingIds.includes(dept.id)) {
           // Update existing department
@@ -166,7 +164,6 @@ router.put('/departments', async (req, res) => {
             if (deptName.length > 0) {
               const hires = await executeQuery('SELECT COUNT(*) as count FROM hires WHERE department = ?', [deptName[0].name]);
               if (hires.length > 0 && hires[0].count > 0) {
-                await executeQuery('ROLLBACK');
                 return res.status(400).json({ 
                   error: `Cannot delete department that is used by ${hires[0].count} employee(s)` 
                 });
@@ -181,11 +178,8 @@ router.put('/departments', async (req, res) => {
         }
       }
       
-      await executeQuery('COMMIT');
-      
       res.json({ success: true, message: 'Departments updated successfully' });
     } catch (dbError) {
-      await executeQuery('ROLLBACK');
       console.error('Database error updating departments:', dbError);
       
       // Fallback to file storage if database fails
