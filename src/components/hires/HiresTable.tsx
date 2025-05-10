@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import { Edit, Trash2, Search } from "lucide-react";
+import { Edit, Trash2, Search, ListPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { BulkUpdateDialog } from "./BulkUpdateDialog";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -16,7 +18,9 @@ export function HiresTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedHires, setSelectedHires] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showBulkUpdateDialog, setShowBulkUpdateDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -109,6 +113,29 @@ export function HiresTable() {
       setShowDeleteDialog(false);
     }
   };
+  
+  const handleBulkUpdate = async (updateData: Partial<NewHire>) => {
+    if (selectedHires.length === 0) return;
+    
+    setIsBulkUpdating(true);
+    try {
+      await hiresApi.bulkUpdate(selectedHires, updateData);
+      toast({
+        title: "Success",
+        description: `${selectedHires.length} records updated successfully`,
+      });
+      fetchHires();
+    } catch (error) {
+      console.error("Error bulk updating hires:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update selected records",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
 
   const filteredHires = hires.filter((hire) => {
     const searchLower = searchQuery.toLowerCase();
@@ -134,13 +161,24 @@ export function HiresTable() {
         </div>
         <div className="flex space-x-2">
           {selectedHires.length > 0 && (
-            <Button 
-              variant="destructive" 
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={isBulkDeleting}
-            >
-              Delete Selected ({selectedHires.length})
-            </Button>
+            <>
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowBulkUpdateDialog(true)}
+                disabled={isBulkUpdating}
+              >
+                <ListPlus className="h-4 w-4 mr-1" />
+                Bulk Update ({selectedHires.length})
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isBulkDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Selected ({selectedHires.length})
+              </Button>
+            </>
           )}
           <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
         </div>
@@ -237,6 +275,13 @@ export function HiresTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <BulkUpdateDialog 
+        isOpen={showBulkUpdateDialog}
+        onClose={() => setShowBulkUpdateDialog(false)}
+        onUpdate={handleBulkUpdate}
+        selectedCount={selectedHires.length}
+      />
     </div>
   );
 }

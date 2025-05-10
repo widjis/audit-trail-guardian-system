@@ -249,6 +249,7 @@ export const hiresApi = {
       throw error;
     }
   },
+  
   bulkDelete: async (ids: string[]): Promise<void> => {
     console.log('[hiresApi] Bulk deleting hires with IDs:', ids);
     try {
@@ -260,6 +261,16 @@ export const hiresApi = {
     }
   },
   
+  bulkUpdate: async (ids: string[], updateData: Partial<NewHire>): Promise<void> => {
+    console.log('[hiresApi] Bulk updating hires with IDs:', ids, 'Data:', updateData);
+    try {
+      await apiClient.post('/hires/bulk-update', { ids, updateData });
+      console.log('[hiresApi] Hires bulk updated successfully');
+    } catch (error) {
+      console.error('[hiresApi] Error bulk updating hires:', error);
+      throw error;
+    }
+  }
 };
 
 // Auth helper hook
