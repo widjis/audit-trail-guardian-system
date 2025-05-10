@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,17 +7,36 @@ import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Edit, Trash2, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedHires, setSelectedHires] = useState<string[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchHires();
   }, []);
+
+  // Reset selected hires when the search query changes
+  useEffect(() => {
+    setSelectedHires([]);
+  }, [searchQuery]);
 
   const fetchHires = async () => {
     try {
@@ -67,6 +85,45 @@ export function HiresTable() {
     );
   });
 
+  const handleSelectAll = () => {
+    if (selectedHires.length === filteredHires.length) {
+      setSelectedHires([]);
+    } else {
+      setSelectedHires(filteredHires.map(hire => hire.id));
+    }
+  };
+
+  const handleSelectHire = (id: string) => {
+    if (selectedHires.includes(id)) {
+      setSelectedHires(selectedHires.filter(hireId => hireId !== id));
+    } else {
+      setSelectedHires([...selectedHires, id]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await hiresApi.bulkDelete(selectedHires);
+      toast({
+        title: "Success",
+        description: `${selectedHires.length} records deleted successfully`,
+      });
+      setSelectedHires([]);
+      fetchHires();
+    } catch (error) {
+      console.error("Error deleting multiple hires:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete selected records",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -79,7 +136,18 @@ export function HiresTable() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
+        <div className="flex items-center gap-2">
+          {selectedHires.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={isDeleting}
+            >
+              Delete Selected ({selectedHires.length})
+            </Button>
+          )}
+          <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -93,6 +161,13 @@ export function HiresTable() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={selectedHires.length === filteredHires.length && filteredHires.length > 0}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Department</TableHead>
@@ -105,6 +180,13 @@ export function HiresTable() {
             <TableBody>
               {filteredHires.map((hire) => (
                 <TableRow key={hire.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedHires.includes(hire.id)}
+                      onCheckedChange={() => handleSelectHire(hire.id)}
+                      aria-label={`Select ${hire.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{hire.name}</TableCell>
                   <TableCell>{hire.title}</TableCell>
                   <TableCell>{hire.department}</TableCell>
@@ -141,6 +223,28 @@ export function HiresTable() {
           </Table>
         </div>
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to delete {selectedHires.length} record{selectedHires.length !== 1 ? 's' : ''}. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkDelete} 
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
