@@ -191,11 +191,25 @@ export function HireForm() {
       }
       navigate("/hires");
     } catch (error) {
-      // ... existing error handling code ...
+      logger.ui.error("HireForm", "Error saving hire:", error);
+      if (error instanceof Error) {
+        logger.ui.error("HireForm", "Error details:", error.message);
+        
+        if (error.stack) {
+          logger.ui.error("HireForm", "Error stack:", error.stack);
+        }
+      }
+      
+      toast({
+        title: "Error",
+        description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
+  
   
 
   if (isFetching) {
@@ -452,12 +466,15 @@ export function HireForm() {
               <Input
                 id="ict_support_pic"
                 name="ict_support_pic"
-                value={hire.ict_support_pic || "Not yet edited"}
-                readOnly
-                disabled
-                className="bg-gray-100"
+                value={hire.ict_support_pic || ""} // Use empty string as fallback to avoid null warnings
+                disabled // Makes the field read-only
+                className="bg-gray-100" // Gray background to indicate read-only
               />
+              <p className="text-xs text-gray-500 mt-1">
+                This field shows the last person who edited this record
+              </p>
             </div>
+
 
             <div className="space-y-2">
               <label htmlFor="remarks" className="text-sm font-medium">

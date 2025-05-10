@@ -177,14 +177,12 @@ router.post('/', async (req, res) => {
     const values = [id, now, now];
     
     // Add all properties from hireData
-    for (const [key, value] of Object.entries(hireData)) {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs') {
-        columns.push(key);
-        placeholders.push('?');
+    for (const [key, value] of Object.entries(updateData)) {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs' && key !== 'ict_support_pic') {
+        setClause.push(`${key} = ?`);
         
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
-          logger.api.debug(`Converting boolean field ${key}: ${value} to ${value ? 1 : 0}`);
           values.push(value ? 1 : 0);
         } else {
           values.push(value);
