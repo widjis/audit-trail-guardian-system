@@ -177,9 +177,10 @@ router.post('/', async (req, res) => {
     const values = [id, now, now];
     
     // Add all properties from hireData
-    for (const [key, value] of Object.entries(updateData)) {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs' && key !== 'ict_support_pic') {
-        setClause.push(`${key} = ?`);
+    for (const [key, value] of Object.entries(hireData)) {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs') {
+        columns.push(key);
+        placeholders.push('?');
         
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
@@ -254,11 +255,6 @@ router.post('/', async (req, res) => {
 });
 
 // Update a hire
-// src/server/routes/hires.js - Update route
-// In src/server/routes/hires.js
-// Find the update route (PUT '/:id') and modify the part where it sets ict_support_pic:
-
-// Update a hire
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
@@ -279,9 +275,9 @@ router.put('/:id', async (req, res) => {
     const setClause = ['updated_at = ?'];
     const values = [now];
     
-    // Add all properties from updateData except ict_support_pic
+    // Add all properties from updateData
     for (const [key, value] of Object.entries(updateData)) {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs' && key !== 'ict_support_pic') {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs') {
         setClause.push(`${key} = ?`);
         
         // Handle boolean values for SQL Server
@@ -291,15 +287,6 @@ router.put('/:id', async (req, res) => {
           values.push(value);
         }
       }
-    }
-    
-    // ALWAYS set the ict_support_pic to the current user's username
-    if (req.user && req.user.username) {
-      setClause.push('ict_support_pic = ?');
-      values.push(req.user.username);
-      logger.api.info(`Setting ict_support_pic to current user: ${req.user.username}`);
-    } else {
-      logger.api.warn('No authenticated user found when updating hire');
     }
     
     // Add ID to values array for the WHERE clause
@@ -337,8 +324,6 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update hire', message: error.message });
   }
 });
-
-
 
 // Delete a hire
 router.delete('/:id', async (req, res) => {
@@ -405,7 +390,100 @@ router.post('/bulk-delete', async (req, res) => {
   }
 });
 
-
+// Bulk update hires
+router.post('/bulk-update', async (req, res) => {
+  const { ids, updateData } = req.body;
+  
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Invalid or empty IDs array' });
+  }
+  
+  if (!updateData || Object.keys(updateData).length === 0) {
+    return res.status(400).json({ error: 'No update data provided' });
+  }
+  
+  try {
+    logger.api.info(`Bulk updating ${ids.length} hires with data:`, updateData);
+    
+    const now = new Date().toISOString();
+    
+    // Build SET clause and values for SQL update
+    const setClause = ['updated_at = ?'];
+    const values = [now];
+    
+    // Process update data for SQL query
+    for (const [key, value] of Object.entries(updateData)) {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs') {
+        setClause.push(`${key} = ?`);
+        
+        // Handle boolean values for SQL Server
+        if (typeof value === 'boolean') {
+          values.push(value ? 1 : 0);
+        } else {
+          values.push(value);
+        }
+      }
+    }
+    
+    // Use parameterized queries to prevent SQL injection
+    const placeholders = ids.map(() => '?').join(',');
+    
+    // Complete values array with IDs for WHERE clause
+    const allValues = [...values, ...ids];
+    
+    // Construct and execute SQL query
+    const query = `
+      UPDATE hires
+      SET ${setClause.join(', ')}
+      WHERE id IN (${placeholders})
+    `;
+    
+    logger.api.debug("Executing bulk update query:", query);
+    logger.api.debug("Update query values:", allValues);
+    
+    await executeQuery(query, allValues);
+    
+    // Create audit logs for each updated hire
+    for (const id of ids) {
+      const logId = generateId();
+      const log = {
+        id: logId,
+        new_hire_id: id,
+        action_type: "BULK_UPDATE",
+        status: "SUCCESS",
+        message: "Record updated in bulk operation",
+        details: JSON.stringify(updateData),
+        performed_by: req.user ? req.user.username : "system",
+        timestamp: now
+      };
+      
+      // Insert audit log
+      await executeQuery(`
+        INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, details, performed_by, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        log.id, 
+        log.new_hire_id, 
+        log.action_type, 
+        log.status, 
+        log.message, 
+        log.details, 
+        log.performed_by, 
+        log.timestamp
+      ]);
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: `Successfully updated ${ids.length} records`,
+      updatedCount: ids.length
+    });
+    
+  } catch (error) {
+    logger.api.error('Error bulk updating hires in database:', error);
+    res.status(500).json({ error: 'Failed to bulk update hires', message: error.message });
+  }
+});
 
 // Get audit logs for a hire
 router.get('/:id/logs', async (req, res) => {
