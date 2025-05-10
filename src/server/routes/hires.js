@@ -256,6 +256,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update a hire
+// src/server/routes/hires.js - Update route
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
@@ -290,6 +291,18 @@ router.put('/:id', async (req, res) => {
       }
     }
     
+    // Automatically set the ict_support_pic to the current user's username
+    if (req.user && req.user.username) {
+      // Only add this if it's not already in the update data
+      if (!updateData.hasOwnProperty('ict_support_pic')) {
+        setClause.push('ict_support_pic = ?');
+        values.push(req.user.username);
+        logger.api.info(`Setting ict_support_pic to current user: ${req.user.username}`);
+      }
+    } else {
+      logger.api.warn('No authenticated user found when updating hire');
+    }
+    
     // Add ID to values array for the WHERE clause
     values.push(id);
     
@@ -318,10 +331,11 @@ router.put('/:id', async (req, res) => {
     
     res.json(updatedHire);
   } catch (error) {
-    console.error('Error updating hire in database:', error);
+    logger.api.error('Error updating hire in database:', error);
     res.status(500).json({ error: 'Failed to update hire', message: error.message });
   }
 });
+
 
 // Delete a hire
 router.delete('/:id', async (req, res) => {

@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDbConnection } from './utils/dbConnection.js';
 import { initializeSchema } from './utils/schemaInit.js';
+import { extractUser } from './middleware/authMiddleware.js';
 
 // Get current directory path using ES module approach
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(extractUser);
 
 // Data storage paths
 const DATA_DIR = path.join(__dirname, 'data');

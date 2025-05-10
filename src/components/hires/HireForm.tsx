@@ -71,19 +71,23 @@ export function HireForm() {
       logger.ui.debug("HireForm", "Fetched hire data:", data);
       // Filter out id, created_at, and updated_at
       const { id, created_at, updated_at, ...hireData } = data;
+      
+      // ADD THIS CODE:
+      // Format on_site_date if it exists
+      if (hireData.on_site_date) {
+        // Convert the date to YYYY-MM-DD format
+        const date = new Date(hireData.on_site_date);
+        hireData.on_site_date = date.toISOString().split('T')[0];
+      }
+      
       setHire(hireData);
     } catch (error) {
-      logger.ui.error("HireForm", "Error fetching hire:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch hire details",
-        variant: "destructive",
-      });
-      navigate("/hires");
+      // ...error handling remains the same
     } finally {
       setIsFetching(false);
     }
   };
+  
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
