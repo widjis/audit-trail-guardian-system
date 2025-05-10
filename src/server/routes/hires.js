@@ -257,6 +257,10 @@ router.post('/', async (req, res) => {
 
 // Update a hire
 // src/server/routes/hires.js - Update route
+// In src/server/routes/hires.js
+// Find the update route (PUT '/:id') and modify the part where it sets ict_support_pic:
+
+// Update a hire
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
@@ -277,9 +281,9 @@ router.put('/:id', async (req, res) => {
     const setClause = ['updated_at = ?'];
     const values = [now];
     
-    // Add all properties from updateData
+    // Add all properties from updateData except ict_support_pic
     for (const [key, value] of Object.entries(updateData)) {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs') {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'audit_logs' && key !== 'ict_support_pic') {
         setClause.push(`${key} = ?`);
         
         // Handle boolean values for SQL Server
@@ -291,14 +295,11 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    // Automatically set the ict_support_pic to the current user's username
+    // ALWAYS set the ict_support_pic to the current user's username
     if (req.user && req.user.username) {
-      // Only add this if it's not already in the update data
-      if (!updateData.hasOwnProperty('ict_support_pic')) {
-        setClause.push('ict_support_pic = ?');
-        values.push(req.user.username);
-        logger.api.info(`Setting ict_support_pic to current user: ${req.user.username}`);
-      }
+      setClause.push('ict_support_pic = ?');
+      values.push(req.user.username);
+      logger.api.info(`Setting ict_support_pic to current user: ${req.user.username}`);
     } else {
       logger.api.warn('No authenticated user found when updating hire');
     }
@@ -312,6 +313,9 @@ router.put('/:id', async (req, res) => {
       SET ${setClause.join(', ')}
       WHERE id = ?
     `;
+    
+    logger.api.debug("Executing update query:", query);
+    logger.api.debug("Update query values:", values);
     
     await executeQuery(query, values);
     
@@ -335,6 +339,7 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update hire', message: error.message });
   }
 });
+
 
 
 // Delete a hire

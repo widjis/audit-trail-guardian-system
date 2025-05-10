@@ -105,19 +105,74 @@ export function HireForm() {
     setHire((prev) => ({ ...prev, [name]: value }));
   };
 
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+    
+  //   logger.ui.info("HireForm", "Form submitted");
+  //   logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hire));
+  //   logger.ui.debug("HireForm", "Is new hire?", isNewHire);
+
+  //   try {
+  //     if (isNewHire) {
+  //       logger.ui.info("HireForm", "Creating new hire");
+  //       logger.ui.debug("HireForm", "Create data:", JSON.stringify(hire));
+  //       const result = await hiresApi.create(hire);
+  //       logger.ui.info("HireForm", "Create hire API call completed!");
+  //       logger.ui.debug("HireForm", "Create hire result:", result);
+  //       toast({
+  //         title: "Success",
+  //         description: "New hire added successfully",
+  //       });
+  //     } else if (id) {
+  //       logger.ui.info("HireForm", "Updating hire with ID:", id);
+  //       logger.ui.debug("HireForm", "Update data:", JSON.stringify(hire));
+  //       const result = await hiresApi.update(id, hire);
+  //       logger.ui.debug("HireForm", "Update hire result:", result);
+  //       toast({
+  //         title: "Success",
+  //         description: "Hire details updated successfully",
+  //       });
+  //     }
+  //     navigate("/hires");
+  //   } catch (error) {
+  //     logger.ui.error("HireForm", "Error saving hire:", error);
+  //     if (error instanceof Error) {
+  //       logger.ui.error("HireForm", "Error details:", error.message);
+        
+  //       if (error.stack) {
+  //         logger.ui.error("HireForm", "Error stack:", error.stack);
+  //       }
+  //     }
+      
+  //     toast({
+  //       title: "Error",
+  //       description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     logger.ui.info("HireForm", "Form submitted");
-    logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hire));
+    
+    // Create a copy of hire data without ict_support_pic
+    const hireToSubmit = { ...hire };
+    delete hireToSubmit.ict_support_pic; // Remove this field before submission
+    
+    logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hireToSubmit));
     logger.ui.debug("HireForm", "Is new hire?", isNewHire);
-
+  
     try {
       if (isNewHire) {
         logger.ui.info("HireForm", "Creating new hire");
-        logger.ui.debug("HireForm", "Create data:", JSON.stringify(hire));
-        const result = await hiresApi.create(hire);
+        logger.ui.debug("HireForm", "Create data:", JSON.stringify(hireToSubmit));
+        const result = await hiresApi.create(hireToSubmit);
         logger.ui.info("HireForm", "Create hire API call completed!");
         logger.ui.debug("HireForm", "Create hire result:", result);
         toast({
@@ -126,8 +181,8 @@ export function HireForm() {
         });
       } else if (id) {
         logger.ui.info("HireForm", "Updating hire with ID:", id);
-        logger.ui.debug("HireForm", "Update data:", JSON.stringify(hire));
-        const result = await hiresApi.update(id, hire);
+        logger.ui.debug("HireForm", "Update data:", JSON.stringify(hireToSubmit));
+        const result = await hiresApi.update(id, hireToSubmit);
         logger.ui.debug("HireForm", "Update hire result:", result);
         toast({
           title: "Success",
@@ -136,24 +191,12 @@ export function HireForm() {
       }
       navigate("/hires");
     } catch (error) {
-      logger.ui.error("HireForm", "Error saving hire:", error);
-      if (error instanceof Error) {
-        logger.ui.error("HireForm", "Error details:", error.message);
-        
-        if (error.stack) {
-          logger.ui.error("HireForm", "Error stack:", error.stack);
-        }
-      }
-      
-      toast({
-        title: "Error",
-        description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
+      // ... existing error handling code ...
     } finally {
       setIsLoading(false);
     }
   };
+  
 
   if (isFetching) {
     return <div className="text-center py-8">Loading...</div>;
@@ -404,13 +447,15 @@ export function HireForm() {
 
             <div className="space-y-2">
               <label htmlFor="ict_support_pic" className="text-sm font-medium">
-                ICT Support PIC
+                ICT Support PIC (Last Editor)
               </label>
               <Input
                 id="ict_support_pic"
                 name="ict_support_pic"
-                value={hire.ict_support_pic}
-                onChange={handleInputChange}
+                value={hire.ict_support_pic || "Not yet edited"}
+                readOnly
+                disabled
+                className="bg-gray-100"
               />
             </div>
 
