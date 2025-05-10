@@ -1,24 +1,33 @@
-
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Edit, Trash2, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedHires, setSelectedHires] = useState<string[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchHires();
   }, []);
+  
+  useEffect(() => {
+    // Clear selections when filters change
+    setSelectedHires([]);
+  }, [searchQuery]);
 
   const fetchHires = async () => {
     try {
@@ -46,6 +55,7 @@ export function HiresTable() {
           description: "Record deleted successfully",
         });
         fetchHires();
+        setSelectedHires(prev => prev.filter(hireId => hireId !== id));
       } catch (error) {
         console.error("Error deleting hire:", error);
         toast({
@@ -54,6 +64,49 @@ export function HiresTable() {
           variant: "destructive",
         });
       }
+    }
+  };
+  
+  const isSelected = (id: string) => selectedHires.includes(id);
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedHires((prev) => [...prev, id]);
+    } else {
+      setSelectedHires((prev) => prev.filter((item) => item !== id));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedHires(filteredHires.map((hire) => hire.id));
+    } else {
+      setSelectedHires([]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedHires.length === 0) return;
+    
+    setIsBulkDeleting(true);
+    try {
+      await hiresApi.bulkDelete(selectedHires);
+      toast({
+        title: "Success",
+        description: `${selectedHires.length} records deleted successfully`,
+      });
+      setSelectedHires([]);
+      fetchHires();
+    } catch (error) {
+      console.error("Error bulk deleting hires:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete selected records",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -79,7 +132,18 @@ export function HiresTable() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
+        <div className="flex space-x-2">
+          {selectedHires.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={isBulkDeleting}
+            >
+              Delete Selected ({selectedHires.length})
+            </Button>
+          )}
+          <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -93,6 +157,13 @@ export function HiresTable() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox 
+                    checked={filteredHires.length > 0 && selectedHires.length === filteredHires.length} 
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Department</TableHead>
@@ -105,6 +176,13 @@ export function HiresTable() {
             <TableBody>
               {filteredHires.map((hire) => (
                 <TableRow key={hire.id}>
+                  <TableCell>
+                    <Checkbox 
+                      checked={isSelected(hire.id)}
+                      onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
+                      aria-label={`Select ${hire.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{hire.name}</TableCell>
                   <TableCell>{hire.title}</TableCell>
                   <TableCell>{hire.department}</TableCell>
@@ -141,6 +219,24 @@ export function HiresTable() {
           </Table>
         </div>
       )}
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete {selectedHires.length} selected records
+              and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isBulkDeleting}>
+              {isBulkDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

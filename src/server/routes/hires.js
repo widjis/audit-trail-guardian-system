@@ -371,6 +371,42 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Bulk delete hires
+router.post('/bulk-delete', async (req, res) => {
+  const { ids } = req.body;
+  
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Invalid or empty IDs array' });
+  }
+  
+  try {
+    logger.api.info(`Bulk deleting ${ids.length} hires`);
+    
+    // Delete associated audit logs first (should be handled by CASCADE but let's be sure)
+    for (const id of ids) {
+      await executeQuery(`
+        DELETE FROM audit_logs WHERE new_hire_id = ?
+      `, [id]);
+    }
+    
+    // Delete the hires
+    // Use parameterized queries to prevent SQL injection
+    const placeholders = ids.map(() => '?').join(',');
+    
+    // Delete the hires
+    await executeQuery(`
+      DELETE FROM hires WHERE id IN (${placeholders})
+    `, ids);
+    
+    res.status(204).end();
+  } catch (error) {
+    logger.api.error('Error bulk deleting hires from database:', error);
+    res.status(500).json({ error: 'Failed to bulk delete hires', message: error.message });
+  }
+});
+
+
+
 // Get audit logs for a hire
 router.get('/:id/logs', async (req, res) => {
   const { id } = req.params;

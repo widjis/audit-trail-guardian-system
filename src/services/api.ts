@@ -249,6 +249,17 @@ export const hiresApi = {
       throw error;
     }
   },
+  bulkDelete: async (ids: string[]): Promise<void> => {
+    console.log('[hiresApi] Bulk deleting hires with IDs:', ids);
+    try {
+      await apiClient.post('/hires/bulk-delete', { ids });
+      console.log('[hiresApi] Hires bulk deleted successfully');
+    } catch (error) {
+      console.error('[hiresApi] Error bulk deleting hires:', error);
+      throw error;
+    }
+  },
+  
 };
 
 // Auth helper hook
