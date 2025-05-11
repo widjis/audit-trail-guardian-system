@@ -187,11 +187,11 @@ export function DashboardOverview() {
                   <div className="flex items-center justify-between text-sm">
                     <span>M365 Licenses</span>
                     <span className="font-medium">
-                      {hires.filter(h => h.microsoft_365_license).length}/{totalHires}
+                      {hires.filter(h => h.microsoft_365_license && h.microsoft_365_license !== "None").length}/{totalHires}
                     </span>
                   </div>
                   <Progress 
-                    value={totalHires > 0 ? (hires.filter(h => h.microsoft_365_license).length / totalHires) * 100 : 0} 
+                    value={totalHires > 0 ? (hires.filter(h => h.microsoft_365_license && h.microsoft_365_license !== "None").length / totalHires) * 100 : 0} 
                     className="h-1"
                   />
                 </div>

@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
+import { licenseService } from "@/services/license-service";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
@@ -27,6 +28,12 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
   const { data: settings } = useQuery({
     queryKey: ['settings'],
     queryFn: settingsService.getSettings
+  });
+  
+  // For Microsoft 365 license options
+  const { data: licenseTypes } = useQuery({
+    queryKey: ['licenseTypes'],
+    queryFn: licenseService.getLicenseTypes
   });
   
   const accountStatuses = settings?.accountStatuses || ['Pending', 'In Progress', 'Done'];
@@ -55,7 +62,7 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
           updateData = { status_srf: updateFields.value === "true" };
           break;
         case "microsoft_365_license":
-          updateData = { microsoft_365_license: updateFields.value === "true" };
+          updateData = { microsoft_365_license: updateFields.value };
           break;
       }
       
@@ -109,9 +116,28 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
           </Select>
         );
       
+      case "microsoft_365_license":
+        return (
+          <Select 
+            value={updateFields.value} 
+            onValueChange={(value) => setUpdateFields({ ...updateFields, value })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select license type" />
+            </SelectTrigger>
+            <SelectContent>
+              {(licenseTypes || []).map((licenseType) => (
+                <SelectItem key={licenseType.id} value={licenseType.name}>
+                  {licenseType.name}
+                </SelectItem>
+              ))}
+              <SelectItem value="None">None</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+      
       case "license_assigned":
       case "status_srf":
-      case "microsoft_365_license":
         return (
           <div className="flex items-center space-x-2">
             <Switch 

@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { HireForm } from "@/components/hires/HireForm";
 import { AuditLogsList } from "@/components/hires/AuditLogsList";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export default function HireDetail() {
