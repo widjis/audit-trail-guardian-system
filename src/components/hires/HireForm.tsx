@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,12 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { hiresApi } from "@/services/api";
-import { NewHire, MS365LicenseType } from "@/types/types";
+import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
-import { licenseService } from "@/services/license-service";
 import logger from "@/utils/logger";
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
@@ -30,7 +30,7 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   username: "",
   password: "",
   on_site_date: new Date().toISOString().split("T")[0],
-  microsoft_365_license: "None", // Changed from false to "None"
+  microsoft_365_license: false,
   laptop_ready: "Pending",
   note: "",
   ict_support_pic: "",
@@ -51,12 +51,6 @@ export function HireForm() {
   const { data: settingsData } = useQuery({
     queryKey: ['settings'],
     queryFn: settingsService.getSettings,
-  });
-
-  // Fetch license types
-  const { data: licenseTypes } = useQuery({
-    queryKey: ['licenseTypes'],
-    queryFn: licenseService.getLicenseTypes,
   });
 
   useEffect(() => {
@@ -110,6 +104,56 @@ export function HireForm() {
     logger.ui.debug("HireForm", `Select changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
+
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+    
+  //   logger.ui.info("HireForm", "Form submitted");
+  //   logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hire));
+  //   logger.ui.debug("HireForm", "Is new hire?", isNewHire);
+
+  //   try {
+  //     if (isNewHire) {
+  //       logger.ui.info("HireForm", "Creating new hire");
+  //       logger.ui.debug("HireForm", "Create data:", JSON.stringify(hire));
+  //       const result = await hiresApi.create(hire);
+  //       logger.ui.info("HireForm", "Create hire API call completed!");
+  //       logger.ui.debug("HireForm", "Create hire result:", result);
+  //       toast({
+  //         title: "Success",
+  //         description: "New hire added successfully",
+  //       });
+  //     } else if (id) {
+  //       logger.ui.info("HireForm", "Updating hire with ID:", id);
+  //       logger.ui.debug("HireForm", "Update data:", JSON.stringify(hire));
+  //       const result = await hiresApi.update(id, hire);
+  //       logger.ui.debug("HireForm", "Update hire result:", result);
+  //       toast({
+  //         title: "Success",
+  //         description: "Hire details updated successfully",
+  //       });
+  //     }
+  //     navigate("/hires");
+  //   } catch (error) {
+  //     logger.ui.error("HireForm", "Error saving hire:", error);
+  //     if (error instanceof Error) {
+  //       logger.ui.error("HireForm", "Error details:", error.message);
+        
+  //       if (error.stack) {
+  //         logger.ui.error("HireForm", "Error stack:", error.stack);
+  //       }
+  //     }
+      
+  //     toast({
+  //       title: "Error",
+  //       description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,10 +220,6 @@ export function HireForm() {
   const departments = settingsData?.departments || [];
   const accountStatuses = settingsData?.accountStatuses || ["Pending", "In Progress", "Done", "NO NEED"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
-  const ms365LicenseOptions = licenseTypes || [
-    { id: "1", name: "None", description: "No Microsoft 365 license" },
-    { id: "2", name: "Business Standard", description: "Standard license" }
-  ];
 
   return (
     <div className="space-y-6">
@@ -407,25 +447,15 @@ export function HireForm() {
                   SRF Status
                 </label>
               </div>
-              <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="microsoft_365_license"
+                  checked={hire.microsoft_365_license}
+                  onCheckedChange={(checked) => handleSwitchChange("microsoft_365_license", checked)}
+                />
                 <label htmlFor="microsoft_365_license" className="text-sm font-medium">
                   Microsoft 365 License
                 </label>
-                <Select
-                  value={hire.microsoft_365_license}
-                  onValueChange={(value) => handleSelectChange("microsoft_365_license", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select license type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ms365LicenseOptions.map(license => (
-                      <SelectItem key={license.id} value={license.name}>
-                        {license.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
