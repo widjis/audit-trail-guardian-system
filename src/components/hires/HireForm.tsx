@@ -14,6 +14,9 @@ import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
+import { licenseService } from "@/services/license-service";
+
+const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string; description: string }[]>([]);
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -35,6 +38,8 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   note: "",
   ict_support_pic: "",
 };
+
+
 
 export function HireForm() {
   const { id } = useParams<{ id: string }>();
