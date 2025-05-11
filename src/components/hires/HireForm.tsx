@@ -79,7 +79,6 @@ export function HireForm() {
       // Filter out id, created_at, and updated_at
       const { id, created_at, updated_at, ...hireData } = data;
       
-      // ADD THIS CODE:
       // Format on_site_date if it exists
       if (hireData.on_site_date) {
         // Convert the date to YYYY-MM-DD format
@@ -180,6 +179,9 @@ export function HireForm() {
   const departments = settingsData?.departments || [];
   const accountStatuses = settingsData?.accountStatuses || ["Pending", "In Progress", "Done", "NO NEED"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
+
+  // Check if any license type has the name "None" to avoid duplicate keys
+  const hasNoneLicenseType = (licenseTypes || []).some(lt => lt.name === "None");
 
   return (
     <div className="space-y-6">
@@ -424,12 +426,15 @@ export function HireForm() {
                         {licenseType.name}
                       </SelectItem>
                     ))}
-                    <SelectItem value="None">None</SelectItem>
+                    {/* Add "None" option only if it's not already in the license types */}
+                    {!hasNoneLicenseType && (
+                      <SelectItem key="none-option" value="None">
+                        None
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-
-
             </div>
 
             <div className="space-y-2">
