@@ -16,7 +16,6 @@ import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
 
-const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string; description: string }[]>([]);
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -33,13 +32,17 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   username: "",
   password: "",
   on_site_date: new Date().toISOString().split("T")[0],
-  microsoft_365_license: false,
+  microsoft_365_license: "None",
   laptop_ready: "Pending",
   note: "",
   ict_support_pic: "",
 };
 
-
+// Add this query to fetch license types
+const { data: licenseTypes } = useQuery({
+  queryKey: ['licenseTypes'],
+  queryFn: licenseService.getLicenseTypes,
+});
 
 export function HireForm() {
   const { id } = useParams<{ id: string }>();
@@ -452,16 +455,29 @@ export function HireForm() {
                   SRF Status
                 </label>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="microsoft_365_license"
-                  checked={hire.microsoft_365_license}
-                  onCheckedChange={(checked) => handleSwitchChange("microsoft_365_license", checked)}
-                />
+              <div className="space-y-2">
                 <label htmlFor="microsoft_365_license" className="text-sm font-medium">
                   Microsoft 365 License
                 </label>
+                <Select
+                  value={hire.microsoft_365_license}
+                  onValueChange={(value) => handleSelectChange("microsoft_365_license", value)}
+                >
+                  <SelectTrigger id="microsoft_365_license">
+                    <SelectValue placeholder="Select license type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(licenseTypes || []).map((licenseType) => (
+                      <SelectItem key={licenseType.id} value={licenseType.name}>
+                        {licenseType.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="None">None</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+
             </div>
 
             <div className="space-y-2">
