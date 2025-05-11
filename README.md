@@ -78,12 +78,13 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - DB_TYPE=postgres
+      - DB_TYPE=mssql
       - DB_HOST=db
-      - DB_PORT=5432
+      - DB_PORT=1433
       - DB_NAME=mti_onboarding
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=sa
+      - DB_PASSWORD=YourStrongPassword123!
+      - DB_ENCRYPT=false
       - JWT_SECRET=your_secret_key_here
       - PORT=3001
     depends_on:
@@ -91,29 +92,29 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:15
+    image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
-      - "5432:5432"
+      - "1433:1433"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mssql_data:/var/opt/mssql
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=mti_onboarding
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrongPassword123!
+      - MSSQL_PID=Express
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  mssql_data:
 ```
 
 4. Create or modify `.env` file for your production environment:
 ```
-DB_TYPE=postgres
+DB_TYPE=mssql
 DB_HOST=db
-DB_PORT=5432
+DB_PORT=1433
 DB_NAME=mti_onboarding
-DB_USER=postgres
-DB_PASSWORD=postgres
+DB_USER=sa
+DB_PASSWORD=YourStrongPassword123!
 DB_INSTANCE=
 DB_ENCRYPT=false
 
@@ -145,10 +146,12 @@ docker-compose up -d
    - Use environment variables for all sensitive information
    - Generate a strong JWT_SECRET for production
    - Use Docker secrets for sensitive data in a swarm environment
+   - For MSSQL, always use a strong SA password and consider using a non-SA account for the application
 
 2. **Database:**
    - For production, use a managed database service or properly configured database with regular backups
    - Consider using a database initialization script
+   - For MSSQL, configure proper memory limits based on your server capacity
 
 3. **SSL/TLS:**
    - For production, configure a reverse proxy (like Nginx) with SSL certificates
