@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -38,12 +37,6 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   ict_support_pic: "",
 };
 
-// Add this query to fetch license types
-const { data: licenseTypes } = useQuery({
-  queryKey: ['licenseTypes'],
-  queryFn: licenseService.getLicenseTypes,
-});
-
 export function HireForm() {
   const { id } = useParams<{ id: string }>();
   const isNewHire = id === "new";
@@ -59,6 +52,12 @@ export function HireForm() {
   const { data: settingsData } = useQuery({
     queryKey: ['settings'],
     queryFn: settingsService.getSettings,
+  });
+
+  // Move the license types query inside the component
+  const { data: licenseTypes } = useQuery({
+    queryKey: ['licenseTypes'],
+    queryFn: licenseService.getLicenseTypes,
   });
 
   useEffect(() => {
@@ -90,7 +89,12 @@ export function HireForm() {
       
       setHire(hireData);
     } catch (error) {
-      // ...error handling remains the same
+      console.error("Error fetching hire:", error);
+      toast({
+        title: "Error",
+        description: `Failed to fetch hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     } finally {
       setIsFetching(false);
     }
@@ -112,56 +116,6 @@ export function HireForm() {
     logger.ui.debug("HireForm", `Select changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
   };
-
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   setIsLoading(true);
-    
-  //   logger.ui.info("HireForm", "Form submitted");
-  //   logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hire));
-  //   logger.ui.debug("HireForm", "Is new hire?", isNewHire);
-
-  //   try {
-  //     if (isNewHire) {
-  //       logger.ui.info("HireForm", "Creating new hire");
-  //       logger.ui.debug("HireForm", "Create data:", JSON.stringify(hire));
-  //       const result = await hiresApi.create(hire);
-  //       logger.ui.info("HireForm", "Create hire API call completed!");
-  //       logger.ui.debug("HireForm", "Create hire result:", result);
-  //       toast({
-  //         title: "Success",
-  //         description: "New hire added successfully",
-  //       });
-  //     } else if (id) {
-  //       logger.ui.info("HireForm", "Updating hire with ID:", id);
-  //       logger.ui.debug("HireForm", "Update data:", JSON.stringify(hire));
-  //       const result = await hiresApi.update(id, hire);
-  //       logger.ui.debug("HireForm", "Update hire result:", result);
-  //       toast({
-  //         title: "Success",
-  //         description: "Hire details updated successfully",
-  //       });
-  //     }
-  //     navigate("/hires");
-  //   } catch (error) {
-  //     logger.ui.error("HireForm", "Error saving hire:", error);
-  //     if (error instanceof Error) {
-  //       logger.ui.error("HireForm", "Error details:", error.message);
-        
-  //       if (error.stack) {
-  //         logger.ui.error("HireForm", "Error stack:", error.stack);
-  //       }
-  //     }
-      
-  //     toast({
-  //       title: "Error",
-  //       description: `Failed to save hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
-  //       variant: "destructive",
-  //     });
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,8 +171,6 @@ export function HireForm() {
       setIsLoading(false);
     }
   };
-  
-  
 
   if (isFetching) {
     return <div className="text-center py-8">Loading...</div>;
