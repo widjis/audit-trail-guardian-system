@@ -120,6 +120,73 @@ router.put('/mailing-lists', (req, res) => {
   }
 });
 
+// Add this to src/server/routes/settings.js
+
+// Get license types
+router.get('/license-types', async (req, res) => {
+  try {
+    const licenseTypes = await executeQuery('SELECT id, name, description FROM ms365_license_types ORDER BY name');
+    res.json(licenseTypes);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get license types', message: err.message });
+  }
+});
+
+// Add license type
+router.post('/license-types', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    await executeQuery(
+      'INSERT INTO ms365_license_types (id, name, description) VALUES (?, ?, ?)',
+      [id, name, description || null]
+    );
+    res.status(201).json({ id, name, description });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add license type', message: err.message });
+  }
+});
+
+// Update license type
+router.put('/license-types/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    await executeQuery(
+      'UPDATE ms365_license_types SET name = ?, description = ? WHERE id = ?',
+      [name, description || null, id]
+    );
+    res.json({ id, name, description });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update license type', message: err.message });
+  }
+});
+
+// Delete license type
+router.delete('/license-types/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if this license type is being used by any hires
+    const hires = await executeQuery(
+      'SELECT COUNT(*) as count FROM hires WHERE microsoft_365_license = (SELECT name FROM ms365_license_types WHERE id = ?)',
+      [id]
+    );
+    
+    if (hires.length > 0 && hires[0].count > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete license type that is used by ${hires[0].count} hire(s)` 
+      });
+    }
+    
+    await executeQuery('DELETE FROM ms365_license_types WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete license type', message: err.message });
+  }
+});
+
+
 // Update departments - now using database
 router.put('/departments', async (req, res) => {
   try {

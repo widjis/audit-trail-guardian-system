@@ -15,7 +15,7 @@ export interface NewHire {
   username: string;
   password: string;
   on_site_date: string;
-  microsoft_365_license: boolean;
+  microsoft_365_license: string;
   laptop_ready: string;
   note: string;
   ict_support_pic: string;
