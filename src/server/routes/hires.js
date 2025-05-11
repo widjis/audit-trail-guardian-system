@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -303,6 +304,36 @@ router.put('/:id', async (req, res) => {
     logger.api.debug("Update query values:", values);
     
     await executeQuery(query, values);
+    
+    // Create an audit log entry for this update
+    const logId = generateId();
+    const auditLog = {
+      id: logId,
+      new_hire_id: id,
+      action_type: "UPDATE",
+      status: "SUCCESS",
+      message: "Record updated",
+      details: JSON.stringify(updateData),
+      performed_by: req.user ? req.user.username : "system",
+      timestamp: now
+    };
+    
+    // Insert audit log
+    await executeQuery(`
+      INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, details, performed_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      auditLog.id, 
+      auditLog.new_hire_id, 
+      auditLog.action_type, 
+      auditLog.status, 
+      auditLog.message, 
+      auditLog.details, 
+      auditLog.performed_by, 
+      auditLog.timestamp
+    ]);
+    
+    logger.api.info(`Created audit log ${logId} for hire update ${id}`);
     
     // Get the updated hire
     const updatedHires = await executeQuery(`
