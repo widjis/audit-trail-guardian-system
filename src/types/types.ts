@@ -1,27 +1,18 @@
-
 export interface NewHire {
   id: string;
   name: string;
+  email: string;
+  phone_number?: string;
   title: string;
   department: string;
-  email: string;
-  direct_report: string;
-  phone_number: string;
-  mailing_list: string;
-  remarks: string;
-  account_creation_status: string;
-  license_assigned: boolean;
-  status_srf: boolean;
-  username: string;
-  password: string;
-  on_site_date: string;
-  microsoft_365_license: string;
-  laptop_ready: string;
-  note: string;
-  ict_support_pic: string;
+  status: string;
+  mailing_list?: string[];
   created_at?: string;
   updated_at?: string;
   audit_logs?: AuditLog[];
+  notes?: string;
+  microsoft_365_license?: string;
+  [key: string]: any;
 }
 
 export interface AuditLog {

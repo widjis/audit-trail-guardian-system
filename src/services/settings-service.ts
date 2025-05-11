@@ -14,11 +14,18 @@ interface Department {
   code: string;
 }
 
+interface WhatsAppSettings {
+  apiUrl: string;
+  defaultMessage: string;
+  defaultRecipient: "userNumber" | "testNumber";
+}
+
 interface SettingsData {
   accountStatuses?: string[];
   mailingLists?: MailingList[];
   departments?: Department[];
   mailingListDisplayAsDropdown?: boolean;
+  whatsappSettings?: WhatsAppSettings;
 }
 
 // The API client already includes /api in its baseURL, so we don't need to include it again
@@ -54,6 +61,21 @@ export const settingsService = {
     const response = await apiClient.put<{ success: boolean }>(
       `${SETTINGS_ENDPOINT}/departments`, 
       { departments }
+    );
+    return response.data;
+  },
+
+  // Get WhatsApp settings
+  getWhatsAppSettings: async () => {
+    const response = await apiClient.get<WhatsAppSettings>(`${SETTINGS_ENDPOINT}/whatsapp`);
+    return response.data;
+  },
+
+  // Update WhatsApp settings
+  updateWhatsAppSettings: async (settings: WhatsAppSettings) => {
+    const response = await apiClient.put<WhatsAppSettings>(
+      `${SETTINGS_ENDPOINT}/whatsapp`,
+      settings
     );
     return response.data;
   }

@@ -1,60 +1,91 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { whatsappService } from "@/services/whatsapp-service";
-import { Loader2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Send, Info } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+
+// Types for WhatsApp settings
+interface WhatsAppSettings {
+  apiUrl: string;
+  defaultMessage: string;
+  defaultRecipient: "userNumber" | "testNumber";
+}
 
 export function WhatsAppSettings() {
-  const [apiUrl, setApiUrl] = useState("");
-  const [defaultMessage, setDefaultMessage] = useState("");
-  const [testPhoneNumber, setTestPhoneNumber] = useState("");
-  const [defaultRecipient, setDefaultRecipient] = useState("userNumber");
-  const [isLoading, setIsLoading] = useState(true);
+  // State for settings
+  const [settings, setSettings] = useState<WhatsAppSettings>({
+    apiUrl: "",
+    defaultMessage: "",
+    defaultRecipient: "userNumber" as "userNumber" | "testNumber",
+  });
+
+  // State for loading states and test number
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testNumber, setTestNumber] = useState("");
+  const [testNumberError, setTestNumberError] = useState("");
+
   const { toast } = useToast();
 
+  // Load settings on component mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const settings = await whatsappService.getSettings();
-        setApiUrl(settings.apiUrl || "");
-        setDefaultMessage(settings.defaultMessage || "");
-        setDefaultRecipient(settings.defaultRecipient || "userNumber");
+        const whatsappSettings = await whatsappService.getSettings();
+        setSettings({
+          apiUrl: whatsappSettings.apiUrl,
+          defaultMessage: whatsappSettings.defaultMessage,
+          defaultRecipient: (whatsappSettings.defaultRecipient as "userNumber" | "testNumber") || "userNumber",
+        });
       } catch (error) {
-        console.error("Error loading WhatsApp settings:", error);
+        console.error("Failed to load WhatsApp settings:", error);
         toast({
           title: "Error",
           description: "Failed to load WhatsApp settings",
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
       }
     };
 
     loadSettings();
   }, [toast]);
 
+  // Handle input changes
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setSettings((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle radio button change for default recipient
+  const handleRecipientChange = (value: "userNumber" | "testNumber") => {
+    setSettings((prev) => ({ ...prev, defaultRecipient: value }));
+  };
+
+  // Save settings
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await whatsappService.saveSettings({ 
-        apiUrl, 
-        defaultMessage,
-        defaultRecipient 
-      });
+      await whatsappService.saveSettings(settings);
       toast({
         title: "Success",
         description: "WhatsApp settings saved successfully",
       });
     } catch (error) {
-      console.error("Error saving WhatsApp settings:", error);
+      console.error("Failed to save WhatsApp settings:", error);
       toast({
         title: "Error",
         description: "Failed to save WhatsApp settings",
@@ -65,154 +96,151 @@ export function WhatsAppSettings() {
     }
   };
 
+  // Test connection
   const handleTestConnection = async () => {
-    if (!testPhoneNumber) {
-      toast({
-        title: "Error",
-        description: "Please enter a test phone number",
-        variant: "destructive",
-      });
+    if (!testNumber) {
+      setTestNumberError("Please enter a test phone number");
       return;
     }
-    
-    setIsSaving(true);
+
+    setTestNumberError("");
+    setIsTesting(true);
     try {
-      // Save settings first
-      await whatsappService.saveSettings({ 
-        apiUrl, 
-        defaultMessage,
-        defaultRecipient 
-      });
-      
-      // Test with a simple message
-      await whatsappService.sendMessage(testPhoneNumber, "This is a test message from the HR Portal");
-      
+      // Example message with placeholder variables for testing
+      const testMessage = "This is a test message from the MTI Onboarding System.";
+      await whatsappService.sendMessage(testNumber, testMessage);
       toast({
         title: "Success",
-        description: "WhatsApp API connection test successful",
+        description: "Test message sent successfully",
       });
     } catch (error) {
-      console.error("Error testing WhatsApp connection:", error);
+      console.error("Failed to send test message:", error);
       toast({
         title: "Error",
-        description: `Connection test failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        description: "Failed to send test message. Please check the API URL and the test number format.",
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsTesting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>WhatsApp Integration</CardTitle>
-          <CardDescription>Loading settings...</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>WhatsApp Integration</CardTitle>
-        <CardDescription>
-          Configure the WhatsApp API settings to send account information to new hires.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="apiUrl" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            WhatsApp API URL
-          </label>
-          <Input
-            id="apiUrl"
-            value={apiUrl}
-            onChange={(e) => setApiUrl(e.target.value)}
-            placeholder="http://10.60.10.46:8192"
-            disabled={isSaving}
-          />
-          <p className="text-xs text-muted-foreground">
-            Enter the base URL of your WhatsApp API service (without /send-message)
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium">WhatsApp Integration Settings</h3>
+        <p className="text-sm text-muted-foreground">
+          Configure the WhatsApp API integration for sending account information to new hires.
+        </p>
+      </div>
 
-        <div className="space-y-2">
-          <label htmlFor="defaultMessage" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            Default Message Template
-          </label>
-          <Textarea
-            id="defaultMessage"
-            value={defaultMessage}
-            onChange={(e) => setDefaultMessage(e.target.value)}
-            rows={10}
-            disabled={isSaving}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Use &#123;&#123;name&#125;&#125;, &#123;&#123;email&#125;&#125;, &#123;&#123;title&#125;&#125;, etc. as placeholders for hire information
-          </p>
-        </div>
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          {/* API URL */}
+          <div className="space-y-2">
+            <Label htmlFor="apiUrl">WhatsApp API URL</Label>
+            <Input
+              id="apiUrl"
+              name="apiUrl"
+              placeholder="http://your-api-url:port"
+              value={settings.apiUrl}
+              onChange={handleChange}
+            />
+            <p className="text-xs text-muted-foreground">
+              The URL of the WhatsApp messaging API service.
+            </p>
+          </div>
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-medium mb-2">Default Recipient</h3>
+          {/* Test Number Input */}
+          <div className="space-y-2">
+            <Label htmlFor="testNumber">Test Phone Number</Label>
+            <Input
+              id="testNumber"
+              name="testNumber"
+              placeholder="6281234567890"
+              value={testNumber}
+              onChange={(e) => {
+                setTestNumber(e.target.value);
+                setTestNumberError("");
+              }}
+            />
+            {testNumberError && (
+              <p className="text-xs text-destructive">{testNumberError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Enter a phone number with country code but without the '+' symbol or spaces for testing.
+            </p>
+          </div>
+
+          {/* Test Connection Button */}
+          <Button
+            onClick={handleTestConnection}
+            disabled={isTesting || !settings.apiUrl}
+            className="flex gap-2 items-center w-full sm:w-auto"
+          >
+            {isTesting ? "Testing..." : "Test Connection"}
+            <Send className="h-4 w-4" />
+          </Button>
+
+          {/* Default Recipient */}
+          <div className="space-y-2">
+            <Label>Default Recipient for "Send WhatsApp" Button</Label>
             <RadioGroup 
-              value={defaultRecipient} 
-              onValueChange={setDefaultRecipient}
-              disabled={isSaving}
-              className="space-y-2"
+              value={settings.defaultRecipient} 
+              onValueChange={(value: "userNumber" | "testNumber") => handleRecipientChange(value)}
+              className="flex flex-col space-y-1"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="userNumber" id="userNumber" />
-                <Label htmlFor="userNumber">Send to user's phone number</Label>
+                <Label htmlFor="userNumber" className="font-normal cursor-pointer">User's phone number</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="testNumber" id="testNumber" />
-                <Label htmlFor="testNumber">Send to test number (for testing)</Label>
+                <Label htmlFor="testNumber" className="font-normal cursor-pointer">Test number from settings</Label>
               </div>
             </RadioGroup>
+            <p className="text-xs text-muted-foreground">
+              Choose whether to send messages to the user's actual phone number or to the test number by default.
+            </p>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <h3 className="font-medium">Connection Testing</h3>
-          <div className="flex flex-col space-y-3">
-            <div>
-              <Label htmlFor="testPhoneNumber" className="text-sm">Test Phone Number</Label>
-              <Input
-                id="testPhoneNumber"
-                value={testPhoneNumber}
-                onChange={(e) => setTestPhoneNumber(e.target.value)}
-                placeholder="628123456789"
-                disabled={isSaving}
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Enter the phone number with country code but without + or spaces (e.g., 628123456789)
-              </p>
+          {/* Message Template */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="defaultMessage">Default Message Template</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Use these placeholders in your message:</p>
+                    <p className="text-xs">
+                      {`{{name}}, {{email}}, {{title}}, {{department}}, {{password}}`}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleTestConnection}
-              disabled={isSaving || !apiUrl || !testPhoneNumber}
-              className="mt-2 self-start"
-            >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Test Connection
-            </Button>
+            <Textarea
+              id="defaultMessage"
+              name="defaultMessage"
+              placeholder="Welcome message with placeholders..."
+              value={settings.defaultMessage}
+              onChange={handleChange}
+              rows={10}
+              className="font-mono text-sm"
+            />
           </div>
-        </div>
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Settings
+          {/* Save Button */}
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? "Saving..." : "Save Settings"}
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
