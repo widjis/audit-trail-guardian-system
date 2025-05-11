@@ -58,6 +58,7 @@
   "mailingListDisplayAsDropdown": false,
   "whatsappSettings": {
     "apiUrl": "http://10.60.10.46:8192",
-    "defaultMessage": "Welcome aboard to PT. Merdeka Tsingshan Indonesia. \nBy this message, we inform you regarding your account information for the email address: {{email}}\nName: {{name}}\nTitle: {{title}}\nDepartment: {{department}}\nEmail: {{email}}\nPassword: {{password}}\n\nPlease don't hesitate to contact IT for any question."
+    "defaultMessage": "Welcome aboard to PT. Merdeka Tsingshan Indonesia. \nBy this message, we inform you regarding your account information for the email address: {{email}}\nName: {{name}}\nTitle: {{title}}\nDepartment: {{department}}\nEmail: {{email}}\nPassword: {{password}}\n\nPlease don't hesitate to contact IT for any question.",
+    "defaultRecipient": "userNumber"
   }
 }

@@ -280,7 +280,8 @@ Department: {{department}}
 Email: {{email}}
 Password: {{password}}
 
-Please don't hesitate to contact IT for any question.`
+Please don't hesitate to contact IT for any question.`,
+      defaultRecipient: 'userNumber'
     };
     
     res.json(whatsappSettings);
@@ -292,7 +293,7 @@ Please don't hesitate to contact IT for any question.`
 
 router.put('/whatsapp', (req, res) => {
   try {
-    const { apiUrl, defaultMessage } = req.body;
+    const { apiUrl, defaultMessage, defaultRecipient } = req.body;
     
     // Read current settings
     const settingsPath = path.join(DATA_DIR, 'settings.json');
@@ -301,7 +302,8 @@ router.put('/whatsapp', (req, res) => {
     // Update WhatsApp settings
     settings.whatsappSettings = {
       apiUrl,
-      defaultMessage
+      defaultMessage,
+      defaultRecipient: defaultRecipient || 'userNumber'
     };
     
     // Write updated settings back to file

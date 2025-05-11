@@ -6,6 +6,7 @@ import logger from "@/utils/logger";
 interface WhatsAppSettings {
   apiUrl: string;
   defaultMessage: string;
+  defaultRecipient?: "userNumber" | "testNumber";
 }
 
 const WHATSAPP_SETTINGS_KEY = "whatsapp_settings";
@@ -36,7 +37,8 @@ Department: {{department}}
 Email: {{email}}
 Password: {{password}}
 
-Please don't hesitate to contact IT for any question.`
+Please don't hesitate to contact IT for any question.`,
+        defaultRecipient: "userNumber"
       };
     }
   },
@@ -98,5 +100,11 @@ Please don't hesitate to contact IT for any question.`
     });
     
     return message;
+  },
+
+  // Get recipient type based on settings
+  getDefaultRecipient: async (): Promise<string> => {
+    const settings = await whatsappService.getSettings();
+    return settings.defaultRecipient || "userNumber";
   }
 };
