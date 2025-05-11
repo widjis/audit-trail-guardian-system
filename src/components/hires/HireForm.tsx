@@ -177,7 +177,7 @@ export function HireForm() {
 
   // Get departments and statuses from settings
   const departments = settingsData?.departments || [];
-  const accountStatuses = settingsData?.accountStatuses || ["Pending", "In Progress", "Done", "NO NEED"];
+  const accountStatuses = settingsData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
 
   // Check if any license type has the name "None" to avoid duplicate keys

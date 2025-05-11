@@ -147,12 +147,12 @@ export function DashboardOverview() {
                   <div className="flex items-center justify-between text-sm">
                     <span>Accounts Created</span>
                     <span className="font-medium">
-                      {hires.filter(h => h.account_creation_status === "Done").length}/{totalHires}
+                      {hires.filter(h => h.account_creation_status === "Active").length}/{totalHires}
                     </span>
                   </div>
                   <Progress 
                     value={totalHires > 0 ? 
-                      (hires.filter(h => h.account_creation_status === "Done").length / totalHires) * 100 : 0
+                      (hires.filter(h => h.account_creation_status === "Active").length / totalHires) * 100 : 0
                     } 
                     className="h-1"
                   />

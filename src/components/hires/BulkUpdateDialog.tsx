@@ -36,7 +36,7 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
     queryFn: licenseService.getLicenseTypes
   });
   
-  const accountStatuses = settings?.accountStatuses || ["Pending", "In Progress", "Done", "NO NEED"];
+  const accountStatuses = settings?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
   
   const handleSubmit = async () => {
