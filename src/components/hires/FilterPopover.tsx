@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Filter } from "lucide-react";
+import { Filter, FilterX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,11 @@ export function FilterPopover({ isActive, onClear, children }: FilterPopoverProp
             isActive && "text-primary bg-muted"
           )}
         >
-          <Filter className="h-3 w-3" />
+          {isActive ? (
+            <FilterX className="h-3 w-3" />
+          ) : (
+            <Filter className="h-3 w-3" />
+          )}
           <span className="sr-only">Filter</span>
         </Button>
       </PopoverTrigger>

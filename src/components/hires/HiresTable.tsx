@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { BulkUpdateDialog } from "./BulkUpdateDialog";
 import { FilterPopover } from "./FilterPopover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { licenseService } from "@/services/license-service";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -24,6 +25,7 @@ export function HiresTable() {
   const [showBulkUpdateDialog, setShowBulkUpdateDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
   // New states for column filters
   const [filters, setFilters] = useState({
     name: "",
@@ -31,12 +33,14 @@ export function HiresTable() {
     department: "",
     email: "",
     status: "",
+    license: "", // Added license filter
   });
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchHires();
+    fetchLicenseTypes();
   }, []);
   
   useEffect(() => {
@@ -58,6 +62,20 @@ export function HiresTable() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchLicenseTypes = async () => {
+    try {
+      const data = await licenseService.getLicenseTypes();
+      // Extract just the names for the filter
+      const licenseNames = data.map(license => license.name);
+      // Add "None" option for users without a license
+      setLicenseTypes(["None", ...licenseNames]);
+    } catch (error) {
+      console.error("Error fetching license types:", error);
+      // Fallback to basic options if API fails
+      setLicenseTypes(["None", "E3", "E5", "F3"]);
     }
   };
 
@@ -180,8 +198,16 @@ export function HiresTable() {
     const matchesStatus = filters.status === "" || 
       hire.account_creation_status === filters.status;
     
+    // New license filter
+    const licenseLower = filters.license.toLowerCase();
+    const hireLicense = (hire.microsoft_365_license || "None").toLowerCase();
+    const matchesLicense = filters.license === "" || 
+      hireLicense === licenseLower ||
+      // Special case for "None" filter
+      (licenseLower === "none" && (!hire.microsoft_365_license || hire.microsoft_365_license === ""));
+    
     return matchesSearch && matchesName && matchesTitle && 
-           matchesDepartment && matchesEmail && matchesStatus;
+           matchesDepartment && matchesEmail && matchesStatus && matchesLicense;
   });
 
   return (
@@ -314,6 +340,23 @@ export function HiresTable() {
                   <div className="flex items-center">
                     <Laptop className="h-3 w-3 mr-1" /> 
                     License
+                    <FilterPopover 
+                      isActive={isFilterActive("license")}
+                      onClear={() => clearFilter("license")}
+                    >
+                      <Label className="text-xs mb-2">Select license type</Label>
+                      <RadioGroup 
+                        value={filters.license} 
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, license: value }))}
+                      >
+                        {licenseTypes.map((license) => (
+                          <div key={license} className="flex items-center space-x-2">
+                            <RadioGroupItem value={license} id={`license-${license.toLowerCase()}`} />
+                            <Label htmlFor={`license-${license.toLowerCase()}`} className="text-sm">{license}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FilterPopover>
                   </div>
                 </TableHead>
                 <TableHead>
