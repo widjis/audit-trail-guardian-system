@@ -33,6 +33,135 @@ The backend API will be available at http://localhost:3001
 - Audit logging
 - Customizable settings for account statuses, mailing lists, and departments
 
+## Docker Deployment
+
+### Prerequisites
+- Docker installed on your system
+- Docker Compose installed on your system
+
+### Docker Deployment Steps
+
+1. Create a `Dockerfile` in the root directory:
+```
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# Build the frontend
+RUN npm run build
+
+EXPOSE 3001
+
+CMD ["node", "src/server/start.js"]
+```
+
+2. Create a `.dockerignore` file:
+```
+node_modules
+dist
+.git
+.env
+.vscode
+```
+
+3. Create a `docker-compose.yml` file:
+```yaml
+version: '3'
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=mti_onboarding
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - JWT_SECRET=your_secret_key_here
+      - PORT=3001
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mti_onboarding
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+4. Create or modify `.env` file for your production environment:
+```
+DB_TYPE=postgres
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=mti_onboarding
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_INSTANCE=
+DB_ENCRYPT=false
+
+PORT=3001
+JWT_SECRET=your_secure_secret_key_here
+
+DB_INIT_SCHEMA=true
+DB_DROP_TABLES=false
+
+LOG_LEVEL=info
+LOG_API=true
+LOG_DB=true
+LOG_UI=false
+
+BCRYPT_SALT_ROUNDS=10
+```
+
+5. Build and run the Docker containers:
+```
+docker-compose up -d
+```
+
+6. Access the application:
+   - The application will be available at http://localhost:3001
+
+### Docker Production Deployment Considerations
+
+1. **Security:**
+   - Use environment variables for all sensitive information
+   - Generate a strong JWT_SECRET for production
+   - Use Docker secrets for sensitive data in a swarm environment
+
+2. **Database:**
+   - For production, use a managed database service or properly configured database with regular backups
+   - Consider using a database initialization script
+
+3. **SSL/TLS:**
+   - For production, configure a reverse proxy (like Nginx) with SSL certificates
+   - You can add Nginx as a service in your docker-compose file
+
+4. **Scaling:**
+   - The application can be scaled horizontally for more traffic
+   - Add a load balancer for multiple instances
+
+5. **Monitoring:**
+   - Add monitoring services like Prometheus and Grafana
+   - Configure proper logging with a centralized log management system
+
 ## Backend API Endpoints
 
 ### Authentication
