@@ -8,11 +8,16 @@ import { useEffect, useState } from "react";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
+import { Button } from "@/components/ui/button";
+import { Send } from "lucide-react";
+import { Dialog } from "@/components/ui/dialog";
+import { SendWhatsAppDialog } from "@/components/hires/SendWhatsAppDialog";
 
 export default function HireDetail() {
   const { id } = useParams<{ id: string }>();
   const [hire, setHire] = useState<NewHire | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -43,9 +48,26 @@ export default function HireDetail() {
     }
   }, [id, toast]);
 
+  const handleSendWhatsApp = () => {
+    setIsWhatsAppDialogOpen(true);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
+        {!isLoading && id && id !== "new" && hire && (
+          <div className="flex items-center justify-end mb-4">
+            <Button 
+              onClick={handleSendWhatsApp} 
+              className="flex items-center gap-2"
+              variant="outline"
+            >
+              <Send className="h-4 w-4" />
+              Send via WhatsApp
+            </Button>
+          </div>
+        )}
+        
         <HireForm />
         {id && id !== "new" && (
           <>
@@ -54,6 +76,15 @@ export default function HireDetail() {
           </>
         )}
       </div>
+
+      {hire && (
+        <Dialog open={isWhatsAppDialogOpen} onOpenChange={setIsWhatsAppDialogOpen}>
+          <SendWhatsAppDialog 
+            hire={hire} 
+            onClose={() => setIsWhatsAppDialogOpen(false)} 
+          />
+        </Dialog>
+      )}
     </MainLayout>
   );
 }

@@ -1,5 +1,3 @@
-
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -186,7 +184,6 @@ router.delete('/license-types/:id', async (req, res) => {
   }
 });
 
-
 // Update departments - now using database
 router.put('/departments', async (req, res) => {
   try {
@@ -262,6 +259,58 @@ router.put('/departments', async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ error: 'Failed to update departments', message: err.message });
+  }
+});
+
+// Add this to your existing routes
+router.get('/whatsapp', (req, res) => {
+  try {
+    // Read the settings file
+    const settingsPath = path.join(DATA_DIR, 'settings.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    
+    // Return WhatsApp settings or default values
+    const whatsappSettings = settings.whatsappSettings || {
+      apiUrl: '',
+      defaultMessage: `Welcome aboard to PT. Merdeka Tsingshan Indonesia. 
+By this message, we inform you regarding your account information for the email address: {{email}}
+Name: {{name}}
+Title: {{title}}
+Department: {{department}}
+Email: {{email}}
+Password: {{password}}
+
+Please don't hesitate to contact IT for any question.`
+    };
+    
+    res.json(whatsappSettings);
+  } catch (error) {
+    console.error('Error fetching WhatsApp settings:', error);
+    res.status(500).json({ error: 'Failed to fetch WhatsApp settings' });
+  }
+});
+
+router.put('/whatsapp', (req, res) => {
+  try {
+    const { apiUrl, defaultMessage } = req.body;
+    
+    // Read current settings
+    const settingsPath = path.join(DATA_DIR, 'settings.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    
+    // Update WhatsApp settings
+    settings.whatsappSettings = {
+      apiUrl,
+      defaultMessage
+    };
+    
+    // Write updated settings back to file
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    
+    res.json(settings.whatsappSettings);
+  } catch (error) {
+    console.error('Error updating WhatsApp settings:', error);
+    res.status(500).json({ error: 'Failed to update WhatsApp settings' });
   }
 });
 
