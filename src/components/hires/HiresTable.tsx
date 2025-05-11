@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import { Edit, Trash2, Search, ListPlus } from "lucide-react";
+import { Edit, Trash2, Search, ListPlus, Microsoft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BulkUpdateDialog } from "./BulkUpdateDialog";
@@ -312,6 +312,12 @@ export function HiresTable() {
                 <TableHead>Onsite Date</TableHead>
                 <TableHead>
                   <div className="flex items-center">
+                    <Microsoft className="h-3 w-3 mr-1" /> 
+                    License
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center">
                     Status
                     <FilterPopover 
                       isActive={isFilterActive("status")}
@@ -360,6 +366,15 @@ export function HiresTable() {
                   <TableCell>{hire.department}</TableCell>
                   <TableCell>{hire.email}</TableCell>
                   <TableCell>{new Date(hire.on_site_date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
+                        "bg-green-100 text-green-800" : 
+                        "bg-gray-100 text-gray-800"
+                    }`}>
+                      {hire.microsoft_365_license || "None"}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       hire.account_creation_status === "Active" ? 
