@@ -1,4 +1,3 @@
-
 {
   "accountStatuses": [
     "Pending",
@@ -58,7 +57,7 @@
   "mailingListDisplayAsDropdown": false,
   "whatsappSettings": {
     "apiUrl": "http://10.60.10.46:8192",
-    "defaultMessage": "Welcome aboard to PT. Merdeka Tsingshan Indonesia. \nBy this message, we inform you regarding your account information for the email address: {{email}}\nName: {{name}}\nTitle: {{title}}\nDepartment: {{department}}\nEmail: {{email}}\nPassword: {{password}}\n\nPlease don't hesitate to contact IT for any question.",
-    "defaultRecipient": "userNumber"
+    "defaultMessage": "*📢 Welcome to PT. Merdeka Tsingshan Indonesia!* 🎉\n\nBy this message, we inform you regarding your account information for the email address:\n\n*Your Account Information:*\n*Name:* {{name}}\n*Title:* {{title}}\n*Department:* {{department}}\n*Email:* {{email}}\n*Password:* `{{password}}`\n\n_Please contact ICT Support at mti.icthelpdesk@merdekabattery.com if you have any questions._",
+    "defaultRecipient": "testNumber"
   }
 }
