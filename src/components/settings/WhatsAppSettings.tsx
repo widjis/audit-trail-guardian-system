@@ -130,7 +130,7 @@ export function WhatsAppSettings() {
             className="font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            Use {{name}}, {{email}}, {{title}}, etc. as placeholders for hire information
+            Use &#123;&#123;name&#125;&#125;, &#123;&#123;email&#125;&#125;, &#123;&#123;title&#125;&#125;, etc. as placeholders for hire information
           </p>
         </div>
 
