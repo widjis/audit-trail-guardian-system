@@ -18,13 +18,15 @@ export async function initMS365Schema() {
     const schemaSql = fs.readFileSync(schemaFilePath, 'utf8');
     
     // Split SQL statements by semicolons followed by newline or end of file
-    // This is more accurate than just splitting by semicolons
+    // This approach handles T-SQL statements that may contain multiple statements
     const statements = schemaSql
-      .split(/;\s*[\r\n]+|;\s*$/)
+      .replace(/\r\n/g, '\n') // Normalize line endings
+      .split(/;\s*\n|;\s*$/)  // Split by semicolon followed by newline or end of file
       .filter(statement => statement.trim().length > 0);
     
     // Execute each statement
     for (const statement of statements) {
+      logger.db.debug('Executing SQL statement:', statement.substring(0, 100) + '...');
       await executeQuery(statement);
     }
     
