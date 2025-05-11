@@ -402,6 +402,11 @@ router.post('/bulk-update', async (req, res) => {
     return res.status(400).json({ error: 'No update data provided' });
   }
   
+  // Add ict_support_pic to the update data if not already present
+  if (!updateData.ict_support_pic && req.user) {
+    updateData.ict_support_pic = req.user.username;
+  }
+
   try {
     logger.api.info(`Bulk updating ${ids.length} hires with data:`, updateData);
     
