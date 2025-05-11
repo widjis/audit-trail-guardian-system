@@ -15,7 +15,7 @@ export interface NewHire {
   username: string;
   password: string;
   on_site_date: string;
-  microsoft_365_license: boolean;
+  microsoft_365_license: string; // Changed from boolean to string
   laptop_ready: string;
   note: string;
   ict_support_pic: string;
@@ -73,4 +73,10 @@ export interface ImportResponse {
   rowsImported?: number;
   totalRows?: number;
   errors?: ImportError[];
+}
+
+export interface MS365LicenseType {
+  id: string;
+  name: string;
+  description: string;
 }

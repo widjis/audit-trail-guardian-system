@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
+import { licenseService } from "@/services/license-service";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
@@ -29,8 +30,18 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
     queryFn: settingsService.getSettings
   });
   
+  // For license type options
+  const { data: licenseTypes } = useQuery({
+    queryKey: ['licenseTypes'],
+    queryFn: licenseService.getLicenseTypes
+  });
+  
   const accountStatuses = settings?.accountStatuses || ['Pending', 'In Progress', 'Done'];
   const laptopStatuses = ['Not Ready', 'Ready', 'Delivered'];
+  const ms365LicenseOptions = licenseTypes || [
+    { id: "1", name: "None" },
+    { id: "2", name: "Business Standard" }
+  ];
   
   const handleSubmit = async () => {
     if (!updateFields.field) return;
@@ -55,7 +66,7 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
           updateData = { status_srf: updateFields.value === "true" };
           break;
         case "microsoft_365_license":
-          updateData = { microsoft_365_license: updateFields.value === "true" };
+          updateData = { microsoft_365_license: updateFields.value };
           break;
       }
       
@@ -111,7 +122,6 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
       
       case "license_assigned":
       case "status_srf":
-      case "microsoft_365_license":
         return (
           <div className="flex items-center space-x-2">
             <Switch 
@@ -125,6 +135,25 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
               {updateFields.value === "true" ? "Yes" : "No"}
             </Label>
           </div>
+        );
+      
+      case "microsoft_365_license":
+        return (
+          <Select 
+            value={updateFields.value} 
+            onValueChange={(value) => setUpdateFields({ ...updateFields, value })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select license type" />
+            </SelectTrigger>
+            <SelectContent>
+              {ms365LicenseOptions.map((license) => (
+                <SelectItem key={license.id} value={license.name}>
+                  {license.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         );
       
       default:

@@ -733,6 +733,21 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 });
 
+// Get all license types
+router.get('/license-types', async (req, res) => {
+  try {
+    logger.api.info('GET /hires/license-types - Fetching all MS365 license types');
+    const licenseTypes = await executeQuery(`
+      SELECT * FROM ms365_license_types ORDER BY name ASC
+    `);
+    logger.api.info(`Retrieved ${licenseTypes.length} license types from database`);
+    res.json(licenseTypes);
+  } catch (error) {
+    logger.api.error('Error fetching license types from database:', error);
+    res.status(500).json({ error: 'Failed to get license types', message: error.message });
+  }
+});
+
 // Helper function to convert various boolean string representations to actual boolean
 function convertToBoolean(value) {
   if (typeof value === 'boolean') return value;
