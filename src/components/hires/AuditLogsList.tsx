@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { AuditLog } from "@/types/types";
-import { auditApi } from "@/services/api";
+import { hiresApi } from "@/services/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle, Info, MessageSquare, RefreshCw } from "lucide-react";
@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 
 interface AuditLogsListProps {
   hireId: string;
+  refreshKey?: string; // Optional prop to trigger refresh when hire is updated
 }
 
-export function AuditLogsList({ hireId }: AuditLogsListProps) {
+export function AuditLogsList({ hireId, refreshKey }: AuditLogsListProps) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -21,8 +22,13 @@ export function AuditLogsList({ hireId }: AuditLogsListProps) {
   const fetchLogs = async () => {
     try {
       setIsLoading(true);
+      // Use the direct endpoint for audit logs instead of the general hire API
       console.log("Fetching logs for hire ID:", hireId);
-      const data = await auditApi.getLogsForHire(hireId);
+      const data = await hiresApi.getOne(hireId).then(hire => {
+        console.log("Full hire data:", hire);
+        return hire.audit_logs || [];
+      });
+      
       console.log("Fetched audit logs:", data);
       setLogs(data);
     } catch (error) {
@@ -42,7 +48,7 @@ export function AuditLogsList({ hireId }: AuditLogsListProps) {
     if (hireId) {
       fetchLogs();
     }
-  }, [hireId, toast]);
+  }, [hireId, refreshKey]); // Include refreshKey in dependencies to trigger refresh
 
   const handleRefresh = () => {
     setIsRefreshing(true);
