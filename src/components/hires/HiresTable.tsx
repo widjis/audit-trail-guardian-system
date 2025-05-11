@@ -11,6 +11,9 @@ import { Edit, Trash2, Search, ListPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BulkUpdateDialog } from "./BulkUpdateDialog";
+import { FilterPopover } from "./FilterPopover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -21,6 +24,14 @@ export function HiresTable() {
   const [showBulkUpdateDialog, setShowBulkUpdateDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  // New states for column filters
+  const [filters, setFilters] = useState({
+    name: "",
+    title: "",
+    department: "",
+    email: "",
+    status: "",
+  });
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -31,7 +42,7 @@ export function HiresTable() {
   useEffect(() => {
     // Clear selections when filters change
     setSelectedHires([]);
-  }, [searchQuery]);
+  }, [searchQuery, filters]);
 
   const fetchHires = async () => {
     try {
@@ -137,14 +148,40 @@ export function HiresTable() {
     }
   };
 
+  // Helper to check if a filter is active for a specific column
+  const isFilterActive = (column: keyof typeof filters) => {
+    return filters[column] !== "";
+  };
+
+  // Helper to clear a specific column filter
+  const clearFilter = (column: keyof typeof filters) => {
+    setFilters(prev => ({ ...prev, [column]: "" }));
+  };
+  
+  // Combined filtering logic for global search and column filters
   const filteredHires = hires.filter((hire) => {
+    // Global search filtering
     const searchLower = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = searchQuery === "" ||
       hire.name.toLowerCase().includes(searchLower) ||
       hire.email.toLowerCase().includes(searchLower) ||
       hire.department.toLowerCase().includes(searchLower) ||
-      hire.title.toLowerCase().includes(searchLower)
-    );
+      hire.title.toLowerCase().includes(searchLower);
+      
+    // Column-specific filtering
+    const matchesName = filters.name === "" || 
+      hire.name.toLowerCase().includes(filters.name.toLowerCase());
+    const matchesTitle = filters.title === "" || 
+      hire.title.toLowerCase().includes(filters.title.toLowerCase());
+    const matchesDepartment = filters.department === "" || 
+      hire.department.toLowerCase().includes(filters.department.toLowerCase());
+    const matchesEmail = filters.email === "" || 
+      hire.email.toLowerCase().includes(filters.email.toLowerCase());
+    const matchesStatus = filters.status === "" || 
+      hire.account_creation_status === filters.status;
+    
+    return matchesSearch && matchesName && matchesTitle && 
+           matchesDepartment && matchesEmail && matchesStatus;
   });
 
   return (
@@ -188,7 +225,9 @@ export function HiresTable() {
         <div className="text-center py-8">Loading...</div>
       ) : filteredHires.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          {searchQuery ? "No matching records found" : "No records available. Import or add new hires."}
+          {searchQuery || Object.values(filters).some(f => f !== "") 
+            ? "No matching records found" 
+            : "No records available. Import or add new hires."}
         </div>
       ) : (
         <div className="border rounded-md overflow-hidden">
@@ -202,12 +241,107 @@ export function HiresTable() {
                     aria-label="Select all"
                   />
                 </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Name
+                    <FilterPopover 
+                      isActive={isFilterActive("name")}
+                      onClear={() => clearFilter("name")}
+                    >
+                      <Label className="text-xs">Filter by name</Label>
+                      <Input
+                        placeholder="Type to filter..."
+                        value={filters.name}
+                        onChange={(e) => setFilters(prev => ({ ...prev, name: e.target.value }))}
+                        className="h-8 mt-1"
+                      />
+                    </FilterPopover>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Title
+                    <FilterPopover 
+                      isActive={isFilterActive("title")}
+                      onClear={() => clearFilter("title")}
+                    >
+                      <Label className="text-xs">Filter by title</Label>
+                      <Input
+                        placeholder="Type to filter..."
+                        value={filters.title}
+                        onChange={(e) => setFilters(prev => ({ ...prev, title: e.target.value }))}
+                        className="h-8 mt-1"
+                      />
+                    </FilterPopover>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Department
+                    <FilterPopover 
+                      isActive={isFilterActive("department")}
+                      onClear={() => clearFilter("department")}
+                    >
+                      <Label className="text-xs">Filter by department</Label>
+                      <Input
+                        placeholder="Type to filter..."
+                        value={filters.department}
+                        onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                        className="h-8 mt-1"
+                      />
+                    </FilterPopover>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Email
+                    <FilterPopover 
+                      isActive={isFilterActive("email")}
+                      onClear={() => clearFilter("email")}
+                    >
+                      <Label className="text-xs">Filter by email</Label>
+                      <Input
+                        placeholder="Type to filter..."
+                        value={filters.email}
+                        onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+                        className="h-8 mt-1"
+                      />
+                    </FilterPopover>
+                  </div>
+                </TableHead>
                 <TableHead>Onsite Date</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Status
+                    <FilterPopover 
+                      isActive={isFilterActive("status")}
+                      onClear={() => clearFilter("status")}
+                    >
+                      <Label className="text-xs mb-2">Select status</Label>
+                      <RadioGroup 
+                        value={filters.status} 
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Active" id="active" />
+                          <Label htmlFor="active" className="text-sm">Active</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Pending" id="pending" />
+                          <Label htmlFor="pending" className="text-sm">Pending</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Inactive" id="inactive" />
+                          <Label htmlFor="inactive" className="text-sm">Inactive</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Suspended" id="suspended" />
+                          <Label htmlFor="suspended" className="text-sm">Suspended</Label>
+                        </div>
+                      </RadioGroup>
+                    </FilterPopover>
+                  </div>
+                </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -228,9 +362,13 @@ export function HiresTable() {
                   <TableCell>{new Date(hire.on_site_date).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      hire.account_creation_status === "Done" ? 
+                      hire.account_creation_status === "Active" ? 
                         "bg-green-100 text-green-800" : 
-                        "bg-yellow-100 text-yellow-800"
+                        hire.account_creation_status === "Pending" ?
+                          "bg-yellow-100 text-yellow-800" :
+                          hire.account_creation_status === "Inactive" ?
+                            "bg-gray-100 text-gray-800" :
+                            "bg-red-100 text-red-800"
                     }`}>
                       {hire.account_creation_status}
                     </span>
