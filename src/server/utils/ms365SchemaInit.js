@@ -17,9 +17,10 @@ export async function initMS365Schema() {
     const schemaFilePath = path.join(__dirname, '../data/ms365_schema.sql');
     const schemaSql = fs.readFileSync(schemaFilePath, 'utf8');
     
-    // Split SQL statements by semicolons
+    // Split SQL statements by semicolons followed by newline or end of file
+    // This is more accurate than just splitting by semicolons
     const statements = schemaSql
-      .split(';')
+      .split(/;\s*[\r\n]+|;\s*$/)
       .filter(statement => statement.trim().length > 0);
     
     // Execute each statement
