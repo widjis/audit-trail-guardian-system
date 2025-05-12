@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -269,7 +268,7 @@ export function AccountManagementSettings() {
                         <TableCell>{account.role}</TableCell>
                         <TableCell>
                           {account.approved ? (
-                            <Badge variant="success" className="bg-green-500">Active</Badge>
+                            <Badge variant="secondary" className="bg-green-500">Active</Badge>
                           ) : (
                             <Badge variant="secondary">Pending</Badge>
                           )}
