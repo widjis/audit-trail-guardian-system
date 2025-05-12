@@ -317,7 +317,7 @@ export function HiresTable() {
       ) : (
         <div className="border rounded-md overflow-hidden">
           <ScrollArea className="w-full h-[calc(100vh-250px)]">
-            <div className="min-w-[1200px] relative">
+            <div className="min-w-[1200px]">
               <Table>
                 <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
@@ -497,7 +497,9 @@ export function HiresTable() {
                           aria-label={`Select ${hire.name}`}
                         />
                       </TableCell>
-                      <TableCell className="font-medium sticky left-[50px] z-20 bg-background shadow-[1px_0_0_0_#e5e7eb]">{hire.name}</TableCell>
+                      <TableCell className="font-medium sticky left-[50px] z-20 bg-background shadow-[1px_0_0_0_#e5e7eb]">
+                        {hire.name}
+                      </TableCell>
                       <TableCell>{hire.title}</TableCell>
                       <TableCell>{hire.department}</TableCell>
                       <TableCell>{hire.email}</TableCell>
