@@ -83,17 +83,17 @@ router.post('/register', async (req, res) => {
     const userId = generateId();
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Insert new user
-    const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
-    await executeQuery(query, [userId, username, hashedPassword, 'user']);
+    // Changed role from 'user' to 'support' for new registrations
+    await executeQuery('INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)', 
+      [userId, username, hashedPassword, 'support']);
     
-    const token = generateToken(userId, username, 'user');
+    const token = generateToken(userId, username, 'support');
     res.status(201).json({
       token,
       user: {
         id: userId,
         username,
-        role: 'user'
+        role: 'support'
       }
     });
   } catch (error) {
