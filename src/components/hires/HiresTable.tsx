@@ -317,18 +317,18 @@ export function HiresTable() {
       ) : (
         <div className="border rounded-md overflow-hidden">
           <ScrollArea className="w-full h-[calc(100vh-250px)]">
-            <div className="min-w-[1200px]">
+            <div className="min-w-[1200px] relative">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
-                    <TableHead className="w-[50px] sticky left-0 bg-background z-10">
+                    <TableHead className="w-[50px] sticky left-0 z-30 bg-background shadow-[1px_0_0_0_#e5e7eb]">
                       <Checkbox 
                         checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead className="min-w-[150px] sticky left-[50px] bg-background z-10">
+                    <TableHead className="min-w-[150px] sticky left-[50px] z-30 bg-background shadow-[1px_0_0_0_#e5e7eb]">
                       <div className="flex items-center space-x-1">
                         Name
                         <SortButton 
@@ -490,14 +490,14 @@ export function HiresTable() {
                 <TableBody>
                   {sortedHires.map((hire) => (
                     <TableRow key={hire.id}>
-                      <TableCell className="sticky left-0 bg-background z-10">
+                      <TableCell className="sticky left-0 z-20 bg-background shadow-[1px_0_0_0_#e5e7eb]">
                         <Checkbox 
                           checked={isSelected(hire.id)}
                           onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
                           aria-label={`Select ${hire.name}`}
                         />
                       </TableCell>
-                      <TableCell className="font-medium sticky left-[50px] bg-background z-10">{hire.name}</TableCell>
+                      <TableCell className="font-medium sticky left-[50px] z-20 bg-background shadow-[1px_0_0_0_#e5e7eb]">{hire.name}</TableCell>
                       <TableCell>{hire.title}</TableCell>
                       <TableCell>{hire.department}</TableCell>
                       <TableCell>{hire.email}</TableCell>

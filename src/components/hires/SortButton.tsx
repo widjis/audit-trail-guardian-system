@@ -16,7 +16,7 @@ export const SortButton = ({ direction, onClick, className }: SortButtonProps) =
       onClick={onClick} 
       variant="ghost" 
       size="sm" 
-      className={cn("h-5 w-5 p-0", className)}
+      className={cn("h-5 w-5 p-0 inline-flex", className)}
     >
       {direction === "asc" ? (
         <ArrowUp className="h-3 w-3" />
