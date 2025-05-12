@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { hiresApi } from "@/services/api";
 import { NewHire, SortDirection, SortField } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
@@ -317,7 +316,7 @@ export function HiresTable() {
         </div>
       ) : (
         <div className="border rounded-md overflow-hidden">
-          <ScrollArea className="w-full">
+          <ScrollArea className="w-full h-[calc(100vh-250px)]">
             <div className="min-w-[1200px]">
               <Table>
                 <TableHeader>
@@ -546,6 +545,7 @@ export function HiresTable() {
                 </TableBody>
               </Table>
             </div>
+            <ScrollBar orientation="horizontal" className="h-2.5" />
           </ScrollArea>
         </div>
       )}
