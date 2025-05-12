@@ -319,16 +319,16 @@ export function HiresTable() {
             <ScrollArea className="w-full h-[calc(100vh-250px)]" showHorizontalScrollbar>
              <div className="min-w-[1200px] relative">
               <Table>
-                <TableHeader className="sticky top-0 z-20 bg-background">
+                <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px] sticky left-0 z-30 bg-background shadow-[1px_0_0_0_#e5e7eb] before:absolute before:left-0 before:top-0 before:z-10 before:w-full before:h-full before:bg-background">
-                    <Checkbox 
-                      checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all"
-                    />
+                    <TableHead className="w-[50px]">
+                      <Checkbox 
+                        checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all"
+                      />
                     </TableHead>
-                    <TableHead className="min-w-[150px] sticky left-[50px] z-30 bg-background shadow-[1px_0_0_0_#e5e7eb] before:absolute before:left-0 before:top-0 before:z-10 before:w-full before:h-full before:bg-background">
+                    <TableHead className="min-w-[150px]">
                       <div className="flex items-center space-x-1">
                         Name
                         <SortButton 
@@ -490,18 +490,14 @@ export function HiresTable() {
                 <TableBody>
                   {sortedHires.map((hire) => (
                     <TableRow key={hire.id}>
-                      <TableCell className="sticky left-0 z-30 bg-background shadow-[1px_0_0_0_#e5e7eb] before:absolute before:left-0 before:top-0 before:z-10 before:w-full before:h-full before:bg-background">
+                      <TableCell>
                         <Checkbox 
                           checked={isSelected(hire.id)}
                           onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
                           aria-label={`Select ${hire.name}`}
                         />
                       </TableCell>
-                      <TableCell className="font-medium sticky left-[50px] z-30 bg-background shadow-[1px_0_0_0_#e5e7eb] before:absolute before:left-0 before:top-0 before:z-10 before:w-full before:h-full before:bg-background">
-                        {hire.name}
-                      </TableCell>
-
-                      <TableCell className="font-medium sticky left-[50px] z-20 bg-background shadow-[1px_0_0_0_#e5e7eb]">
+                      <TableCell className="font-medium">
                         {hire.name}
                       </TableCell>
                       <TableCell>{hire.title}</TableCell>
