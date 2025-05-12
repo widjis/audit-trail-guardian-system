@@ -28,7 +28,7 @@ export function Sidebar() {
     : commonNavItems;
 
   return (
-    <div className="h-full min-h-screen flex flex-col bg-audit-blue text-white w-64 py-4">
+    <div className="h-full min-h-screen flex flex-col bg-audit-blue text-white min-w-64 w-auto max-w-80 py-4">
       <div className="px-4 mb-6">
         <h1 className="text-2xl font-bold">MTI Onboarding Workflow</h1>
         <p className="text-sm opacity-75">New Hire Management</p>
@@ -52,9 +52,9 @@ export function Sidebar() {
 
       <div className="border-t border-audit-lightBlue pt-4 px-4">
         <div className="flex items-center mb-4 px-2">
-          <UserCircle className="h-6 w-6 mr-2" />
-          <div>
-            <p className="font-medium">{user?.username || "User"}</p>
+          <UserCircle className="h-6 w-6 min-w-6 mr-2" />
+          <div className="overflow-hidden">
+            <p className="font-medium truncate">{user?.username || "User"}</p>
             <p className="text-xs opacity-75">{user?.role || "Role"}</p>
           </div>
         </div>
