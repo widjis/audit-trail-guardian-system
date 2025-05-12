@@ -316,7 +316,7 @@ export function HiresTable() {
         </div>
       ) : (
         <div className="border rounded-md">
-          <ScrollArea className="w-full" orientation="horizontal">
+          <ScrollArea className="w-full">
             <div className="min-w-[1200px]">
               <Table>
                 <TableHeader>
