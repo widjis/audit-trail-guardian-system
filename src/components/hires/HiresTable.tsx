@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -315,7 +316,7 @@ export function HiresTable() {
             : "No records available. Import or add new hires."}
         </div>
       ) : (
-        <div className="border rounded-md">
+        <div className="border rounded-md overflow-hidden">
           <ScrollArea className="w-full">
             <div className="min-w-[1200px]">
               <Table>
@@ -524,7 +525,7 @@ export function HiresTable() {
                           {hire.account_creation_status}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
