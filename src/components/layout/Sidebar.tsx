@@ -8,13 +8,24 @@ export function Sidebar() {
   const location = useLocation();
   const { logout, getCurrentUser } = useAuth();
   const user = getCurrentUser();
+  const isAdmin = user?.role === "admin";
 
-  const navItems = [
+  // Define navigation items
+  const commonNavItems = [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
     { label: "New Hires", path: "/hires", icon: <Users className="mr-2 h-4 w-4" /> },
     { label: "Import Data", path: "/import", icon: <Upload className="mr-2 h-4 w-4" /> },
+  ];
+  
+  // Admin-only navigation item
+  const adminNavItems = [
     { label: "Settings", path: "/settings", icon: <Settings className="mr-2 h-4 w-4" /> }
   ];
+  
+  // Combine navigation items based on user role
+  const navItems = isAdmin 
+    ? [...commonNavItems, ...adminNavItems]
+    : commonNavItems;
 
   return (
     <div className="h-full min-h-screen flex flex-col bg-audit-blue text-white w-64 py-4">
