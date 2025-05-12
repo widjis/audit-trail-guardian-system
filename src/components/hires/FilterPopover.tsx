@@ -19,7 +19,7 @@ export function FilterPopover({ isActive, onClear, children }: FilterPopoverProp
           variant="ghost" 
           size="sm" 
           className={cn(
-            "h-8 w-8 p-0 ml-1", 
+            "h-6 w-6 p-0", 
             isActive && "text-primary bg-muted"
           )}
         >

@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { hiresApi } from "@/services/api";
 import { NewHire, SortDirection, SortField } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
@@ -314,233 +315,237 @@ export function HiresTable() {
             : "No records available. Import or add new hires."}
         </div>
       ) : (
-        <div className="border rounded-md overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox 
-                    checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Name
-                    <SortButton 
-                      direction={getSortDirectionForField("name")}
-                      onClick={() => handleSort("name")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("name")}
-                      onClear={() => clearFilter("name")}
-                    >
-                      <Label className="text-xs">Filter by name</Label>
-                      <Input
-                        placeholder="Type to filter..."
-                        value={filters.name}
-                        onChange={(e) => setFilters(prev => ({ ...prev, name: e.target.value }))}
-                        className="h-8 mt-1"
+        <div className="border rounded-md">
+          <ScrollArea className="w-full" orientation="horizontal">
+            <div className="min-w-[1200px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px] sticky left-0 bg-background z-10">
+                      <Checkbox 
+                        checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all"
                       />
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Title
-                    <SortButton 
-                      direction={getSortDirectionForField("title")}
-                      onClick={() => handleSort("title")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("title")}
-                      onClear={() => clearFilter("title")}
-                    >
-                      <Label className="text-xs">Filter by title</Label>
-                      <Input
-                        placeholder="Type to filter..."
-                        value={filters.title}
-                        onChange={(e) => setFilters(prev => ({ ...prev, title: e.target.value }))}
-                        className="h-8 mt-1"
-                      />
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Department
-                    <SortButton 
-                      direction={getSortDirectionForField("department")}
-                      onClick={() => handleSort("department")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("department")}
-                      onClear={() => clearFilter("department")}
-                    >
-                      <Label className="text-xs">Filter by department</Label>
-                      <Input
-                        placeholder="Type to filter..."
-                        value={filters.department}
-                        onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
-                        className="h-8 mt-1"
-                      />
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Email
-                    <SortButton 
-                      direction={getSortDirectionForField("email")}
-                      onClick={() => handleSort("email")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("email")}
-                      onClear={() => clearFilter("email")}
-                    >
-                      <Label className="text-xs">Filter by email</Label>
-                      <Input
-                        placeholder="Type to filter..."
-                        value={filters.email}
-                        onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
-                        className="h-8 mt-1"
-                      />
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Onsite Date
-                    <SortButton 
-                      direction={getSortDirectionForField("on_site_date")}
-                      onClick={() => handleSort("on_site_date")}
-                    />
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    <Laptop className="h-3 w-3 mr-1" /> 
-                    License
-                    <SortButton 
-                      direction={getSortDirectionForField("microsoft_365_license")}
-                      onClick={() => handleSort("microsoft_365_license")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("license")}
-                      onClear={() => clearFilter("license")}
-                    >
-                      <Label className="text-xs mb-2">Select license type</Label>
-                      <RadioGroup 
-                        value={filters.license} 
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, license: value }))}
-                      >
-                        {licenseTypes.map((license) => (
-                          <div key={license} className="flex items-center space-x-2">
-                            <RadioGroupItem value={license} id={`license-${license.toLowerCase()}`} />
-                            <Label htmlFor={`license-${license.toLowerCase()}`} className="text-sm">{license}</Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Status
-                    <SortButton 
-                      direction={getSortDirectionForField("account_creation_status")}
-                      onClick={() => handleSort("account_creation_status")}
-                    />
-                    <FilterPopover 
-                      isActive={isFilterActive("status")}
-                      onClear={() => clearFilter("status")}
-                    >
-                      <Label className="text-xs mb-2">Select status</Label>
-                      <RadioGroup 
-                        value={filters.status} 
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Active" id="active" />
-                          <Label htmlFor="active" className="text-sm">Active</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Pending" id="pending" />
-                          <Label htmlFor="pending" className="text-sm">Pending</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Inactive" id="inactive" />
-                          <Label htmlFor="inactive" className="text-sm">Inactive</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Suspended" id="suspended" />
-                          <Label htmlFor="suspended" className="text-sm">Suspended</Label>
-                        </div>
-                      </RadioGroup>
-                    </FilterPopover>
-                  </div>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedHires.map((hire) => (
-                <TableRow key={hire.id}>
-                  <TableCell>
-                    <Checkbox 
-                      checked={isSelected(hire.id)}
-                      onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
-                      aria-label={`Select ${hire.name}`}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{hire.name}</TableCell>
-                  <TableCell>{hire.title}</TableCell>
-                  <TableCell>{hire.department}</TableCell>
-                  <TableCell>{hire.email}</TableCell>
-                  <TableCell>{new Date(hire.on_site_date).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
-                        "bg-green-100 text-green-800" : 
-                        "bg-gray-100 text-gray-800"
-                    }`}>
-                      {hire.microsoft_365_license || "None"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      hire.account_creation_status === "Active" ? 
-                        "bg-green-100 text-green-800" : 
-                        hire.account_creation_status === "Pending" ?
-                          "bg-yellow-100 text-yellow-800" :
-                          hire.account_creation_status === "Inactive" ?
-                            "bg-gray-100 text-gray-800" :
-                            "bg-red-100 text-red-800"
-                    }`}>
-                      {hire.account_creation_status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => navigate(`/hires/${hire.id}`)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDelete(hire.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableHead>
+                    <TableHead className="min-w-[150px] sticky left-[50px] bg-background z-10">
+                      <div className="flex items-center space-x-1">
+                        Name
+                        <SortButton 
+                          direction={getSortDirectionForField("name")}
+                          onClick={() => handleSort("name")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("name")}
+                          onClear={() => clearFilter("name")}
+                        >
+                          <Label className="text-xs">Filter by name</Label>
+                          <Input
+                            placeholder="Type to filter..."
+                            value={filters.name}
+                            onChange={(e) => setFilters(prev => ({ ...prev, name: e.target.value }))}
+                            className="h-8 mt-1"
+                          />
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[150px]">
+                      <div className="flex items-center space-x-1">
+                        Title
+                        <SortButton 
+                          direction={getSortDirectionForField("title")}
+                          onClick={() => handleSort("title")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("title")}
+                          onClear={() => clearFilter("title")}
+                        >
+                          <Label className="text-xs">Filter by title</Label>
+                          <Input
+                            placeholder="Type to filter..."
+                            value={filters.title}
+                            onChange={(e) => setFilters(prev => ({ ...prev, title: e.target.value }))}
+                            className="h-8 mt-1"
+                          />
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[150px]">
+                      <div className="flex items-center space-x-1">
+                        Department
+                        <SortButton 
+                          direction={getSortDirectionForField("department")}
+                          onClick={() => handleSort("department")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("department")}
+                          onClear={() => clearFilter("department")}
+                        >
+                          <Label className="text-xs">Filter by department</Label>
+                          <Input
+                            placeholder="Type to filter..."
+                            value={filters.department}
+                            onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                            className="h-8 mt-1"
+                          />
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[200px]">
+                      <div className="flex items-center space-x-1">
+                        Email
+                        <SortButton 
+                          direction={getSortDirectionForField("email")}
+                          onClick={() => handleSort("email")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("email")}
+                          onClear={() => clearFilter("email")}
+                        >
+                          <Label className="text-xs">Filter by email</Label>
+                          <Input
+                            placeholder="Type to filter..."
+                            value={filters.email}
+                            onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+                            className="h-8 mt-1"
+                          />
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center space-x-1">
+                        Onsite Date
+                        <SortButton 
+                          direction={getSortDirectionForField("on_site_date")}
+                          onClick={() => handleSort("on_site_date")}
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center space-x-1">
+                        <Laptop className="h-3 w-3 mr-1" /> 
+                        License
+                        <SortButton 
+                          direction={getSortDirectionForField("microsoft_365_license")}
+                          onClick={() => handleSort("microsoft_365_license")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("license")}
+                          onClear={() => clearFilter("license")}
+                        >
+                          <Label className="text-xs mb-2">Select license type</Label>
+                          <RadioGroup 
+                            value={filters.license} 
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, license: value }))}
+                          >
+                            {licenseTypes.map((license) => (
+                              <div key={license} className="flex items-center space-x-2">
+                                <RadioGroupItem value={license} id={`license-${license.toLowerCase()}`} />
+                                <Label htmlFor={`license-${license.toLowerCase()}`} className="text-sm">{license}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center space-x-1">
+                        Status
+                        <SortButton 
+                          direction={getSortDirectionForField("account_creation_status")}
+                          onClick={() => handleSort("account_creation_status")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("status")}
+                          onClear={() => clearFilter("status")}
+                        >
+                          <Label className="text-xs mb-2">Select status</Label>
+                          <RadioGroup 
+                            value={filters.status} 
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Active" id="active" />
+                              <Label htmlFor="active" className="text-sm">Active</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Pending" id="pending" />
+                              <Label htmlFor="pending" className="text-sm">Pending</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Inactive" id="inactive" />
+                              <Label htmlFor="inactive" className="text-sm">Inactive</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Suspended" id="suspended" />
+                              <Label htmlFor="suspended" className="text-sm">Suspended</Label>
+                            </div>
+                          </RadioGroup>
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedHires.map((hire) => (
+                    <TableRow key={hire.id}>
+                      <TableCell className="sticky left-0 bg-background z-10">
+                        <Checkbox 
+                          checked={isSelected(hire.id)}
+                          onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
+                          aria-label={`Select ${hire.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium sticky left-[50px] bg-background z-10">{hire.name}</TableCell>
+                      <TableCell>{hire.title}</TableCell>
+                      <TableCell>{hire.department}</TableCell>
+                      <TableCell>{hire.email}</TableCell>
+                      <TableCell>{new Date(hire.on_site_date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
+                            "bg-green-100 text-green-800" : 
+                            "bg-gray-100 text-gray-800"
+                        }`}>
+                          {hire.microsoft_365_license || "None"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          hire.account_creation_status === "Active" ? 
+                            "bg-green-100 text-green-800" : 
+                            hire.account_creation_status === "Pending" ?
+                              "bg-yellow-100 text-yellow-800" :
+                              hire.account_creation_status === "Inactive" ?
+                                "bg-gray-100 text-gray-800" :
+                                "bg-red-100 text-red-800"
+                        }`}>
+                          {hire.account_creation_status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => navigate(`/hires/${hire.id}`)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDelete(hire.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
         </div>
       )}
       
