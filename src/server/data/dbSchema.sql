@@ -8,15 +8,16 @@ BEGIN
         id NVARCHAR(255) PRIMARY KEY,
         username NVARCHAR(255) NOT NULL UNIQUE,
         password NVARCHAR(255) NOT NULL,
-        role NVARCHAR(50) NOT NULL
+        role NVARCHAR(50) NOT NULL,
+        approved BIT DEFAULT 0
     );
     
     -- Create an index on username for faster lookups
     CREATE INDEX IDX_USERS_USERNAME ON users(username);
     
     -- Insert default admin account if none exists
-    INSERT INTO users (id, username, password, role)
-    VALUES ('1', 'admin', 'password123', 'admin');
+    INSERT INTO users (id, username, password, role, approved)
+    VALUES ('1', 'admin', 'password123', 'admin', 1);
     
     PRINT 'Users table created successfully';
 END
@@ -25,13 +26,22 @@ BEGIN
     -- Check if admin user exists, if not create it
     IF NOT EXISTS (SELECT * FROM users WHERE id = '1' AND role = 'admin')
     BEGIN
-        INSERT INTO users (id, username, password, role)
-        VALUES ('1', 'admin', 'password123', 'admin');
+        INSERT INTO users (id, username, password, role, approved)
+        VALUES ('1', 'admin', 'password123', 'admin', 1);
         PRINT 'Admin user created successfully';
     END
     ELSE
     BEGIN
         PRINT 'Admin user already exists';
+    END
+    
+    -- Check if the 'approved' column exists, if not add it
+    IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('users') AND name='approved')
+    BEGIN
+        ALTER TABLE users ADD approved BIT DEFAULT 0;
+        -- Set existing users (except new registrations) as approved
+        UPDATE users SET approved = 1 WHERE role IN ('admin', 'support');
+        PRINT 'Added approved column to users table';
     END
     
     PRINT 'Users table already exists';

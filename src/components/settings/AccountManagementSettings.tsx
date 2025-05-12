@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -42,8 +43,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { usersService } from "@/services/users-service";
-import { Pencil, Trash2, Key } from "lucide-react";
+import { Pencil, Trash2, Key, ShieldCheck, UserCheck, UserX } from "lucide-react";
 import { UserAccount } from "@/types/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function AccountManagementSettings() {
   const [newAccount, setNewAccount] = useState<Partial<UserAccount>>({
@@ -57,13 +59,20 @@ export function AccountManagementSettings() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("active");
 
   const queryClient = useQueryClient();
 
   // Fetch all support accounts
-  const { data: accounts = [], isLoading } = useQuery({
+  const { data: accounts = [], isLoading: isLoadingAccounts } = useQuery({
     queryKey: ["supportAccounts"],
     queryFn: usersService.getSupportAccounts
+  });
+  
+  // Fetch pending approval accounts
+  const { data: pendingAccounts = [], isLoading: isLoadingPending } = useQuery({
+    queryKey: ["pendingAccounts"],
+    queryFn: usersService.getPendingAccounts
   });
 
   // Add new account mutation
@@ -89,6 +98,7 @@ export function AccountManagementSettings() {
     mutationFn: usersService.deleteAccount,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["supportAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingAccounts"] });
       toast({ title: "Success", description: "Account deleted successfully" });
     },
     onError: (error) => {
@@ -105,6 +115,7 @@ export function AccountManagementSettings() {
     mutationFn: usersService.updateAccount,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["supportAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingAccounts"] });
       toast({ title: "Success", description: "Account updated successfully" });
       setIsEditDialogOpen(false);
       setEditAccount(null);
@@ -133,6 +144,40 @@ export function AccountManagementSettings() {
       toast({ 
         title: "Error", 
         description: error instanceof Error ? error.message : "Failed to reset password", 
+        variant: "destructive" 
+      });
+    }
+  });
+  
+  // Approve account mutation
+  const approveAccountMutation = useMutation({
+    mutationFn: usersService.approveAccount,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["supportAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingAccounts"] });
+      toast({ title: "Success", description: data.message || "Account approved successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to approve account", 
+        variant: "destructive" 
+      });
+    }
+  });
+  
+  // Disapprove account mutation
+  const disapproveAccountMutation = useMutation({
+    mutationFn: usersService.disapproveAccount,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["supportAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingAccounts"] });
+      toast({ title: "Success", description: data.message || "Account disapproved successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to disapprove account", 
         variant: "destructive" 
       });
     }
@@ -183,89 +228,206 @@ export function AccountManagementSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">Loading accounts...</div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accounts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8">
-                    No support accounts found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                accounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell>{account.username}</TableCell>
-                    <TableCell>{account.role}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditAccount(account);
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setResetPasswordId(account.id);
-                            setIsResetDialogOpen(true);
-                          }}
-                        >
-                          <Key className="h-4 w-4" />
-                          <span className="sr-only">Reset Password</span>
-                        </Button>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Account</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete the account "{account.username}"? 
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => deleteAccountMutation.mutate(account.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="active">Active Accounts</TabsTrigger>
+            <TabsTrigger value="pending" className="flex items-center gap-1">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Pending Approval</span>
+              {pendingAccounts.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {pendingAccounts.length}
+                </Badge>
               )}
-            </TableBody>
-          </Table>
-        )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="active">
+            {isLoadingAccounts ? (
+              <div className="flex justify-center py-8">Loading accounts...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        No support accounts found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    accounts.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell>{account.username}</TableCell>
+                        <TableCell>{account.role}</TableCell>
+                        <TableCell>
+                          {account.approved ? (
+                            <Badge variant="success" className="bg-green-500">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pending</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditAccount(account);
+                                setIsEditDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setResetPasswordId(account.id);
+                                setIsResetDialogOpen(true);
+                              }}
+                            >
+                              <Key className="h-4 w-4" />
+                              <span className="sr-only">Reset Password</span>
+                            </Button>
+                            
+                            {account.approved ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => disapproveAccountMutation.mutate(account.id)}
+                              >
+                                <UserX className="h-4 w-4 text-yellow-500" />
+                                <span className="sr-only">Disapprove</span>
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => approveAccountMutation.mutate(account.id)}
+                              >
+                                <UserCheck className="h-4 w-4 text-green-500" />
+                                <span className="sr-only">Approve</span>
+                              </Button>
+                            )}
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                  <span className="sr-only">Delete</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete the account "{account.username}"? 
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => deleteAccountMutation.mutate(account.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="pending">
+            {isLoadingPending ? (
+              <div className="flex justify-center py-8">Loading pending accounts...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingAccounts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        No pending approval accounts
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pendingAccounts.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell>{account.username}</TableCell>
+                        <TableCell>{account.role}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-green-50 border-green-200 hover:bg-green-100"
+                              onClick={() => approveAccountMutation.mutate(account.id)}
+                            >
+                              <UserCheck className="h-4 w-4 text-green-500 mr-1" />
+                              <span>Approve</span>
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4 text-destructive mr-1" />
+                                  <span>Delete</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete the account "{account.username}"? 
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => deleteAccountMutation.mutate(account.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
       <CardFooter className="flex justify-end">
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>

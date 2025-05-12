@@ -11,6 +11,12 @@ export const usersService = {
     const response = await apiClient.get<UserAccount[]>(`${USERS_ENDPOINT}/support`);
     return response.data;
   },
+  
+  // Get pending approval accounts
+  getPendingAccounts: async (): Promise<UserAccount[]> => {
+    const response = await apiClient.get<UserAccount[]>(`${USERS_ENDPOINT}/pending`);
+    return response.data;
+  },
 
   // Create a new account
   createAccount: async (account: UserAccount): Promise<UserAccount> => {
@@ -21,6 +27,22 @@ export const usersService = {
   // Update an existing account
   updateAccount: async (account: UserAccount): Promise<UserAccount> => {
     const response = await apiClient.put<UserAccount>(`${USERS_ENDPOINT}/${account.id}`, account);
+    return response.data;
+  },
+  
+  // Approve an account
+  approveAccount: async (id: string): Promise<{ success: boolean, message: string }> => {
+    const response = await apiClient.post<{ success: boolean, message: string }>(
+      `${USERS_ENDPOINT}/${id}/approve`
+    );
+    return response.data;
+  },
+  
+  // Disapprove an account
+  disapproveAccount: async (id: string): Promise<{ success: boolean, message: string }> => {
+    const response = await apiClient.post<{ success: boolean, message: string }>(
+      `${USERS_ENDPOINT}/${id}/disapprove`
+    );
     return response.data;
   },
 

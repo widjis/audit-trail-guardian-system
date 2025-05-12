@@ -45,6 +45,12 @@ router.post('/login', async (req, res) => {
     const passwordMatch = await bcrypt.compare(password, user.password);
     
     if (passwordMatch) {
+      // Check if user is approved
+      if (user.approved !== 1 && user.role !== 'admin') {
+        logger.api.warn(`Login attempt by unapproved user: ${username}`);
+        return res.status(403).json({ error: 'Your account is pending approval by an admin' });
+      }
+      
       logger.api.info(`User logged in successfully: ${username}`);
       const token = generateToken(user.id, user.username, user.role);
       res.json({
@@ -84,8 +90,8 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Changed role from 'user' to 'support' for new registrations
-    await executeQuery('INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)', 
-      [userId, username, hashedPassword, 'support']);
+    await executeQuery('INSERT INTO users (id, username, password, role, approved) VALUES (?, ?, ?, ?, ?)', 
+      [userId, username, hashedPassword, 'support', 0]);
     
     const token = generateToken(userId, username, 'support');
     res.status(201).json({

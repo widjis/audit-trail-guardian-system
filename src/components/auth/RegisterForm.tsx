@@ -6,12 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/services/auth-service";
 import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 export function RegisterForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
   const { toast } = useToast();
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -32,17 +35,44 @@ export function RegisterForm() {
 
     try {
       await register({ username, password });
+      setIsRegistered(true);
       toast({
         title: "Registration Successful",
-        description: "Your account has been created",
+        description: "Your account is pending approval by an administrator",
       });
-      navigate("/dashboard");
     } catch (error) {
       console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isRegistered) {
+    return (
+      <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle className="text-2xl">Registration Complete</CardTitle>
+          <CardDescription>
+            Your account is pending approval
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertDescription>
+              Thank you for registering! Your account requires administrator approval before you can log in.
+              Please contact an administrator to approve your account.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={() => navigate("/login")} className="w-full">
+            Return to Login
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-[350px]">
@@ -54,6 +84,12 @@ export function RegisterForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          <Alert className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertDescription>
+              New accounts require administrator approval before they can be used.
+            </AlertDescription>
+          </Alert>
           <div className="space-y-2">
             <label htmlFor="username" className="text-sm font-medium">
               Username

@@ -32,6 +32,7 @@ export interface User {
   username: string;
   password?: string; // Make password optional since it shouldn't be returned in most API responses
   role: string;
+  approved?: boolean; // Whether the user account is approved by an admin
 }
 
 export interface UserAccount extends User {
@@ -70,4 +71,3 @@ export interface ImportResponse {
 // Add types for table sorting
 export type SortDirection = "asc" | "desc" | null;
 export type SortField = string | null;
-

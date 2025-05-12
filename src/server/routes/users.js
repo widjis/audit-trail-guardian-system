@@ -16,7 +16,7 @@ initializeSchema().catch(err => {
 // Get all users
 router.get('/', async (req, res) => {
   try {
-    const users = await executeQuery('SELECT id, username, role FROM users');
+    const users = await executeQuery('SELECT id, username, role, approved FROM users');
     res.json(users);
   } catch (error) {
     logger.api.error('Failed to get users from database:', error);
@@ -27,12 +27,24 @@ router.get('/', async (req, res) => {
 // Get all support accounts
 router.get('/support', async (req, res) => {
   try {
-    const query = "SELECT id, username, role FROM users WHERE role = 'support'";
+    const query = "SELECT id, username, role, approved FROM users WHERE role = 'support'";
     const supportUsers = await executeQuery(query);
     res.json(supportUsers);
   } catch (error) {
     logger.api.error('Failed to get support users from database:', error);
     res.status(500).json({ error: 'Database error: Failed to retrieve support users' });
+  }
+});
+
+// Get pending approval accounts
+router.get('/pending', async (req, res) => {
+  try {
+    const query = "SELECT id, username, role FROM users WHERE approved = 0 AND role = 'support'";
+    const pendingUsers = await executeQuery(query);
+    res.json(pendingUsers);
+  } catch (error) {
+    logger.api.error('Failed to get pending users from database:', error);
+    res.status(500).json({ error: 'Database error: Failed to retrieve pending users' });
   }
 });
 
@@ -63,9 +75,12 @@ router.post('/', async (req, res) => {
     const hashedPassword = await bcrypt.hash(user.password, SALT_ROUNDS);
     logger.api.debug('Password hashed successfully');
     
+    // Set approved to 1 for admin-created accounts
+    const approved = user.approved !== undefined ? user.approved : 1;
+    
     // Insert user into database with hashed password
-    const query = 'INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)';
-    await executeQuery(query, [user.id, user.username, hashedPassword, user.role]);
+    const query = 'INSERT INTO users (id, username, password, role, approved) VALUES (?, ?, ?, ?, ?)';
+    await executeQuery(query, [user.id, user.username, hashedPassword, user.role, approved]);
     
     logger.api.info('User successfully created in database');
     
@@ -82,7 +97,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, role } = req.body;
+    const { username, role, approved } = req.body;
     
     // Check if user exists
     const existingUsers = await executeQuery('SELECT id FROM users WHERE id = ?', [id]);
@@ -99,12 +114,71 @@ router.put('/:id', async (req, res) => {
     }
     
     // Update user in database
-    const query = 'UPDATE users SET username = ?, role = ? WHERE id = ?';
-    await executeQuery(query, [username, role, id]);
+    let query = 'UPDATE users SET username = ?, role = ?';
+    let params = [username, role];
     
-    res.json({ id, username, role });
+    // Include approved status in update if provided
+    if (approved !== undefined) {
+      query += ', approved = ?';
+      params.push(approved ? 1 : 0);
+    }
+    
+    query += ' WHERE id = ?';
+    params.push(id);
+    
+    await executeQuery(query, params);
+    
+    res.json({ id, username, role, approved: approved !== undefined ? approved : undefined });
   } catch (error) {
     logger.api.error('Failed to update user in database:', error);
+    res.status(500).json({ error: `Database error: ${error.message}` });
+  }
+});
+
+// Approve a user
+router.post('/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const existingUsers = await executeQuery('SELECT id, username FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update approval status
+    await executeQuery('UPDATE users SET approved = 1 WHERE id = ?', [id]);
+    
+    const username = existingUsers[0].username;
+    logger.api.info(`User ${username} has been approved`);
+    
+    res.json({ success: true, message: `User ${username} has been approved` });
+  } catch (error) {
+    logger.api.error('Failed to approve user:', error);
+    res.status(500).json({ error: `Database error: ${error.message}` });
+  }
+});
+
+// Disapprove a user
+router.post('/:id/disapprove', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const existingUsers = await executeQuery('SELECT id, username FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update approval status
+    await executeQuery('UPDATE users SET approved = 0 WHERE id = ?', [id]);
+    
+    const username = existingUsers[0].username;
+    logger.api.info(`User ${username} has been disapproved`);
+    
+    res.json({ success: true, message: `User ${username} has been disapproved` });
+  } catch (error) {
+    logger.api.error('Failed to disapprove user:', error);
     res.status(500).json({ error: `Database error: ${error.message}` });
   }
 });
