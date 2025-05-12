@@ -1,3 +1,4 @@
+
 export interface NewHire {
   id: string;
   name: string;
@@ -65,3 +66,8 @@ export interface ImportResponse {
   totalRows?: number;
   errors?: ImportError[];
 }
+
+// Add types for table sorting
+export type SortDirection = "asc" | "desc" | null;
+export type SortField = string | null;
+

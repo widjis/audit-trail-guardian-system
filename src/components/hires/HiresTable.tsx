@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { hiresApi } from "@/services/api";
-import { NewHire } from "@/types/types";
+import { NewHire, SortDirection, SortField } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Edit, Trash2, Search, ListPlus, Laptop } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { licenseService } from "@/services/license-service";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { SortButton } from "./SortButton";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -26,7 +27,10 @@ export function HiresTable() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
-  // New states for column filters
+  // Add sort state
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  // Column filters state
   const [filters, setFilters] = useState({
     name: "",
     title: "",
@@ -176,6 +180,31 @@ export function HiresTable() {
     setFilters(prev => ({ ...prev, [column]: "" }));
   };
   
+  // New function to handle sorting
+  const handleSort = (field: string) => {
+    let newDirection: SortDirection = "asc";
+    
+    // If already sorting by this field, toggle direction or clear sort
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        newDirection = "desc";
+      } else if (sortDirection === "desc") {
+        // Reset sort
+        setSortField(null);
+        setSortDirection(null);
+        return;
+      }
+    }
+    
+    setSortField(field);
+    setSortDirection(newDirection);
+  };
+  
+  // Get sort direction for a column (for display in UI)
+  const getSortDirectionForField = (field: string): SortDirection => {
+    return sortField === field ? sortDirection : null;
+  };
+  
   // Combined filtering logic for global search and column filters
   const filteredHires = hires.filter((hire) => {
     // Global search filtering
@@ -198,16 +227,45 @@ export function HiresTable() {
     const matchesStatus = filters.status === "" || 
       hire.account_creation_status === filters.status;
     
-    // New license filter
+    // License filter
     const licenseLower = filters.license.toLowerCase();
     const hireLicense = (hire.microsoft_365_license || "None").toLowerCase();
     const matchesLicense = filters.license === "" || 
       hireLicense === licenseLower ||
-      // Special case for "None" filter
       (licenseLower === "none" && (!hire.microsoft_365_license || hire.microsoft_365_license === ""));
     
     return matchesSearch && matchesName && matchesTitle && 
            matchesDepartment && matchesEmail && matchesStatus && matchesLicense;
+  });
+
+  // Apply sorting to filtered data
+  const sortedHires = [...filteredHires].sort((a, b) => {
+    if (!sortField || !sortDirection) return 0;
+    
+    // Handle different data types for sorting
+    let valueA = a[sortField];
+    let valueB = b[sortField];
+    
+    // Special handling for dates
+    if (sortField === "on_site_date" || sortField === "created_at" || sortField === "updated_at") {
+      valueA = new Date(valueA || 0).getTime();
+      valueB = new Date(valueB || 0).getTime();
+    } 
+    // Special handling for license (consider "None" as empty string for sorting)
+    else if (sortField === "microsoft_365_license") {
+      valueA = valueA || "";
+      valueB = valueB || "";
+    }
+    // String comparison for other fields
+    else if (typeof valueA === "string" && typeof valueB === "string") {
+      valueA = valueA.toLowerCase();
+      valueB = valueB.toLowerCase();
+    }
+    
+    // Compare values based on sort direction
+    if (valueA < valueB) return sortDirection === "asc" ? -1 : 1;
+    if (valueA > valueB) return sortDirection === "asc" ? 1 : -1;
+    return 0;
   });
 
   return (
@@ -249,7 +307,7 @@ export function HiresTable() {
 
       {isLoading ? (
         <div className="text-center py-8">Loading...</div>
-      ) : filteredHires.length === 0 ? (
+      ) : sortedHires.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {searchQuery || Object.values(filters).some(f => f !== "") 
             ? "No matching records found" 
@@ -262,7 +320,7 @@ export function HiresTable() {
               <TableRow>
                 <TableHead className="w-[50px]">
                   <Checkbox 
-                    checked={filteredHires.length > 0 && selectedHires.length === filteredHires.length} 
+                    checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all"
                   />
@@ -270,6 +328,10 @@ export function HiresTable() {
                 <TableHead>
                   <div className="flex items-center">
                     Name
+                    <SortButton 
+                      direction={getSortDirectionForField("name")}
+                      onClick={() => handleSort("name")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("name")}
                       onClear={() => clearFilter("name")}
@@ -287,6 +349,10 @@ export function HiresTable() {
                 <TableHead>
                   <div className="flex items-center">
                     Title
+                    <SortButton 
+                      direction={getSortDirectionForField("title")}
+                      onClick={() => handleSort("title")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("title")}
                       onClear={() => clearFilter("title")}
@@ -304,6 +370,10 @@ export function HiresTable() {
                 <TableHead>
                   <div className="flex items-center">
                     Department
+                    <SortButton 
+                      direction={getSortDirectionForField("department")}
+                      onClick={() => handleSort("department")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("department")}
                       onClear={() => clearFilter("department")}
@@ -321,6 +391,10 @@ export function HiresTable() {
                 <TableHead>
                   <div className="flex items-center">
                     Email
+                    <SortButton 
+                      direction={getSortDirectionForField("email")}
+                      onClick={() => handleSort("email")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("email")}
                       onClear={() => clearFilter("email")}
@@ -335,11 +409,23 @@ export function HiresTable() {
                     </FilterPopover>
                   </div>
                 </TableHead>
-                <TableHead>Onsite Date</TableHead>
+                <TableHead>
+                  <div className="flex items-center">
+                    Onsite Date
+                    <SortButton 
+                      direction={getSortDirectionForField("on_site_date")}
+                      onClick={() => handleSort("on_site_date")}
+                    />
+                  </div>
+                </TableHead>
                 <TableHead>
                   <div className="flex items-center">
                     <Laptop className="h-3 w-3 mr-1" /> 
                     License
+                    <SortButton 
+                      direction={getSortDirectionForField("microsoft_365_license")}
+                      onClick={() => handleSort("microsoft_365_license")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("license")}
                       onClear={() => clearFilter("license")}
@@ -362,6 +448,10 @@ export function HiresTable() {
                 <TableHead>
                   <div className="flex items-center">
                     Status
+                    <SortButton 
+                      direction={getSortDirectionForField("account_creation_status")}
+                      onClick={() => handleSort("account_creation_status")}
+                    />
                     <FilterPopover 
                       isActive={isFilterActive("status")}
                       onClear={() => clearFilter("status")}
@@ -395,7 +485,7 @@ export function HiresTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredHires.map((hire) => (
+              {sortedHires.map((hire) => (
                 <TableRow key={hire.id}>
                   <TableCell>
                     <Checkbox 
