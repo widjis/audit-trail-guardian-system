@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
     
     if (passwordMatch) {
       // Check if user is approved
-      if (user.approved !== 1 && user.role !== 'admin') {
+      if (!user.approved && user.role !== 'admin') {
         logger.api.warn(`Login attempt by unapproved user: ${username}`);
         return res.status(403).json({ error: 'Your account is pending approval by an admin' });
       }
