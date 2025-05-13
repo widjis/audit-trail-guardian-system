@@ -17,8 +17,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// CORS configuration - accept requests from all origins or specific ones
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(extractUser);
 
@@ -129,9 +137,10 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend server is running!' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Start server - listen on all network interfaces (0.0.0.0)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}, accessible at http://localhost:${PORT}`);
+  console.log(`Also accessible at http://<your-network-ip>:${PORT}`);
 });
 
 export default app;

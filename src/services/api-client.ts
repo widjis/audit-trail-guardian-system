@@ -2,9 +2,12 @@
 import axios from 'axios';
 import logger from '@/utils/logger';
 
+// Get API base URL from environment variables, with fallback for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 // Create base API client
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   }
