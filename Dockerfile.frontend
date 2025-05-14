@@ -1,21 +1,22 @@
-# Dockerfile.frontend
-
 # — Build Stage —
 FROM node:18-alpine AS build
 WORKDIR /app
 
-# 1) grab package files + config  
-COPY package*.json vite.config.ts tsconfig*.json ./
+# 1) Copy manifest + config + entrypoint
+COPY package*.json vite.config.ts tsconfig*.json index.html ./
 
-# 2) copy source  
-COPY public/ public/
+# 2) Copy your source & public assets
 COPY src/ src/
+COPY public/ public/
 
-# 3) install & build  
-RUN npm ci  
-# accept the build-time API URL and expose it to Vite
+# 3) Install dependencies
+RUN npm ci
+
+# 4) Inject your API URL
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
+
+# 5) Build
 RUN npm run build
 
 # — Serve Stage —
