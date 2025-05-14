@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 1) Copy manifest + configs + entrypoint
 COPY package*.json vite.config.ts tsconfig*.json index.html ./
-COPY postcss.config.js tailwind.config.js ./
+COPY postcss.config.js tailwind.config.ts ./
 
 # 2) Copy your source & public assets
 COPY src/ src/
