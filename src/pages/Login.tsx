@@ -29,12 +29,14 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-audit-gray">
-      <div className="max-w-md w-full space-y-8 p-4">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-audit-blue">MTI Onboarding Workflow</h1>
-          <p className="mt-2 text-sm text-gray-600">New Hire Audit Log Management System</p>
+      <div>
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-audit-blue">MTI User Onboarding System</h1>
+          <p className="mt-2 text-sm text-gray-600">Streamlined User Onboarding & Audit Management</p>
         </div>
-        <LoginForm />
+        <div className="max-w-md w-full space-y-8 p-4 mx-auto">
+          <LoginForm />
+        </div>
       </div>
     </div>
   );
