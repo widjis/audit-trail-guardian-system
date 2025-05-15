@@ -43,6 +43,13 @@ export interface UserAccount extends User {
 export interface LoginCredentials {
   username: string;
   password: string;
+  rememberMe?: boolean; // Add this line
+}
+
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
 }
 
 export interface AuthResponse {
