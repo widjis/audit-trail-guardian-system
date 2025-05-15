@@ -31,6 +31,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-audit-gray">
       <div>
         <div className="mb-8 text-center">
+          <img
+            src="/MTI-removebg-preview.png"
+            alt="MTI Logo"
+            className="mx-auto mb-4 h-20 w-auto"
+          />
           <h1 className="text-3xl font-bold text-audit-blue">MTI User Onboarding System</h1>
           <p className="mt-2 text-sm text-gray-600">Streamlined User Onboarding & Audit Management</p>
         </div>

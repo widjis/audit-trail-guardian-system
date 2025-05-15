@@ -30,6 +30,11 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center bg-audit-gray">
       <div className="max-w-md w-full space-y-8 p-4 text-center">
         <div>
+          <img
+            src="/MTI-removebg-preview.png"
+            alt="MTI Logo"
+            className="mx-auto mb-4 h-40 w-auto"
+          />
           <h1 className="text-4xl font-bold text-audit-blue">MTI User Onboarding System</h1>
           <p className="mt-4 text-xl text-gray-600">Streamlined User Onboarding & Audit Management</p>
           <p className="mt-2 text-gray-500">
