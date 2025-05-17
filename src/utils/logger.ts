@@ -2,6 +2,7 @@
 /**
  * Centralized logger utility for frontend
  * Controls logging based on environment variables
+ * Enhanced with better formatting and additional components
  */
 
 // Log levels in order of verbosity
@@ -12,13 +13,15 @@ export interface LoggerConfig {
   level: LogLevel;
   enableApi: boolean;
   enableUi: boolean;
+  enableLdap: boolean; // Added LDAP logging option
 }
 
 // Default configuration
 const defaultConfig: LoggerConfig = {
-  level: 'info', // Default log level
-  enableApi: true, // API logs enabled by default
-  enableUi: true, // UI logs enabled by default
+  level: 'info',     // Default log level
+  enableApi: true,   // API logs enabled by default
+  enableUi: true,    // UI logs enabled by default
+  enableLdap: true,  // LDAP logs enabled by default
 };
 
 // Get config from environment variables or use defaults
@@ -28,6 +31,7 @@ const getLoggerConfig = (): LoggerConfig => {
     level: (import.meta.env.VITE_LOG_LEVEL as LogLevel) || defaultConfig.level,
     enableApi: import.meta.env.VITE_LOG_API !== 'false',
     enableUi: import.meta.env.VITE_LOG_UI !== 'false',
+    enableLdap: import.meta.env.VITE_LOG_LDAP !== 'false',
   };
 };
 
@@ -50,28 +54,62 @@ const shouldLog = (level: LogLevel): boolean => {
   return messageLevel >= configLevel;
 };
 
+// Format timestamp for logs
+const getTimestamp = (): string => {
+  return new Date().toISOString();
+};
+
+// Helper to sanitize sensitive data from logs
+const sanitizeForLog = (obj: any): any => {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  // Create a deep copy to avoid modifying the original
+  const sanitized = JSON.parse(JSON.stringify(obj));
+  
+  // List of fields that should be redacted
+  const sensitiveFields = ['password', 'pwd', 'secret', 'token', 'key', 'unicodePwd'];
+  
+  // Recursively sanitize the object
+  const sanitizeObj = (obj: any): void => {
+    if (!obj || typeof obj !== 'object') return;
+    
+    Object.keys(obj).forEach(key => {
+      if (sensitiveFields.includes(key.toLowerCase())) {
+        if (obj[key]) {
+          obj[key] = '[REDACTED]';
+        }
+      } else if (typeof obj[key] === 'object') {
+        sanitizeObj(obj[key]);
+      }
+    });
+  };
+  
+  sanitizeObj(sanitized);
+  return sanitized;
+};
+
 // Logger functions for different components
 export const logger = {
   // API related logs
   api: {
     debug: (message: string, ...args: any[]) => {
       if (config.enableApi && shouldLog('debug')) {
-        console.debug(`[API] ${message}`, ...args);
+        console.debug(`[${getTimestamp()}] [API] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     info: (message: string, ...args: any[]) => {
       if (config.enableApi && shouldLog('info')) {
-        console.info(`[API] ${message}`, ...args);
+        console.info(`[${getTimestamp()}] [API] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     warn: (message: string, ...args: any[]) => {
       if (config.enableApi && shouldLog('warn')) {
-        console.warn(`[API] ${message}`, ...args);
+        console.warn(`[${getTimestamp()}] [API] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     error: (message: string, ...args: any[]) => {
       if (config.enableApi && shouldLog('error')) {
-        console.error(`[API] ${message}`, ...args);
+        console.error(`[${getTimestamp()}] [API] [ERROR] ${message}`, ...args.map(sanitizeForLog));
       }
     },
   },
@@ -80,22 +118,54 @@ export const logger = {
   ui: {
     debug: (component: string, message: string, ...args: any[]) => {
       if (config.enableUi && shouldLog('debug')) {
-        console.debug(`[${component}] ${message}`, ...args);
+        console.debug(`[${getTimestamp()}] [${component}] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     info: (component: string, message: string, ...args: any[]) => {
       if (config.enableUi && shouldLog('info')) {
-        console.info(`[${component}] ${message}`, ...args);
+        console.info(`[${getTimestamp()}] [${component}] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     warn: (component: string, message: string, ...args: any[]) => {
       if (config.enableUi && shouldLog('warn')) {
-        console.warn(`[${component}] ${message}`, ...args);
+        console.warn(`[${getTimestamp()}] [${component}] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     error: (component: string, message: string, ...args: any[]) => {
       if (config.enableUi && shouldLog('error')) {
-        console.error(`[${component}] ${message}`, ...args);
+        console.error(`[${getTimestamp()}] [${component}] [ERROR] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+  },
+  
+  // LDAP/Active Directory specific logs (client-side)
+  ldap: {
+    debug: (message: string, ...args: any[]) => {
+      if (config.enableLdap && shouldLog('debug')) {
+        console.debug(`[${getTimestamp()}] [LDAP] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    info: (message: string, ...args: any[]) => {
+      if (config.enableLdap && shouldLog('info')) {
+        console.info(`[${getTimestamp()}] [LDAP] [INFO] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    warn: (message: string, ...args: any[]) => {
+      if (config.enableLdap && shouldLog('warn')) {
+        console.warn(`[${getTimestamp()}] [LDAP] [WARN] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    error: (message: string, ...args: any[]) => {
+      if (config.enableLdap && shouldLog('error')) {
+        console.error(`[${getTimestamp()}] [LDAP] [ERROR] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    operation: (operation: string, details: any = null) => {
+      if (config.enableLdap && shouldLog('debug')) {
+        console.debug(`[${getTimestamp()}] [LDAP] [OPERATION] ${operation}`);
+        if (details) {
+          console.debug(`[${getTimestamp()}] [LDAP] [DETAILS]`, sanitizeForLog(details));
+        }
       }
     },
   },

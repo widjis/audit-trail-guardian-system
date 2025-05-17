@@ -93,13 +93,19 @@ const createLdapClient = (settings) => {
     rejectUnauthorized: false // Don't validate certificate in dev/test environments
   };
   
-  // Create client with appropriate URL
+  // Create client with appropriate URL and explicitly set protocol version to v3
   const client = ldap.createClient({
     url: `${protocol}://${settings.server}:${port}`,
     timeout: 5000,
     connectTimeout: 10000,
     tlsOptions: tlsOptions,
-    reconnect: false // Disable automatic reconnection to avoid hanging
+    reconnect: false, // Disable automatic reconnection to avoid hanging
+    idleTimeout: 30000,
+    strictDN: false, // More forgiving DN parsing
+    queueSize: 1000,
+    queueTimeout: 5000,
+    queueDisable: false,
+    version: 3 // Explicitly set LDAP protocol version to 3
   });
   
   // Add more detailed event handlers
@@ -109,10 +115,21 @@ const createLdapClient = (settings) => {
   
   client.on('error', (err) => {
     logger.api.error('LDAP client error event:', err.message);
+    if (err.code) {
+      logger.api.error(`LDAP error code: ${err.code}, name: ${err.name}`);
+    }
   });
   
   client.on('connect', () => {
     logger.api.debug('LDAP client connected successfully');
+  });
+  
+  client.on('timeout', () => {
+    logger.api.warn('LDAP client timeout occurred');
+  });
+  
+  client.on('close', () => {
+    logger.api.info('LDAP connection closed');
   });
   
   return client;
@@ -179,15 +196,36 @@ const testLdapConnection = (settings) => {
   });
 };
 
-// Helper function to encode password for AD (requires specific unicode format)
+// FIXED: Improved password encoding for AD (requires specific unicode format)
+// Properly encodes password with double quotes and uses utf16le encoding
 function encodeUnicodePwd(password) {
   if (!password) {
     throw new Error("Password is required for AD account creation");
   }
   
+  // Validate password meets minimum complexity requirements
+  if (password.length < 7) {
+    throw new Error("Password must be at least 7 characters long for Active Directory");
+  }
+
+  // Check for potentially problematic characters in the password
+  const problematicChars = /[^\x20-\x7E]/; // Non-printable ASCII
+  if (problematicChars.test(password)) {
+    logger.api.warn("Password contains potentially problematic non-ASCII characters");
+  }
+  
   logger.api.debug(`Encoding password of length: ${password.length}`);
-  const encodedPwd = Buffer.from('"' + password + '"', 'utf16le');
-  return encodedPwd;
+  
+  // Properly encode password with quotes for AD according to MS specs
+  try {
+    // The proper format for AD password is to wrap with double quotes and use utf16le
+    const encodedPwd = Buffer.from('"' + password + '"', 'utf16le');
+    logger.api.debug(`Password encoded successfully, buffer length: ${encodedPwd.length} bytes`);
+    return encodedPwd;
+  } catch (error) {
+    logger.api.error("Error encoding password:", error);
+    throw new Error(`Failed to encode password: ${error.message}`);
+  }
 }
 
 // Get AD settings
@@ -287,12 +325,21 @@ router.post('/create-user/:id', async (req, res) => {
       });
     }
     
-    // Validate required fields including password
+    // Enhanced password validation
     if (!userData.password) {
       logger.api.error('Missing password for AD user creation');
       return res.status(400).json({
         success: false,
         error: "Missing password for user account creation"
+      });
+    }
+    
+    // Check password complexity
+    if (userData.password.length < 7) {
+      logger.api.error('Password too short for AD user creation');
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 7 characters long for AD account"
       });
     }
     
@@ -346,7 +393,7 @@ router.post('/create-user/:id', async (req, res) => {
   }
 });
 
-// Create user in AD - similar to the example provided
+// Create user in AD - enhanced with better error handling and logging
 const createLdapUser = async (settings, userData) => {
   return new Promise(async (resolve, reject) => {
     const client = createLdapClient(settings);
@@ -378,7 +425,7 @@ const createLdapUser = async (settings, userData) => {
       const userDN = `CN=${userData.displayName},${userData.ou}`;
       logger.api.debug(`User DN will be: ${userDN}`);
       
-      // Encode password for AD - with error handling
+      // Encode password for AD - with enhanced error handling
       let unicodePwd;
       try {
         unicodePwd = encodeUnicodePwd(userData.password);
@@ -388,36 +435,57 @@ const createLdapUser = async (settings, userData) => {
         throw new Error(`Password encoding failed: ${pwdError.message}`);
       }
       
-      // Create user entry object
+      // Create user entry object with careful attribute typing
       const entry = {
-        objectClass: ['top','person','organizationalPerson','user'],
+        objectClass: ['top', 'person', 'organizationalPerson', 'user'],
         cn: userData.displayName,
-        sn: userData.lastName || userData.displayName.split(' ').pop(),
-        givenName: userData.firstName || userData.displayName.split(' ')[0],
+        sn: userData.lastName || userData.displayName.split(' ').pop() || userData.displayName,
+        givenName: userData.firstName || userData.displayName.split(' ')[0] || userData.displayName,
         displayName: userData.displayName,
         sAMAccountName: userData.username,
-        userPrincipalName: userData.email,
-        mail: userData.email,
-        unicodePwd: unicodePwd,
         userAccountControl: '512', // Enable account
-        title: userData.title || '',
-        department: userData.department || '',
-        company: userData.company || '',
-        physicalDeliveryOfficeName: userData.office || '',
       };
       
-      // Create the user
+      // Only add non-empty attributes to avoid syntax errors
+      if (userData.email && userData.email.includes('@')) {
+        entry.mail = userData.email;
+        entry.userPrincipalName = userData.email;
+      }
+      
+      if (userData.title) entry.title = userData.title;
+      if (userData.department) entry.department = userData.department;
+      if (userData.company) entry.company = userData.company;
+      if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
+      
+      // Add password as a separate property to ensure correct typing
+      entry.unicodePwd = unicodePwd;
+      
+      // Log the entry object for debugging (without the password)
+      const debugEntry = { ...entry };
+      delete debugEntry.unicodePwd;
+      logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
+      
+      // Create the user with enhanced error logging
       await new Promise((resolveAdd, rejectAdd) => {
         client.add(userDN, entry, (err) => {
           if (err) {
-            logger.api.error('Error creating user:', err);
+            logger.api.error(`Error creating user: ${err.message}`);
+            if (err.code) {
+              logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
+            }
+            // Enhanced logging for attribute syntax errors
+            if (err.name === 'InvalidAttributeSyntaxError') {
+              logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
+              logger.api.error('- unicodePwd (password encoding)');
+              logger.api.error('- userPrincipalName and mail (must be valid email formats)');
+              logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
+            }
             return rejectAdd(err);
           }
+          logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
           resolveAdd();
         });
       });
-      
-      logger.api.debug('User created successfully, will now add to groups');
       
       // Add to security groups if specified
       if (userData.acl) {
@@ -441,7 +509,10 @@ const createLdapUser = async (settings, userData) => {
       
       // Unbind when done
       await new Promise((resolveUnbind) => {
-        client.unbind(() => resolveUnbind());
+        client.unbind(() => {
+          logger.api.debug('Successfully unbound from AD server');
+          resolveUnbind();
+        });
       });
       
       // Return success
@@ -475,15 +546,18 @@ const createLdapUser = async (settings, userData) => {
   });
 };
 
-// Helper function to add user to a group
+// Helper function to add user to a group with improved error handling
 const addUserToGroup = (client, userDN, groupName) => {
   return new Promise((resolve, reject) => {
+    logger.api.debug(`Searching for group: ${groupName}`);
+    
     // First search for the group
     client.search('', {
       filter: `(&(objectClass=group)(cn=${groupName}))`,
       scope: 'sub'
     }, (err, res) => {
       if (err) {
+        logger.api.error(`Error searching for group ${groupName}:`, err);
         return reject(err);
       }
       
@@ -491,14 +565,17 @@ const addUserToGroup = (client, userDN, groupName) => {
       
       res.on('searchEntry', (entry) => {
         groupDN = entry.dn.toString();
+        logger.api.debug(`Found group DN: ${groupDN}`);
       });
       
       res.on('error', (err) => {
+        logger.api.error(`Search error for group ${groupName}:`, err);
         reject(err);
       });
       
       res.on('end', () => {
         if (!groupDN) {
+          logger.api.warn(`Group ${groupName} not found`);
           return reject(new Error(`Group ${groupName} not found`));
         }
         
@@ -511,10 +588,18 @@ const addUserToGroup = (client, userDN, groupName) => {
           }
         });
         
+        logger.api.debug(`Adding user ${userDN} to group ${groupDN}`);
         client.modify(groupDN, change, (err) => {
           if (err) {
+            // If the error is that the user is already a member, that's ok
+            if (err.name === 'EntryAlreadyExistsError') {
+              logger.api.info(`User ${userDN} is already a member of ${groupName}`);
+              return resolve();
+            }
+            logger.api.error(`Error adding user to group ${groupName}:`, err);
             return reject(err);
           }
+          logger.api.info(`Successfully added user to group ${groupName}`);
           resolve();
         });
       });
