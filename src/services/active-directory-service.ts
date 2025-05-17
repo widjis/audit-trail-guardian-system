@@ -103,6 +103,9 @@ export const activeDirectoryService = {
   createUser: async (hireId: string, userData: ADUserData): Promise<ADUserCreationResult> => {
     logger.api.debug('Creating AD user for hire ID:', hireId);
     
+    // Log password presence without revealing actual password
+    logger.api.debug(`Password provided: ${userData.password ? 'Yes' : 'No'}, Length: ${userData.password?.length || 0}`);
+    
     // Validate password before sending request
     if (!userData.password) {
       logger.api.error('Missing password for AD user creation');
@@ -114,9 +117,6 @@ export const activeDirectoryService = {
       logger.api.error('Password too short for AD user creation');
       throw new Error("Password must be at least 7 characters long");
     }
-    
-    // Log password length but not the actual password
-    logger.api.debug(`Password length for user ${userData.username}: ${userData.password.length}`);
     
     try {
       // Validate required fields before sending to server

@@ -184,6 +184,7 @@ function encodeUnicodePwd(password) {
   if (!password) {
     throw new Error("Password is required for AD account creation");
   }
+  
   logger.api.debug(`Encoding password of length: ${password.length}`);
   const encodedPwd = Buffer.from('"' + password + '"', 'utf16le');
   return encodedPwd;
@@ -271,6 +272,11 @@ router.post('/create-user/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userData = req.body;
+    
+    // Log received data (without logging the actual password)
+    logger.api.debug(`Create user request for hire ID: ${id}`);
+    logger.api.debug(`Username: ${userData.username}, Display name: ${userData.displayName}`);
+    logger.api.debug(`Password provided: ${userData.password ? 'Yes' : 'No'}, Length: ${userData.password?.length || 0}`);
     
     // First, check if AD integration is enabled
     const settings = getSettings();

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
 import { activeDirectoryService } from "@/services/active-directory-service";
-import { Loader2, CheckCircle2, Copy, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, Copy, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
   const [manualPassword, setManualPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [result, setResult] = useState<{
     success?: boolean;
     message?: string;
@@ -29,7 +30,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     error?: string;
   } | null>(null);
 
-  // Generate AD user data from hire details - now memoized to avoid re-renders
+  // Generate AD user data from hire details
   const generateADUserData = () => {
     const nameParts = hire.name?.split(' ') || [];
     const firstName = nameParts[0] || '';
@@ -90,8 +91,9 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     
     try {
       const userData = generateADUserData();
-      
-      // Check if password is provided
+      console.log("Creating AD account with password length:", userData.password?.length || 0);
+
+      // Check if password is provided or needs to be manually entered
       if (!userData.password) {
         setResult({
           success: false,
@@ -127,7 +129,6 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         return;
       }
       
-      console.log("Creating AD account with password length:", userData.password?.length || 0);
       const result = await activeDirectoryService.createUser(hire.id, userData);
       
       setResult(result);
@@ -175,7 +176,8 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
 
   // Generate user data once for rendering
   const adUserData = generateADUserData();
-  // Check for missing password outside the render flow
+  
+  // Check for missing password (null, undefined, or empty string)
   const isMissingPassword = !adUserData.password;
 
   return (
@@ -282,6 +284,23 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                     
                     <div className="font-medium">Office:</div>
                     <div>{adUserData.office}</div>
+
+                    {hire.initial_password && (
+                      <>
+                        <div className="font-medium">Initial Password:</div>
+                        <div className="flex items-center">
+                          <span>{showPassword ? hire.initial_password : '•'.repeat(hire.initial_password?.length || 8)}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="ml-2 p-0 h-6 w-6"
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 
@@ -300,7 +319,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                   </ul>
                 </div>
                 
-                {/* Password field */}
+                {/* Password field - only show if initial_password is missing */}
                 {isMissingPassword && (
                   <div className="space-y-2">
                     <Alert variant="destructive">
@@ -313,13 +332,25 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                     
                     <div className="space-y-1">
                       <Label htmlFor="manual-password">Password</Label>
-                      <Input
-                        id="manual-password"
-                        type="password"
-                        value={manualPassword}
-                        onChange={(e) => setManualPassword(e.target.value)}
-                        placeholder="Enter password for AD account"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="manual-password"
+                          type={showPassword ? "text" : "password"}
+                          value={manualPassword}
+                          onChange={(e) => setManualPassword(e.target.value)}
+                          placeholder="Enter password for AD account"
+                          className="pr-10"
+                        />
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="sm" 
+                          className="absolute right-0 top-0 h-full px-3"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
