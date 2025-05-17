@@ -8,6 +8,7 @@ interface ActiveDirectorySettings {
   password: string;
   domain: string;
   baseDN: string;
+  protocol: "ldap" | "ldaps";
   enabled: boolean;
 }
 

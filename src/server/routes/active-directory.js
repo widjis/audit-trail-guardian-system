@@ -48,10 +48,18 @@ const saveSettings = (settings) => {
 
 // Real LDAP/AD Connection using ldapjs
 const createLdapClient = (settings) => {
+  // Determine the protocol (ldap or ldaps)
+  const protocol = settings.protocol || 'ldap';
+  const port = protocol === 'ldaps' ? 636 : 389;
+  
+  // Create client with appropriate URL
   const client = ldap.createClient({
-    url: `ldap://${settings.server}`,
+    url: `${protocol}://${settings.server}:${port}`,
     timeout: 5000,
-    connectTimeout: 10000
+    connectTimeout: 10000,
+    tlsOptions: protocol === 'ldaps' ? {
+      rejectUnauthorized: false // Set to true in production with proper certificates
+    } : undefined
   });
   
   return client;
@@ -79,9 +87,11 @@ const testLdapConnection = (settings) => {
           return reject(new Error(`Authentication failed: ${err.message}`));
         }
         
-        logger.api.info('LDAP connection successful');
+        const protocol = settings.protocol || 'ldap';
+        const secureMsg = protocol === 'ldaps' ? ' using secure LDAPS connection' : '';
+        logger.api.info(`LDAP connection successful${secureMsg}`);
         client.unbind();
-        resolve({ success: true, message: "Connected successfully" });
+        resolve({ success: true, message: `Connected successfully${secureMsg}` });
       });
     } catch (err) {
       logger.api.error('LDAP connection setup error:', err);
@@ -243,6 +253,7 @@ router.get('/', (req, res) => {
       password: '',
       domain: 'mbma.com',
       baseDN: 'DC=mbma,DC=com',
+      protocol: 'ldap',
       enabled: false
     };
     

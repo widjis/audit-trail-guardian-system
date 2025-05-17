@@ -1,3 +1,4 @@
+
 {
   "accountStatuses": [
     "Pending",
@@ -66,6 +67,7 @@
     "password": "MT!@T$1ng5h4n#2@24",
     "domain": "mbma.com",
     "baseDN": "DC=mbma,DC=com",
+    "protocol": "ldap",
     "enabled": true
   }
 }

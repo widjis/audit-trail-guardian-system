@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { settingsService } from "@/services/settings-service";
-import { AlertCircle, Server, ShieldCheck } from "lucide-react";
+import { activeDirectoryService } from "@/services/active-directory-service";
+import { AlertCircle, Server, ShieldCheck, Lock, Unlock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ActiveDirectorySettings {
   server: string;
@@ -17,6 +18,7 @@ interface ActiveDirectorySettings {
   password: string;
   domain: string;
   baseDN: string;
+  protocol: "ldap" | "ldaps";
   enabled: boolean;
 }
 
@@ -31,6 +33,7 @@ export function ActiveDirectorySettings() {
     password: "",
     domain: "mbma.com",
     baseDN: "DC=mbma,DC=com",
+    protocol: "ldap",
     enabled: false
   });
 
@@ -38,9 +41,13 @@ export function ActiveDirectorySettings() {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
-        const data = await settingsService.getActiveDirectorySettings();
+        const data = await activeDirectoryService.getSettings();
         if (data) {
-          setSettings(data);
+          // If protocol is not defined in loaded data, set default to "ldap"
+          setSettings({
+            ...data,
+            protocol: data.protocol || "ldap"
+          });
         }
       } catch (error) {
         console.error("Error fetching Active Directory settings:", error);
@@ -68,7 +75,7 @@ export function ActiveDirectorySettings() {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await settingsService.updateActiveDirectorySettings(settings);
+      await activeDirectoryService.updateSettings(settings);
       toast({
         title: "Success",
         description: "Active Directory settings saved successfully"
@@ -88,33 +95,17 @@ export function ActiveDirectorySettings() {
   const testConnection = async () => {
     try {
       setTestingConnection(true);
-      const response = await fetch('/api/settings/active-directory/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
+      const response = await activeDirectoryService.testConnection(settings);
+      
+      toast({
+        title: "Connection Successful",
+        description: response.message || "Successfully connected to Active Directory server",
       });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        toast({
-          title: "Connection Successful",
-          description: "Successfully connected to Active Directory server",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: data.error || "Could not connect to Active Directory server",
-          variant: "destructive",
-        });
-      }
     } catch (error) {
       console.error("Error testing AD connection:", error);
       toast({
-        title: "Error",
-        description: "Failed to test Active Directory connection",
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Could not connect to Active Directory server",
         variant: "destructive",
       });
     } finally {
@@ -153,38 +144,69 @@ export function ActiveDirectorySettings() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="server">AD Server Address</Label>
-              <Input 
-                id="server"
-                value={settings.server}
-                onChange={(e) => handleChange("server", e.target.value)}
-                placeholder="dc.example.com"
-                disabled={isLoading || !settings.enabled}
-              />
+              <Label>Connection Protocol</Label>
+              <RadioGroup 
+                value={settings.protocol} 
+                onValueChange={(value) => handleChange("protocol", value as "ldap" | "ldaps")}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="ldap" id="ldap" />
+                  <Label htmlFor="ldap" className="flex items-center gap-1">
+                    <Unlock className="h-4 w-4" />
+                    LDAP (Standard)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="ldaps" id="ldaps" />
+                  <Label htmlFor="ldaps" className="flex items-center gap-1">
+                    <Lock className="h-4 w-4" />
+                    LDAPS (Secure)
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-sm text-gray-500">
+                {settings.protocol === "ldaps" ? 
+                  "LDAPS uses SSL encryption for secure communication. Make sure your server is configured for LDAPS (port 636)." :
+                  "Standard LDAP uses port 389 with no encryption. Not recommended for production environments."}
+              </p>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="domain">Domain</Label>
-              <Input 
-                id="domain"
-                value={settings.domain}
-                onChange={(e) => handleChange("domain", e.target.value)}
-                placeholder="example.com"
-                disabled={isLoading || !settings.enabled}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="baseDN">Base DN</Label>
-              <Input 
-                id="baseDN"
-                value={settings.baseDN}
-                onChange={(e) => handleChange("baseDN", e.target.value)}
-                placeholder="DC=example,DC=com"
-                disabled={isLoading || !settings.enabled}
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="server">AD Server Address</Label>
+                <Input 
+                  id="server"
+                  value={settings.server}
+                  onChange={(e) => handleChange("server", e.target.value)}
+                  placeholder="dc.example.com"
+                  disabled={isLoading || !settings.enabled}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="domain">Domain</Label>
+                <Input 
+                  id="domain"
+                  value={settings.domain}
+                  onChange={(e) => handleChange("domain", e.target.value)}
+                  placeholder="example.com"
+                  disabled={isLoading || !settings.enabled}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="baseDN">Base DN</Label>
+                <Input 
+                  id="baseDN"
+                  value={settings.baseDN}
+                  onChange={(e) => handleChange("baseDN", e.target.value)}
+                  placeholder="DC=example,DC=com"
+                  disabled={isLoading || !settings.enabled}
+                />
+              </div>
             </div>
           </div>
 
