@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -180,6 +181,10 @@ const testLdapConnection = (settings) => {
 
 // Helper function to encode password for AD (requires specific unicode format)
 function encodeUnicodePwd(password) {
+  if (!password) {
+    throw new Error("Password is required for AD account creation");
+  }
+  logger.api.debug(`Encoding password of length: ${password.length}`);
   const encodedPwd = Buffer.from('"' + password + '"', 'utf16le');
   return encodedPwd;
 }
@@ -276,6 +281,15 @@ router.post('/create-user/:id', async (req, res) => {
       });
     }
     
+    // Validate required fields including password
+    if (!userData.password) {
+      logger.api.error('Missing password for AD user creation');
+      return res.status(400).json({
+        success: false,
+        error: "Missing password for user account creation"
+      });
+    }
+    
     // Create user in AD using ldapjs
     const result = await createLdapUser(settings.activeDirectorySettings, userData);
     
@@ -332,6 +346,11 @@ const createLdapUser = async (settings, userData) => {
     const client = createLdapClient(settings);
     
     try {
+      // Verify we have a password
+      if (!userData.password) {
+        throw new Error("Missing password for user account");
+      }
+      
       // Format the bind credentials based on settings
       const bindDN = formatBindCredential(settings, settings.username);
       logger.api.debug(`Binding to AD with DN: ${bindDN}`);
@@ -353,12 +372,19 @@ const createLdapUser = async (settings, userData) => {
       const userDN = `CN=${userData.displayName},${userData.ou}`;
       logger.api.debug(`User DN will be: ${userDN}`);
       
-      // Encode password for AD
-      const unicodePwd = encodeUnicodePwd(userData.password);
+      // Encode password for AD - with error handling
+      let unicodePwd;
+      try {
+        unicodePwd = encodeUnicodePwd(userData.password);
+        logger.api.debug(`Successfully encoded password for user ${userData.username}`);
+      } catch (pwdError) {
+        logger.api.error('Failed to encode password:', pwdError);
+        throw new Error(`Password encoding failed: ${pwdError.message}`);
+      }
       
       // Create user entry object
       const entry = {
-        objectClass: ['top', 'person', 'organizationalPerson', 'user'],
+        objectClass: ['top','person','organizationalPerson','user'],
         cn: userData.displayName,
         sn: userData.lastName || userData.displayName.split(' ').pop(),
         givenName: userData.firstName || userData.displayName.split(' ')[0],

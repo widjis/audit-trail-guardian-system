@@ -8,6 +8,8 @@ import { activeDirectoryService } from "@/services/active-directory-service";
 import { Loader2, CheckCircle2, Copy, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface CreateADAccountDialogProps {
   hire: NewHire;
@@ -18,6 +20,7 @@ interface CreateADAccountDialogProps {
 export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAccountDialogProps) {
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
+  const [manualPassword, setManualPassword] = useState("");
   const [result, setResult] = useState<{
     success?: boolean;
     message?: string;
@@ -33,8 +36,8 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     const lastName = nameParts.slice(1).join(' ') || '';
     const username = hire.username || hire.email?.split('@')[0] || '';
     
-    // Ensure we have a password
-    const password = hire.initial_password || '';
+    // Get password from hire record or manual input
+    const password = manualPassword || hire.initial_password || '';
     
     let department = hire.department || '';
     let ou = department 
@@ -88,24 +91,27 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     try {
       const userData = generateADUserData();
       
-      // Check if userData is valid
-      if (!userData) {
-        // Error already set in generateADUserData
-        setIsCreating(false);
+      // Check if password is provided
+      if (!userData.password) {
+        setResult({
+          success: false,
+          error: "Missing password for user account"
+        });
+        
         toast({
           title: "Error",
-          description: "Unable to generate AD user data. Check user details.",
+          description: "A password is required to create an AD account.",
           variant: "destructive",
         });
+        setIsCreating(false);
         return;
       }
       
       // Validate required fields
-      if (!userData.username || !userData.displayName || !userData.password) {
+      if (!userData.username || !userData.displayName) {
         const missingFields = [];
         if (!userData.username) missingFields.push('username');
         if (!userData.displayName) missingFields.push('display name');
-        if (!userData.password) missingFields.push('password');
         
         setResult({
           success: false,
@@ -121,6 +127,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         return;
       }
       
+      console.log("Creating AD account with password length:", userData.password?.length || 0);
       const result = await activeDirectoryService.createUser(hire.id, userData);
       
       setResult(result);
@@ -170,14 +177,6 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
   const adUserData = generateADUserData();
   // Check for missing password outside the render flow
   const isMissingPassword = !adUserData.password;
-  
-  // Set error state for missing password only once on component mount
-  if (isMissingPassword && !result) {
-    setResult({
-      success: false,
-      error: "Missing initial password for user"
-    });
-  }
 
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -301,6 +300,30 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                   </ul>
                 </div>
                 
+                {/* Password field */}
+                {isMissingPassword && (
+                  <div className="space-y-2">
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Missing Password</AlertTitle>
+                      <AlertDescription>
+                        No initial password is set for this user. Please provide a password below.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="manual-password">Password</Label>
+                      <Input
+                        id="manual-password"
+                        type="password"
+                        value={manualPassword}
+                        onChange={(e) => setManualPassword(e.target.value)}
+                        placeholder="Enter password for AD account"
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <Alert>
                   <AlertDescription>
                     This will create an active directory account for {hire.name} with username <strong>{adUserData.username}</strong> and 
@@ -337,7 +360,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         ) : (
           <Button 
             onClick={handleCreateADAccount}
-            disabled={isCreating || !adUserData || isMissingPassword}
+            disabled={isCreating || !adUserData || (isMissingPassword && !manualPassword)}
           >
             {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isCreating ? "Creating..." : "Create AD Account"}
