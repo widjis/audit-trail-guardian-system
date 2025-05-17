@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -201,7 +202,8 @@ router.post('/create-user/:id', async (req, res) => {
           [audit.id, audit.hire_id, audit.action, audit.details, audit.created_by, audit.created_at]
         );
       } catch (dbError) {
-        logger.error('Database error after AD account creation:', dbError);
+        // Using the correct logger format for the server
+        logger.db.error('Database error after AD account creation:', dbError);
         // Still return success, but with a warning
         return res.json({
           ...result,
@@ -212,7 +214,8 @@ router.post('/create-user/:id', async (req, res) => {
     
     res.json(result);
   } catch (err) {
-    logger.error('Error creating AD user:', err);
+    // Using the correct logger format for the server
+    logger.api.error('Error creating AD user:', err);
     res.status(500).json({ error: `Failed to create AD user: ${err.message}` });
   }
 });
