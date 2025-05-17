@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Copy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
@@ -46,6 +48,7 @@ export function HireForm() {
   const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false);
   const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
   const [isPasswordManuallyEdited, setIsPasswordManuallyEdited] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -116,15 +119,26 @@ export function HireForm() {
       let firstName = nameParts[0].toLowerCase();
       
       // For last name, use the last part of the name
-      let lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : "";
+      // If there's only one name (single word), use that for the whole email
+      let emailPart = '';
       
-      // Clean up the names - remove special characters and spaces
+      if (nameParts.length === 1) {
+        // Single word name, use it as-is
+        emailPart = firstName;
+      } else {
+        // Multiple word name, use firstname.lastname format
+        let lastName = nameParts[nameParts.length - 1].toLowerCase();
+        // Clean up the names - remove special characters and spaces
+        lastName = lastName.replace(/[^a-z0-9]/g, "");
+        emailPart = `${firstName}.${lastName}`;
+      }
+      
+      // Clean up first name for single-word case
       firstName = firstName.replace(/[^a-z0-9]/g, "");
-      lastName = lastName.replace(/[^a-z0-9]/g, "");
       
-      if (!firstName || !lastName) return "";
+      if (!firstName) return "";
       
-      return `${firstName}.${lastName}@merdekabattery.com`;
+      return `${emailPart}@merdekabattery.com`;
     } catch (error) {
       logger.ui.error("HireForm", "Error generating email:", error);
       return "";
@@ -203,7 +217,7 @@ export function HireForm() {
           setHire((prev) => ({ ...prev, password: generatedPassword }));
         }
       } else {
-        // If name is cleared
+        // If name is cleared, clear other fields if they're not manually edited
         if (!isEmailManuallyEdited) {
           setHire((prev) => ({ ...prev, email: "" }));
         }
@@ -236,6 +250,16 @@ export function HireForm() {
   const handleSelectChange = (name: string, value: string) => {
     logger.ui.debug("HireForm", `Select changed: ${name} = ${value}`);
     setHire((prev) => ({ ...prev, [name]: value }));
+  };
+  
+  const copyPasswordToClipboard = () => {
+    if (hire.password) {
+      navigator.clipboard.writeText(hire.password);
+      toast({
+        title: "Password copied",
+        description: "Password has been copied to clipboard",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -445,14 +469,56 @@ export function HireForm() {
                 <label htmlFor="password" className="text-sm font-medium">
                   Password (Temporary)
                 </label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={hire.password}
-                  onChange={handleInputChange}
-                  placeholder="Auto-generated from first name"
-                />
+                <div className="flex relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={hire.password}
+                    onChange={handleInputChange}
+                    placeholder="Auto-generated from first name"
+                    className="pr-20" /* Make space for the buttons */
+                  />
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8" 
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{showPassword ? "Hide password" : "Show password"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8" 
+                            onClick={copyPasswordToClipboard}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Copy password</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -567,15 +633,14 @@ export function HireForm() {
               <Input
                 id="ict_support_pic"
                 name="ict_support_pic"
-                value={hire.ict_support_pic || ""} // Use empty string as fallback to avoid null warnings
-                disabled // Makes the field read-only
-                className="bg-gray-100" // Gray background to indicate read-only
+                value={hire.ict_support_pic || ""} 
+                disabled
+                className="bg-gray-100"
               />
               <p className="text-xs text-gray-500 mt-1">
                 This field shows the last person who edited this record
               </p>
             </div>
-
 
             <div className="space-y-2">
               <label htmlFor="remarks" className="text-sm font-medium">
