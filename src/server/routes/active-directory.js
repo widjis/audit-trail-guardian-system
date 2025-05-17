@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -632,6 +631,127 @@ const addUserToGroup = (client, userDN, groupName) => {
         });
       });
     });
+  });
+};
+
+// Add a new endpoint to search for users in AD
+router.get('/search-users', async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || typeof query !== 'string' || query.length < 2) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Search query must be at least 2 characters" 
+      });
+    }
+    
+    logger.api.debug(`Searching AD for users matching: ${query}`);
+    
+    // Get AD settings
+    const settings = getSettings();
+    if (!settings.activeDirectorySettings || !settings.activeDirectorySettings.enabled) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Active Directory integration is not enabled" 
+      });
+    }
+    
+    // Search for users
+    const users = await searchAdUsers(settings.activeDirectorySettings, query);
+    
+    res.json({
+      success: true,
+      users
+    });
+  } catch (err) {
+    logger.api.error('Error searching AD users:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to search AD users: ${err.message}` 
+    });
+  }
+});
+
+// Function to search for users in Active Directory
+const searchAdUsers = async (settings, query) => {
+  return new Promise((resolve, reject) => {
+    const client = createLdapClient(settings);
+    
+    try {
+      // Format the bind credentials based on settings
+      const bindDN = formatBindCredential(settings, settings.username);
+      logger.api.debug(`Binding to AD with DN: ${bindDN} for user search`);
+      
+      // Bind with service account
+      client.bind(bindDN, settings.password, (err) => {
+        if (err) {
+          logger.api.error('Error binding to AD for user search:', err);
+          client.destroy();
+          return reject(err);
+        }
+        
+        logger.api.debug('Successfully bound to AD, searching users');
+        
+        // Create search filter (search by displayName, sAMAccountName, or mail)
+        const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${query}*)(sAMAccountName=*${query}*)(mail=*${query}*)))`;
+        
+        // Specify which attributes to return
+        const searchOptions = {
+          filter: searchFilter,
+          scope: 'sub',
+          attributes: ['displayName', 'sAMAccountName', 'mail', 'title', 'department', 'distinguishedName']
+        };
+        
+        logger.api.debug(`Searching with filter: ${searchFilter}`);
+        
+        const users = [];
+        
+        client.search(settings.baseDN, searchOptions, (err, res) => {
+          if (err) {
+            logger.api.error('Error searching AD:', err);
+            client.destroy();
+            return reject(err);
+          }
+          
+          res.on('searchEntry', (entry) => {
+            const user = {
+              displayName: entry.object.displayName || '',
+              username: entry.object.sAMAccountName || '',
+              email: entry.object.mail || '',
+              title: entry.object.title || '',
+              department: entry.object.department || '',
+              dn: entry.object.distinguishedName || ''
+            };
+            
+            logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
+            users.push(user);
+          });
+          
+          res.on('error', (err) => {
+            logger.api.error('AD search error:', err);
+            client.destroy();
+            reject(err);
+          });
+          
+          res.on('end', (result) => {
+            logger.api.info(`AD user search complete, found ${users.length} users`);
+            client.unbind();
+            resolve(users);
+          });
+        });
+      });
+    } catch (err) {
+      logger.api.error('Error in AD search process:', err);
+      
+      // Ensure client is unbound in case of error
+      try {
+        client.unbind();
+      } catch (unbindErr) {
+        logger.api.debug('Error unbinding client:', unbindErr);
+      }
+      
+      reject(err);
+    }
   });
 };
 

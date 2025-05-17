@@ -1,4 +1,3 @@
-
 import apiClient from "./api-client";
 import logger from "@/utils/logger";
 
@@ -38,6 +37,21 @@ interface ADUserCreationResult {
     groups: string[];
   };
   warning?: string;
+  error?: string;
+}
+
+interface ADUser {
+  displayName: string;
+  username: string;
+  email: string;
+  title: string;
+  department: string;
+  dn: string;
+}
+
+interface ADUserSearchResult {
+  success: boolean;
+  users: ADUser[];
   error?: string;
 }
 
@@ -175,6 +189,44 @@ export const activeDirectoryService = {
         throw new Error(error.response.data.error);
       }
       throw error;
+    }
+  },
+
+  // Search for users in Active Directory
+  searchUsers: async (query: string): Promise<ADUserSearchResult> => {
+    if (!query || query.length < 2) {
+      return { success: false, users: [], error: "Search query must be at least 2 characters" };
+    }
+    
+    logger.api.debug('Searching AD for users matching:', query);
+    
+    try {
+      const response = await apiClient.get<ADUserSearchResult>(
+        `${AD_ENDPOINT}/search-users?query=${encodeURIComponent(query)}`
+      );
+      
+      if (response.data.users && Array.isArray(response.data.users)) {
+        logger.api.info(`Found ${response.data.users.length} AD users matching "${query}"`);
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      logger.api.error('Failed to search AD users:', error);
+      
+      // Check for specific error messages from the server
+      if (error.response?.data?.error) {
+        return { 
+          success: false, 
+          users: [], 
+          error: error.response.data.error 
+        };
+      }
+      
+      return { 
+        success: false, 
+        users: [], 
+        error: error.message || 'Failed to search Active Directory users' 
+      };
     }
   }
 };

@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,7 @@ import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ADUserLookup } from "./ADUserLookup";
 
 // Type definition for Active Directory account details
 interface ADAccountDetails {
@@ -466,6 +466,9 @@ export function HireForm() {
   // Check if any license type has the name "None" to avoid duplicate keys
   const hasNoneLicenseType = (licenseTypes || []).some(lt => lt.name === "None");
 
+  // Check if AD is enabled to decide whether to show the AD user lookup
+  const isADEnabled = settingsData?.activeDirectorySettings?.enabled || false;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -558,14 +561,22 @@ export function HireForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="direct_report" className="text-sm font-medium">
-                  Reports To
+                  Reports To {isADEnabled && "(AD Lookup Enabled)"}
                 </label>
-                <Input
-                  id="direct_report"
-                  name="direct_report"
-                  value={hire.direct_report}
-                  onChange={handleInputChange}
-                />
+                {isADEnabled ? (
+                  <ADUserLookup 
+                    value={hire.direct_report} 
+                    onChange={(value) => handleSelectChange("direct_report", value)}
+                    placeholder="Search for manager..."
+                  />
+                ) : (
+                  <Input
+                    id="direct_report"
+                    name="direct_report"
+                    value={hire.direct_report}
+                    onChange={handleInputChange}
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="on_site_date" className="text-sm font-medium">
@@ -929,26 +940,26 @@ export function HireForm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="flex items-center space-x-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="license_assigned" className="text-sm font-medium">
+                  License Assigned
+                </label>
                 <Switch
                   id="license_assigned"
                   checked={hire.license_assigned}
                   onCheckedChange={(checked) => handleSwitchChange("license_assigned", checked)}
                 />
-                <label htmlFor="license_assigned" className="text-sm font-medium">
-                  License Assigned
-                </label>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="space-y-2">
+                <label htmlFor="status_srf" className="text-sm font-medium">
+                  SRF Status
+                </label>
                 <Switch
                   id="status_srf"
                   checked={hire.status_srf}
                   onCheckedChange={(checked) => handleSwitchChange("status_srf", checked)}
                 />
-                <label htmlFor="status_srf" className="text-sm font-medium">
-                  SRF Status
-                </label>
               </div>
               <div className="space-y-2">
                 <label htmlFor="microsoft_365_license" className="text-sm font-medium">
