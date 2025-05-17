@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,12 +10,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Eye, EyeOff, Copy } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+// Type definition for Active Directory account details
+interface ADAccountDetails {
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  ou: string;
+  company: string;
+  office: string;
+  acl: string;
+}
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -47,6 +60,16 @@ export function HireForm() {
   const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
   const [isPasswordManuallyEdited, setIsPasswordManuallyEdited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showADDetails, setShowADDetails] = useState(false);
+  const [adAccountDetails, setADAccountDetails] = useState<ADAccountDetails>({
+    displayName: "",
+    firstName: "",
+    lastName: "",
+    ou: "OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com",
+    company: "PT. Merdeka Tsingshan Indonesia",
+    office: "Morowali",
+    acl: ""
+  });
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -77,6 +100,13 @@ export function HireForm() {
     }
   }, [id, isNewHire]);
 
+  // Effect to update AD account details when name or department changes
+  useEffect(() => {
+    if (hire.name || hire.department) {
+      updateADAccountDetails(hire.name, hire.department);
+    }
+  }, [hire.name, hire.department]);
+
   const fetchHire = async (hireId: string) => {
     setIsFetching(true);
     try {
@@ -94,6 +124,9 @@ export function HireForm() {
       }
       
       setHire(hireData);
+      
+      // Update AD account details
+      updateADAccountDetails(hireData.name, hireData.department);
     } catch (error) {
       console.error("Error fetching hire:", error);
       toast({
@@ -104,6 +137,49 @@ export function HireForm() {
     } finally {
       setIsFetching(false);
     }
+  };
+  
+  // Function to update AD account details
+  const updateADAccountDetails = (name: string, department: string) => {
+    if (!name) return;
+    
+    // Split name into first and last name
+    const nameParts = name.split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    
+    // Generate display name
+    const displayName = `${name} [MTI]`;
+    
+    // Generate OU path
+    let ou = `OU=${department},OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`;
+    
+    // Special case for Copper Cathode Plant
+    if (department === "Copper Cathode Plant") {
+      ou = `OU=CCP,OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`;
+    }
+    
+    // Generate ACL group
+    let acl = "";
+    if (department === "Occupational Health and Safety" || department === "Environment") {
+      acl = "ACL MTI OHSE";
+    } else if (department === "Copper Cathode Plant") {
+      acl = "ACL MTI Copper Cathode";
+    } else if (department) {
+      // Remove "Plant" from department name if it exists
+      acl = `ACL MTI ${department.replace(' Plant', '')}`;
+    }
+    
+    // Update state
+    setADAccountDetails({
+      displayName,
+      firstName,
+      lastName,
+      ou,
+      company: "PT. Merdeka Tsingshan Indonesia",
+      office: "Morowali",
+      acl
+    });
   };
   
   // Helper function to generate email from name
@@ -148,9 +224,10 @@ export function HireForm() {
     if (!email) return "";
     
     const atIndex = email.indexOf('@');
-    if (atIndex === -1) return email; // If there's no @, return the whole string
+    if (atIndex === -1) return email.substring(0, 20); // If there's no @, return the whole string up to 20 chars
     
-    return email.substring(0, atIndex);
+    // Limit username to 20 characters
+    return email.substring(0, Math.min(atIndex, 20));
   };
   
   // Helper function to generate password from first name
@@ -250,40 +327,44 @@ export function HireForm() {
     setHire((prev) => ({ ...prev, [name]: value }));
   };
   
-  const copyPasswordToClipboard = () => {
-    if (hire.password) {
-      try {
-        // Try the modern Clipboard API first
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(hire.password)
-            .then(() => {
-              toast({
-                title: "Password copied",
-                description: "Password has been copied to clipboard",
-              });
-            })
-            .catch(err => {
-              logger.ui.error("HireForm", "Error copying with Clipboard API:", err);
-              // Fallback to the execCommand method
-              fallbackCopyTextToClipboard(hire.password);
+  const copyToClipboard = (text: string, itemName: string) => {
+    if (!text) return;
+    
+    try {
+      // Try the modern Clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            toast({
+              title: `${itemName} copied`,
+              description: `${itemName} has been copied to clipboard`,
             });
-        } else {
-          // Use fallback method if Clipboard API not available
-          fallbackCopyTextToClipboard(hire.password);
-        }
-      } catch (error) {
-        logger.ui.error("HireForm", "Copy to clipboard error:", error);
-        toast({
-          title: "Copy failed",
-          description: "Could not copy password to clipboard",
-          variant: "destructive",
-        });
+          })
+          .catch(err => {
+            logger.ui.error("HireForm", `Error copying ${itemName} with Clipboard API:`, err);
+            // Fallback to the execCommand method
+            fallbackCopyTextToClipboard(text, itemName);
+          });
+      } else {
+        // Use fallback method if Clipboard API not available
+        fallbackCopyTextToClipboard(text, itemName);
       }
+    } catch (error) {
+      logger.ui.error("HireForm", `Copy ${itemName} to clipboard error:`, error);
+      toast({
+        title: "Copy failed",
+        description: `Could not copy ${itemName} to clipboard`,
+        variant: "destructive",
+      });
     }
+  };
+  
+  const copyPasswordToClipboard = () => {
+    copyToClipboard(hire.password, "Password");
   };
 
   // Fallback method for copying text using document.execCommand
-  const fallbackCopyTextToClipboard = (text: string) => {
+  const fallbackCopyTextToClipboard = (text: string, itemName: string) => {
     try {
       const textArea = document.createElement("textarea");
       textArea.value = text;
@@ -302,17 +383,17 @@ export function HireForm() {
       
       if (successful) {
         toast({
-          title: "Password copied",
-          description: "Password has been copied to clipboard",
+          title: `${itemName} copied`,
+          description: `${itemName} has been copied to clipboard`,
         });
       } else {
         throw new Error("Copy command was unsuccessful");
       }
     } catch (err) {
-      logger.ui.error("HireForm", "Fallback copy error:", err);
+      logger.ui.error("HireForm", `Fallback copy ${itemName} error:`, err);
       toast({
         title: "Copy failed",
-        description: "Could not copy password to clipboard",
+        description: `Could not copy ${itemName} to clipboard`,
         variant: "destructive",
       });
     }
@@ -511,7 +592,7 @@ export function HireForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="username" className="text-sm font-medium">
-                  Username
+                  Username (Max 20 chars)
                 </label>
                 <Input
                   id="username"
@@ -519,7 +600,14 @@ export function HireForm() {
                   value={hire.username}
                   onChange={handleInputChange}
                   placeholder="Auto-generated from email"
+                  maxLength={20}
+                  className={hire.username.length > 20 ? "border-red-500" : ""}
                 />
+                {hire.username.length > 0 && (
+                  <p className={`text-xs ${hire.username.length > 20 ? "text-red-500" : "text-gray-500"}`}>
+                    {hire.username.length}/20 characters
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium">
@@ -577,6 +665,214 @@ export function HireForm() {
                 </div>
               </div>
             </div>
+
+            {/* Active Directory Account Details Section */}
+            <Collapsible 
+              open={showADDetails} 
+              onOpenChange={setShowADDetails}
+              className="border rounded-lg p-4 bg-gray-50 mt-4"
+            >
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between cursor-pointer">
+                  <h3 className="text-base font-medium">Active Directory Account Details</h3>
+                  <Button variant="ghost" size="sm">
+                    {showADDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Display Name</label>
+                    <div className="flex relative">
+                      <Input value={adAccountDetails.displayName} readOnly className="pr-10 bg-gray-100" />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8" 
+                                onClick={() => copyToClipboard(adAccountDetails.displayName, "Display Name")}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Copy display name</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">First Name</label>
+                      <div className="flex relative">
+                        <Input value={adAccountDetails.firstName} readOnly className="pr-10 bg-gray-100" />
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8" 
+                                  onClick={() => copyToClipboard(adAccountDetails.firstName, "First Name")}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Copy first name</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Last Name</label>
+                      <div className="flex relative">
+                        <Input value={adAccountDetails.lastName} readOnly className="pr-10 bg-gray-100" />
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8" 
+                                  onClick={() => copyToClipboard(adAccountDetails.lastName, "Last Name")}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Copy last name</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">OU Path</label>
+                  <div className="flex relative">
+                    <Input value={adAccountDetails.ou} readOnly className="pr-10 bg-gray-100" />
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={() => copyToClipboard(adAccountDetails.ou, "OU Path")}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Copy OU path</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Company</label>
+                    <div className="flex relative">
+                      <Input value={adAccountDetails.company} readOnly className="pr-10 bg-gray-100" />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8" 
+                                onClick={() => copyToClipboard(adAccountDetails.company, "Company")}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Copy company</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Office</label>
+                    <div className="flex relative">
+                      <Input value={adAccountDetails.office} readOnly className="pr-10 bg-gray-100" />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8" 
+                                onClick={() => copyToClipboard(adAccountDetails.office, "Office")}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Copy office</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">ACL Group</label>
+                    <div className="flex relative">
+                      <Input value={adAccountDetails.acl} readOnly className="pr-10 bg-gray-100" />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8" 
+                                onClick={() => copyToClipboard(adAccountDetails.acl, "ACL Group")}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Copy ACL group</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
