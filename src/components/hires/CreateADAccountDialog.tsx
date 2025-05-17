@@ -38,7 +38,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     const username = hire.username || hire.email?.split('@')[0] || '';
     
     // Get password from hire record or manual input
-    const password = manualPassword || hire.initial_password || '';
+    const password = manualPassword || hire.password || '';
     
     let department = hire.department || '';
     let ou = department 
@@ -285,11 +285,11 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                     <div className="font-medium">Office:</div>
                     <div>{adUserData.office}</div>
 
-                    {hire.initial_password && (
+                    {hire.password && (
                       <>
                         <div className="font-medium">Initial Password:</div>
                         <div className="flex items-center">
-                          <span>{showPassword ? hire.initial_password : '•'.repeat(hire.initial_password?.length || 8)}</span>
+                          <span>{showPassword ? hire.password : '•'.repeat(hire.password?.length || 8)}</span>
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -319,14 +319,14 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                   </ul>
                 </div>
                 
-                {/* Password field - only show if initial_password is missing */}
+                {/* Password field - only show if password is missing */}
                 {isMissingPassword && (
                   <div className="space-y-2">
                     <Alert variant="destructive">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>Missing Password</AlertTitle>
                       <AlertDescription>
-                        No initial password is set for this user. Please provide a password below.
+                        No password is set for this user. Please provide a password below.
                       </AlertDescription>
                     </Alert>
                     
