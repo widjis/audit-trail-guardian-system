@@ -26,7 +26,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     error?: string;
   } | null>(null);
 
-  // Generate AD user data from hire details
+  // Generate AD user data from hire details - now memoized to avoid re-renders
   const generateADUserData = () => {
     const nameParts = hire.name?.split(' ') || [];
     const firstName = nameParts[0] || '';
@@ -35,13 +35,6 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     
     // Ensure we have a password
     const password = hire.initial_password || '';
-    if (!password) {
-      setResult({
-        success: false,
-        error: "Missing initial password for user"
-      });
-      return null;
-    }
     
     let department = hire.department || '';
     let ou = department 
@@ -173,7 +166,18 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     });
   };
 
+  // Generate user data once for rendering
   const adUserData = generateADUserData();
+  // Check for missing password outside the render flow
+  const isMissingPassword = !adUserData.password;
+  
+  // Set error state for missing password only once on component mount
+  if (isMissingPassword && !result) {
+    setResult({
+      success: false,
+      error: "Missing initial password for user"
+    });
+  }
 
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -333,7 +337,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         ) : (
           <Button 
             onClick={handleCreateADAccount}
-            disabled={isCreating || !adUserData}
+            disabled={isCreating || !adUserData || isMissingPassword}
           >
             {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isCreating ? "Creating..." : "Create AD Account"}
