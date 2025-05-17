@@ -20,12 +20,22 @@ interface WhatsAppSettings {
   defaultRecipient: "userNumber" | "testNumber";
 }
 
+interface ActiveDirectorySettings {
+  server: string;
+  username: string;
+  password: string;
+  domain: string;
+  baseDN: string;
+  enabled: boolean;
+}
+
 interface SettingsData {
   accountStatuses?: string[];
   mailingLists?: MailingList[];
   departments?: Department[];
   mailingListDisplayAsDropdown?: boolean;
   whatsappSettings?: WhatsAppSettings;
+  activeDirectorySettings?: ActiveDirectorySettings;
 }
 
 // The API client already includes /api in its baseURL, so we don't need to include it again
@@ -75,6 +85,21 @@ export const settingsService = {
   updateWhatsAppSettings: async (settings: WhatsAppSettings) => {
     const response = await apiClient.put<WhatsAppSettings>(
       `${SETTINGS_ENDPOINT}/whatsapp`,
+      settings
+    );
+    return response.data;
+  },
+
+  // Get Active Directory settings
+  getActiveDirectorySettings: async () => {
+    const response = await apiClient.get<ActiveDirectorySettings>(`${SETTINGS_ENDPOINT}/active-directory`);
+    return response.data;
+  },
+
+  // Update Active Directory settings
+  updateActiveDirectorySettings: async (settings: ActiveDirectorySettings) => {
+    const response = await apiClient.put<ActiveDirectorySettings>(
+      `${SETTINGS_ENDPOINT}/active-directory`,
       settings
     );
     return response.data;

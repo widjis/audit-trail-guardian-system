@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -117,8 +118,6 @@ router.put('/mailing-lists', (req, res) => {
     res.status(500).json({ error: 'Failed to update mailing lists', message: err.message });
   }
 });
-
-// Add this to src/server/routes/settings.js
 
 // Get license types
 router.get('/license-types', async (req, res) => {

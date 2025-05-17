@@ -7,7 +7,8 @@ import { DepartmentListSettings } from "@/components/settings/DepartmentListSett
 import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSettings";
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
-import { Database, MessageSquare, Send, Users } from "lucide-react";
+import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
+import { Database, MessageSquare, Send, Users, Server } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -28,6 +29,10 @@ export default function Settings() {
             <TabsTrigger value="whatsapp" className="flex items-center gap-1">
               <Send className="h-4 w-4" />
               <span>WhatsApp</span>
+            </TabsTrigger>
+            <TabsTrigger value="active-directory" className="flex items-center gap-1">
+              <Server className="h-4 w-4" />
+              <span>Active Directory</span>
             </TabsTrigger>
             <TabsTrigger value="database" className="flex items-center gap-1">
               <Database className="h-4 w-4" />
@@ -53,6 +58,10 @@ export default function Settings() {
           
           <TabsContent value="whatsapp" className="space-y-4">
             <WhatsAppSettings />
+          </TabsContent>
+          
+          <TabsContent value="active-directory" className="space-y-4">
+            <ActiveDirectorySettings />
           </TabsContent>
           
           <TabsContent value="database" className="space-y-4">
