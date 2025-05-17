@@ -7,10 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { activeDirectoryService } from "@/services/active-directory-service";
-import { AlertCircle, Server, ShieldCheck, Lock, Unlock } from "lucide-react";
+import { AlertCircle, Server, ShieldCheck, Lock, Unlock, HelpCircle, Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ActiveDirectorySettings {
   server: string;
@@ -28,6 +34,7 @@ export function ActiveDirectorySettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [settings, setSettings] = useState<ActiveDirectorySettings>({
     server: "",
     username: "",
@@ -38,6 +45,7 @@ export function ActiveDirectorySettings() {
     enabled: false,
     authFormat: "upn"
   });
+  const [lastTestError, setLastTestError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -72,6 +80,8 @@ export function ActiveDirectorySettings() {
       ...prev,
       [field]: value
     }));
+    // Clear previous test error when settings change
+    if (lastTestError) setLastTestError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,6 +108,7 @@ export function ActiveDirectorySettings() {
   const testConnection = async () => {
     try {
       setTestingConnection(true);
+      setLastTestError(null);
       const response = await activeDirectoryService.testConnection(settings);
       
       toast({
@@ -106,9 +117,12 @@ export function ActiveDirectorySettings() {
       });
     } catch (error) {
       console.error("Error testing AD connection:", error);
+      const errorMessage = error instanceof Error ? error.message : "Could not connect to Active Directory server";
+      setLastTestError(errorMessage);
+      
       toast({
         title: "Connection Failed",
-        description: error instanceof Error ? error.message : "Could not connect to Active Directory server",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -179,7 +193,21 @@ export function ActiveDirectorySettings() {
 
             {/* Authentication Format */}
             <div className="space-y-2">
-              <Label>Authentication Format</Label>
+              <div className="flex items-center gap-2">
+                <Label>Authentication Format</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>UPN format uses your_username@domain.com</p>
+                      <p>DN format uses CN=your_username,OU=Users,DC=domain,DC=com</p>
+                      <p>Try switching formats if authentication fails</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <RadioGroup 
                 value={settings.authFormat} 
                 onValueChange={(value) => handleChange("authFormat", value as "upn" | "dn")}
@@ -200,7 +228,7 @@ export function ActiveDirectorySettings() {
               </RadioGroup>
               <p className="text-sm text-gray-500">
                 {settings.authFormat === "dn" ? 
-                  "DN format will construct a distinguishedName from your username and baseDN. Use this if UPN format fails." :
+                  "DN format constructs a distinguishedName from your username and baseDN. Try this if UPN format fails." :
                   "UPN format uses username@domain format. This is the most common authentication format."}
               </p>
             </div>
@@ -212,7 +240,7 @@ export function ActiveDirectorySettings() {
                   id="server"
                   value={settings.server}
                   onChange={(e) => handleChange("server", e.target.value)}
-                  placeholder="dc.example.com"
+                  placeholder="dc.example.com or IP address"
                   disabled={isLoading || !settings.enabled}
                 />
               </div>
@@ -265,8 +293,8 @@ export function ActiveDirectorySettings() {
                 />
                 <p className="text-xs text-gray-500">
                   {settings.authFormat === "dn" 
-                    ? "For DN format, you may need to specify the full Distinguished Name" 
-                    : "For UPN format, use username@domain format"}
+                    ? "For DN format, use the simplified username (e.g. 'administrator'). The DN will be created automatically." 
+                    : "For UPN format, include the domain (e.g. 'administrator@domain.com')"}
                 </p>
               </div>
               
@@ -283,6 +311,29 @@ export function ActiveDirectorySettings() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Display last test error if any */}
+          {lastTestError && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Connection Error</AlertTitle>
+              <AlertDescription className="whitespace-normal break-words">
+                {lastTestError}
+                {lastTestError.includes('Invalid Credentials') && (
+                  <div className="mt-2 text-xs">
+                    <p>Troubleshooting tips:</p>
+                    <ul className="list-disc pl-4 mt-1 space-y-1">
+                      <li>Verify username and password are correct</li>
+                      <li>Try switching between UPN and DN format</li>
+                      <li>Check if the account is locked or expired</li>
+                      <li>For DN format, try providing a custom DN in the username field</li>
+                      <li>Verify that the service account has sufficient permissions</li>
+                    </ul>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Button 
             type="button" 

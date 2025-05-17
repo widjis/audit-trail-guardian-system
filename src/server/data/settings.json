@@ -63,12 +63,12 @@
   },
   "activeDirectorySettings": {
     "server": "10.60.10.56",
-    "username": "mti.admin@mbma.com",
+    "username": "mti.admin",
     "password": "MT!@T$1ng5h4n#2@24",
     "domain": "mbma.com",
     "baseDN": "DC=mbma,DC=com",
     "protocol": "ldaps",
     "enabled": true,
-    "authFormat": "upn"
+    "authFormat": "dn"
   }
 }

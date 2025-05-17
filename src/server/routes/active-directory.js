@@ -47,8 +47,12 @@ const saveSettings = (settings) => {
 
 // Format the user's bind DN based on authentication format preference
 const formatBindCredential = (settings, username) => {
+  // Debug the incoming username format
+  logger.api.debug(`Formatting username: ${username} using format: ${settings.authFormat}`);
+  
   // If username already looks like a DN, use it as is
   if (username.startsWith('CN=') || username.startsWith('cn=')) {
+    logger.api.debug('Username already in DN format, using as is');
     return username;
   }
   
@@ -56,15 +60,21 @@ const formatBindCredential = (settings, username) => {
   if (settings.authFormat === 'dn') {
     // Extract the username part if it's in UPN format (user@domain.com)
     const userPart = username.includes('@') ? username.split('@')[0] : username;
+    
     // Create a simple DN - customize based on your AD structure
-    return `CN=${userPart},${settings.baseDN}`;
+    const formattedDN = `CN=${userPart},${settings.baseDN}`;
+    logger.api.debug(`Formatted DN: ${formattedDN}`);
+    return formattedDN;
   }
   
   // Default to UPN format (or keep as is if it already has @domain)
   if (!username.includes('@')) {
-    return `${username}@${settings.domain}`;
+    const upn = `${username}@${settings.domain}`;
+    logger.api.debug(`Formatted UPN: ${upn}`);
+    return upn;
   }
   
+  logger.api.debug(`Username appears to be already in UPN format: ${username}`);
   return username;
 };
 
@@ -74,14 +84,37 @@ const createLdapClient = (settings) => {
   const protocol = settings.protocol || 'ldap';
   const port = protocol === 'ldaps' ? 636 : 389;
   
+  logger.api.debug(`Creating LDAP client with URL: ${protocol}://${settings.server}:${port}`);
+  
+  // Enhanced TLS options for LDAPS
+  const tlsOptions = protocol === 'ldaps' ? {
+    rejectUnauthorized: false, // Set to true in production with proper certificates
+    requestCert: true,
+    // Enable this if you need to provide client certificates
+    // key: fs.readFileSync('client-key.pem'),
+    // cert: fs.readFileSync('client-cert.pem')
+  } : undefined;
+  
   // Create client with appropriate URL
   const client = ldap.createClient({
     url: `${protocol}://${settings.server}:${port}`,
     timeout: 5000,
     connectTimeout: 10000,
-    tlsOptions: protocol === 'ldaps' ? {
-      rejectUnauthorized: false // Set to true in production with proper certificates
-    } : undefined
+    tlsOptions: tlsOptions,
+    reconnect: false // Disable automatic reconnection to avoid hanging
+  });
+  
+  // Add more detailed event handlers
+  client.on('connectError', (err) => {
+    logger.api.error('LDAP connection error event:', err.message);
+  });
+  
+  client.on('error', (err) => {
+    logger.api.error('LDAP client error event:', err.message);
+  });
+  
+  client.on('connect', () => {
+    logger.api.debug('LDAP client connected successfully');
   });
   
   return client;
@@ -94,23 +127,42 @@ const testLdapConnection = (settings) => {
         return reject(new Error("Missing required connection parameters"));
       }
 
+      logger.api.debug(`Testing LDAP connection to server: ${settings.server} with protocol: ${settings.protocol}`);
+      logger.api.debug(`Using authentication format: ${settings.authFormat}`);
+      
       const client = createLdapClient(settings);
       
       client.on('error', (err) => {
         logger.api.error('LDAP connection error:', err);
+        client.destroy();
         reject(new Error(`Connection failed: ${err.message}`));
       });
       
       // Format the bind credentials based on settings
       const bindDN = formatBindCredential(settings, settings.username);
-      logger.api.debug(`Attempting LDAP bind with: ${bindDN}`);
+      logger.api.debug(`Attempting LDAP bind with DN: ${bindDN}`);
       
       // Bind with the provided credentials
       client.bind(bindDN, settings.password, (err) => {
         if (err) {
           logger.api.error(`LDAP bind error (using ${settings.authFormat || 'default'} format):`, err);
+          logger.api.debug(`Error code: ${err.code}, Error name: ${err.name}`);
+          
+          let errorDetails = '';
+          if (err.code === 49) {
+            if (err.name === 'InvalidCredentialsError') {
+              errorDetails = ' - Username or password is incorrect';
+            } else if (err.name === 'AcceptSecurityContextError') {
+              errorDetails = ' - Account restrictions are preventing login';
+            }
+          } else if (err.code === 53) {
+            errorDetails = ' - The server cannot be located';
+          } else if (err.code === 52) {
+            errorDetails = ' - Invalid username format';
+          }
+          
           client.destroy();
-          return reject(new Error(`Authentication failed: ${err.message}`));
+          return reject(new Error(`Authentication failed${errorDetails}: ${err.message}`));
         }
         
         const protocol = settings.protocol || 'ldap';
@@ -123,143 +175,6 @@ const testLdapConnection = (settings) => {
     } catch (err) {
       logger.api.error('LDAP connection setup error:', err);
       reject(new Error(`Connection setup failed: ${err.message}`));
-    }
-  });
-};
-
-const createLdapUser = (settings, userData) => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Validate required parameters
-      if (!userData.username || !userData.password || !userData.displayName) {
-        return reject(new Error("Missing required user parameters"));
-      }
-      
-      const client = createLdapClient(settings);
-      
-      client.on('error', (err) => {
-        logger.api.error('LDAP connection error:', err);
-        reject(new Error(`Connection failed: ${err.message}`));
-      });
-      
-      // Bind with admin credentials
-      client.bind(settings.username, settings.password, (err) => {
-        if (err) {
-          logger.api.error('LDAP bind error:', err);
-          client.destroy();
-          return reject(new Error(`Authentication failed: ${err.message}`));
-        }
-        
-        // Create user DN (distinguished name)
-        const userDN = `CN=${userData.displayName},${userData.ou}`;
-        
-        // Prepare user attributes
-        const userEntry = {
-          cn: userData.displayName,
-          sAMAccountName: userData.username,
-          objectClass: ['top', 'person', 'organizationalPerson', 'user'],
-          givenName: userData.firstName,
-          sn: userData.lastName,
-          displayName: userData.displayName,
-          userPrincipalName: `${userData.username}@${settings.domain}`,
-          mail: userData.email,
-          title: userData.title,
-          department: userData.department,
-          company: userData.company,
-          physicalDeliveryOfficeName: userData.office,
-          unicodePwd: encodeUnicodePwd(userData.password)
-        };
-        
-        // Add the user
-        client.add(userDN, userEntry, (err) => {
-          if (err) {
-            logger.api.error('LDAP add user error:', err);
-            client.unbind();
-            return reject(new Error(`Failed to create user: ${err.message}`));
-          }
-          
-          // User created, now add to groups
-          const groups = [userData.acl, 'VPN-USERS'];
-          const addedGroups = [];
-          let groupsProcessed = 0;
-          
-          groups.forEach(groupName => {
-            // Find the group first
-            const groupFilter = `(&(objectClass=group)(cn=${groupName}))`;
-            client.search(settings.baseDN, { 
-              scope: 'sub',
-              filter: groupFilter
-            }, (err, res) => {
-              if (err) {
-                logger.api.warn(`LDAP search for group ${groupName} error:`, err);
-                groupsProcessed++;
-                checkComplete();
-                return;
-              }
-              
-              let groupFound = false;
-              
-              res.on('searchEntry', (entry) => {
-                groupFound = true;
-                const groupDN = entry.objectName;
-                
-                // Modify group to add the new user
-                const change = new ldap.Change({
-                  operation: 'add',
-                  modification: {
-                    member: userDN
-                  }
-                });
-                
-                client.modify(groupDN, change, (modErr) => {
-                  if (modErr) {
-                    logger.api.warn(`Failed to add user to group ${groupName}:`, modErr);
-                  } else {
-                    addedGroups.push(groupName);
-                    logger.api.info(`User added to group ${groupName}`);
-                  }
-                  
-                  groupsProcessed++;
-                  checkComplete();
-                });
-              });
-              
-              res.on('error', (err) => {
-                logger.api.warn(`Group search error for ${groupName}:`, err);
-                groupsProcessed++;
-                checkComplete();
-              });
-              
-              res.on('end', () => {
-                if (!groupFound) {
-                  logger.api.warn(`Group ${groupName} not found`);
-                  groupsProcessed++;
-                  checkComplete();
-                }
-              });
-            });
-          });
-          
-          function checkComplete() {
-            if (groupsProcessed === groups.length) {
-              client.unbind();
-              resolve({
-                success: true,
-                message: `User ${userData.username} created successfully`,
-                details: {
-                  samAccountName: userData.username,
-                  displayName: userData.displayName,
-                  distinguishedName: userDN,
-                  groups: addedGroups
-                }
-              });
-            }
-          }
-        });
-      });
-    } catch (err) {
-      logger.api.error('LDAP user creation setup error:', err);
-      reject(new Error(`User creation setup failed: ${err.message}`));
     }
   });
 };
@@ -328,14 +243,22 @@ router.put('/', (req, res) => {
 router.post('/test', async (req, res) => {
   try {
     const settings = req.body;
+    logger.api.debug('Testing AD connection with settings:', JSON.stringify({
+      server: settings.server,
+      username: settings.username,
+      domain: settings.domain,
+      protocol: settings.protocol,
+      baseDN: settings.baseDN,
+      authFormat: settings.authFormat
+    }));
     
     // Test connection using ldapjs
-    await testLdapConnection(settings);
+    const result = await testLdapConnection(settings);
     
-    res.json({ success: true, message: "Connection successful" });
+    res.json(result);
   } catch (err) {
     logger.api.warn('AD connection test failed:', err);
-    res.status(400).json({ success: false, error: `Connection failed: ${err.message}` });
+    res.status(400).json({ success: false, error: `${err.message}` });
   }
 });
 

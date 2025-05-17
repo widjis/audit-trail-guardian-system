@@ -10,7 +10,7 @@ interface ActiveDirectorySettings {
   baseDN: string;
   protocol: "ldap" | "ldaps";
   enabled: boolean;
-  authFormat: "upn" | "dn"; // New property to specify auth format
+  authFormat: "upn" | "dn"; // Property to specify auth format
 }
 
 interface ADUserData {
@@ -72,6 +72,8 @@ export const activeDirectoryService = {
   // Test AD connection
   testConnection: async (settings: ActiveDirectorySettings): Promise<{ success: boolean; message: string }> => {
     logger.api.debug('Testing Active Directory connection');
+    logger.api.debug(`Using auth format: ${settings.authFormat}, protocol: ${settings.protocol}`);
+    
     try {
       const response = await apiClient.post<{ success: boolean; message: string }>(
         `${AD_ENDPOINT}/test`,
@@ -80,8 +82,27 @@ export const activeDirectoryService = {
       return response.data;
     } catch (error) {
       logger.api.error('AD connection test failed:', error);
-      // Extract error message from response if available
-      const errorMessage = error.response?.data?.error || "Connection test failed";
+      
+      // Extract error message from response if available and provide more context
+      let errorMessage = "Connection test failed";
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+        
+        // Provide more helpful context based on the error
+        if (errorMessage.includes('Invalid Credentials')) {
+          if (settings.authFormat === 'upn') {
+            errorMessage += ". Try using the DN format instead, or check username and password";
+          } else {
+            errorMessage += ". Try using the UPN format instead, or check username and password";
+          }
+        } else if (errorMessage.includes('Invalid DN')) {
+          errorMessage += ". The Distinguished Name format is incorrect";
+        } else if (errorMessage.toLowerCase().includes('timeout')) {
+          errorMessage += ". Server may be unreachable or blocked by a firewall";
+        }
+      }
+      
       throw new Error(errorMessage);
     }
   },
