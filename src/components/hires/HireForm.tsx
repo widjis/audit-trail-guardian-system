@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -45,6 +44,8 @@ export function HireForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false);
+  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
+  const [isPasswordManuallyEdited, setIsPasswordManuallyEdited] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -70,6 +71,8 @@ export function HireForm() {
     } else {
       logger.ui.info("HireForm", "Creating new hire, using empty form");
       setIsEmailManuallyEdited(false);
+      setIsUsernameManuallyEdited(false);
+      setIsPasswordManuallyEdited(false);
     }
   }, [id, isNewHire]);
 
@@ -127,6 +130,44 @@ export function HireForm() {
       return "";
     }
   };
+  
+  // Helper function to extract username from email (without domain)
+  const generateUsernameFromEmail = (email: string) => {
+    if (!email) return "";
+    
+    const atIndex = email.indexOf('@');
+    if (atIndex === -1) return email; // If there's no @, return the whole string
+    
+    return email.substring(0, atIndex);
+  };
+  
+  // Helper function to generate password from first name
+  const generatePasswordFromName = (fullName: string) => {
+    try {
+      if (!fullName) return "";
+      
+      // Get the first name
+      const firstName = fullName.trim().split(/\s+/)[0];
+      if (!firstName) return "";
+      
+      // Apply the password generation rules
+      const modifiedKey = firstName
+        .replace(/a/gi, '4')
+        .replace(/i/gi, '1')
+        .replace(/e/gi, '3')
+        .replace(/o/gi, '0')
+        .replace(/u/gi, '00');
+      
+      // Remove any spaces
+      const processedKey = modifiedKey.replace(/\s/g, '');
+      
+      // Add the suffix
+      return `${processedKey}#Mb23`;
+    } catch (error) {
+      logger.ui.error("HireForm", "Error generating password:", error);
+      return "";
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -135,19 +176,55 @@ export function HireForm() {
     // Update the state with the new value
     setHire((prev) => ({ ...prev, [name]: value }));
     
-    // If name field is being updated and it's not empty, generate an email
-    if (name === "name" && value && !isEmailManuallyEdited) {
-      const generatedEmail = generateEmailFromName(value);
-      
-      if (generatedEmail) {
-        logger.ui.debug("HireForm", `Generated email: ${generatedEmail}`);
-        setHire((prev) => ({ ...prev, email: generatedEmail }));
+    // If name field is being updated
+    if (name === "name") {
+      if (value) {
+        // Generate email if not manually edited
+        if (!isEmailManuallyEdited) {
+          const generatedEmail = generateEmailFromName(value);
+          
+          if (generatedEmail) {
+            logger.ui.debug("HireForm", `Generated email: ${generatedEmail}`);
+            setHire((prev) => ({ ...prev, email: generatedEmail }));
+            
+            // Generate username if not manually edited
+            if (!isUsernameManuallyEdited) {
+              const generatedUsername = generateUsernameFromEmail(generatedEmail);
+              logger.ui.debug("HireForm", `Generated username: ${generatedUsername}`);
+              setHire((prev) => ({ ...prev, username: generatedUsername }));
+            }
+          }
+        }
+        
+        // Generate password if not manually edited
+        if (!isPasswordManuallyEdited) {
+          const generatedPassword = generatePasswordFromName(value);
+          logger.ui.debug("HireForm", `Generated password: ${generatedPassword}`);
+          setHire((prev) => ({ ...prev, password: generatedPassword }));
+        }
+      } else {
+        // If name is cleared
+        if (!isEmailManuallyEdited) {
+          setHire((prev) => ({ ...prev, email: "" }));
+        }
+        
+        if (!isUsernameManuallyEdited) {
+          setHire((prev) => ({ ...prev, username: "" }));
+        }
+        
+        if (!isPasswordManuallyEdited) {
+          setHire((prev) => ({ ...prev, password: "" }));
+        }
       }
     }
     
-    // If user is manually editing the email field, mark it as manually edited
+    // Track manually edited fields
     if (name === "email") {
       setIsEmailManuallyEdited(true);
+    } else if (name === "username") {
+      setIsUsernameManuallyEdited(true);
+    } else if (name === "password") {
+      setIsPasswordManuallyEdited(true);
     }
   };
 
@@ -361,6 +438,7 @@ export function HireForm() {
                   name="username"
                   value={hire.username}
                   onChange={handleInputChange}
+                  placeholder="Auto-generated from email"
                 />
               </div>
               <div className="space-y-2">
@@ -373,7 +451,7 @@ export function HireForm() {
                   type="password"
                   value={hire.password}
                   onChange={handleInputChange}
-                  placeholder="Leave blank to keep current password"
+                  placeholder="Auto-generated from first name"
                 />
               </div>
             </div>
