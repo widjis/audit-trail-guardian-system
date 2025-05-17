@@ -36,6 +36,7 @@ interface ADUserCreationResult {
     groups: string[];
   };
   warning?: string;
+  error?: string;
 }
 
 // The API client already includes /api in its baseURL
@@ -77,7 +78,9 @@ export const activeDirectoryService = {
       return response.data;
     } catch (error) {
       logger.api.error('AD connection test failed:', error);
-      throw error;
+      // Extract error message from response if available
+      const errorMessage = error.response?.data?.error || "Connection test failed";
+      throw new Error(errorMessage);
     }
   },
 
@@ -85,13 +88,26 @@ export const activeDirectoryService = {
   createUser: async (hireId: string, userData: ADUserData): Promise<ADUserCreationResult> => {
     logger.api.debug('Creating AD user for hire ID:', hireId);
     try {
+      // Validate required fields before sending to server
+      if (!userData.username || !userData.displayName || !userData.password) {
+        throw new Error("Missing required user parameters: username, displayName, or password");
+      }
+      
       const response = await apiClient.post<ADUserCreationResult>(
         `${AD_ENDPOINT}/create-user/${hireId}`,
         userData
       );
+      
+      if (!response.data.success && response.data.error) {
+        throw new Error(response.data.error);
+      }
+      
       return response.data;
     } catch (error) {
       logger.api.error('Failed to create AD user:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
       throw error;
     }
   }

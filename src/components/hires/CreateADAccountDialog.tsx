@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
 import { activeDirectoryService } from "@/services/active-directory-service";
-import { Loader2, CheckCircle2, Copy } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, CheckCircle2, Copy, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface CreateADAccountDialogProps {
@@ -23,6 +23,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     message?: string;
     details?: any;
     warning?: string;
+    error?: string;
   } | null>(null);
 
   // Generate AD user data from hire details
@@ -32,8 +33,20 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     const lastName = nameParts.slice(1).join(' ') || '';
     const username = hire.username || hire.email?.split('@')[0] || '';
     
+    // Ensure we have a password
+    const password = hire.initial_password || '';
+    if (!password) {
+      setResult({
+        success: false,
+        error: "Missing initial password for user"
+      });
+      return null;
+    }
+    
     let department = hire.department || '';
-    let ou = `OU=${department},OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`;
+    let ou = department 
+      ? `OU=${department},OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`
+      : 'OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com';
     
     // Special handling for Copper Cathode Plant
     if (department === "Copper Cathode Plant") {
@@ -44,16 +57,18 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     let acl = '';
     if (department === "Occupational Health and Safety" || department === "Environment") {
       acl = "ACL MTI OHSE";
-    } else {
+    } else if (department) {
       acl = `ACL MTI ${department.replace(' Plant', '')}`;
+    } else {
+      acl = "ACL MTI Users";
     }
     
     return {
       username: username.substring(0, 20), // Ensure username is 20 chars max
-      displayName: `${hire.name} [MTI]`,
+      displayName: `${hire.name || 'New User'} [MTI]`,
       firstName,
       lastName,
-      password: hire.initial_password || '',
+      password,
       email: hire.email || '',
       title: hire.job_title || '',
       department,
@@ -79,6 +94,40 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     
     try {
       const userData = generateADUserData();
+      
+      // Check if userData is valid
+      if (!userData) {
+        // Error already set in generateADUserData
+        setIsCreating(false);
+        toast({
+          title: "Error",
+          description: "Unable to generate AD user data. Check user details.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate required fields
+      if (!userData.username || !userData.displayName || !userData.password) {
+        const missingFields = [];
+        if (!userData.username) missingFields.push('username');
+        if (!userData.displayName) missingFields.push('display name');
+        if (!userData.password) missingFields.push('password');
+        
+        setResult({
+          success: false,
+          error: `Missing required fields: ${missingFields.join(', ')}`
+        });
+        
+        toast({
+          title: "Error",
+          description: `Cannot create AD account. Missing: ${missingFields.join(', ')}`,
+          variant: "destructive",
+        });
+        setIsCreating(false);
+        return;
+      }
+      
       const result = await activeDirectoryService.createUser(hire.id, userData);
       
       setResult(result);
@@ -96,7 +145,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
       } else {
         toast({
           title: "Error",
-          description: result.message || "Failed to create Active Directory account",
+          description: result.message || result.error || "Failed to create Active Directory account",
           variant: "destructive",
         });
       }
@@ -104,12 +153,12 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
       console.error("Error creating AD account:", error);
       setResult({
         success: false,
-        message: error instanceof Error ? error.message : "An unknown error occurred"
+        error: error instanceof Error ? error.message : "An unknown error occurred"
       });
       
       toast({
         title: "Error",
-        description: "Failed to create Active Directory account",
+        description: error instanceof Error ? error.message : "Failed to create Active Directory account",
         variant: "destructive",
       });
     } finally {
@@ -142,14 +191,17 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
               </div>
             ) : (
               <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
                 <AlertDescription>
-                  {result.message || "Failed to create account"}
+                  {result.error || result.message || "Failed to create account"}
                 </AlertDescription>
               </Alert>
             )}
             
             {result.warning && (
               <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+                <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>{result.warning}</AlertDescription>
               </Alert>
             )}
@@ -196,59 +248,71 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
           </div>
         ) : (
           <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">The following account will be created:</h3>
-              <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                <div className="font-medium">Username:</div>
-                <div>{adUserData.username}</div>
+            {adUserData ? (
+              <>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">The following account will be created:</h3>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    <div className="font-medium">Username:</div>
+                    <div>{adUserData.username}</div>
+                    
+                    <div className="font-medium">Display Name:</div>
+                    <div>{adUserData.displayName}</div>
+                    
+                    <div className="font-medium">First Name:</div>
+                    <div>{adUserData.firstName}</div>
+                    
+                    <div className="font-medium">Last Name:</div>
+                    <div>{adUserData.lastName}</div>
+                    
+                    <div className="font-medium">Email:</div>
+                    <div>{adUserData.email}</div>
+                    
+                    <div className="font-medium">Title:</div>
+                    <div>{adUserData.title}</div>
+                    
+                    <div className="font-medium">Department:</div>
+                    <div>{adUserData.department}</div>
+                    
+                    <div className="font-medium">Company:</div>
+                    <div>{adUserData.company}</div>
+                    
+                    <div className="font-medium">Office:</div>
+                    <div>{adUserData.office}</div>
+                  </div>
+                </div>
                 
-                <div className="font-medium">Display Name:</div>
-                <div>{adUserData.displayName}</div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Organizational Unit:</h3>
+                  <div className="text-sm font-mono bg-gray-50 p-2 rounded break-all">
+                    {adUserData.ou}
+                  </div>
+                </div>
                 
-                <div className="font-medium">First Name:</div>
-                <div>{adUserData.firstName}</div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Security Groups:</h3>
+                  <ul className="list-disc list-inside ml-2 text-sm">
+                    <li>{adUserData.acl}</li>
+                    <li>VPN-USERS</li>
+                  </ul>
+                </div>
                 
-                <div className="font-medium">Last Name:</div>
-                <div>{adUserData.lastName}</div>
-                
-                <div className="font-medium">Email:</div>
-                <div>{adUserData.email}</div>
-                
-                <div className="font-medium">Title:</div>
-                <div>{adUserData.title}</div>
-                
-                <div className="font-medium">Department:</div>
-                <div>{adUserData.department}</div>
-                
-                <div className="font-medium">Company:</div>
-                <div>{adUserData.company}</div>
-                
-                <div className="font-medium">Office:</div>
-                <div>{adUserData.office}</div>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Organizational Unit:</h3>
-              <div className="text-sm font-mono bg-gray-50 p-2 rounded break-all">
-                {adUserData.ou}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Security Groups:</h3>
-              <ul className="list-disc list-inside ml-2 text-sm">
-                <li>{adUserData.acl}</li>
-                <li>VPN-USERS</li>
-              </ul>
-            </div>
-            
-            <Alert>
-              <AlertDescription>
-                This will create an active directory account for {hire.name} with username <strong>{adUserData.username}</strong> and 
-                update their account status to <strong>Active</strong>.
-              </AlertDescription>
-            </Alert>
+                <Alert>
+                  <AlertDescription>
+                    This will create an active directory account for {hire.name} with username <strong>{adUserData.username}</strong> and 
+                    update their account status to <strong>Active</strong>.
+                  </AlertDescription>
+                </Alert>
+              </>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Missing Information</AlertTitle>
+                <AlertDescription>
+                  Unable to create AD account. Required user information is missing.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
       </div>
@@ -269,7 +333,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         ) : (
           <Button 
             onClick={handleCreateADAccount}
-            disabled={isCreating}
+            disabled={isCreating || !adUserData}
           >
             {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isCreating ? "Creating..." : "Create AD Account"}

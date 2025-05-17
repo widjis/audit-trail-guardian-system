@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcrypt';
+import ldap from 'ldapjs';
 import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
 
@@ -45,55 +46,192 @@ const saveSettings = (settings) => {
   }
 };
 
-// Mock Active Directory Integration
-// In a real implementation, this would use a library like 'activedirectory2' or 'ldapjs'
-const mockADConnection = (settings) => {
-  // This is a mock function that simulates connecting to AD
-  // In production, this would be replaced with actual AD integration
+// Real LDAP/AD Connection using ldapjs
+const createLdapClient = (settings) => {
+  const client = ldap.createClient({
+    url: `ldap://${settings.server}`,
+    timeout: 5000,
+    connectTimeout: 10000
+  });
+  
+  return client;
+};
+
+const testLdapConnection = (settings) => {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    try {
       if (!settings.server || !settings.username || !settings.password) {
-        reject(new Error("Missing required connection parameters"));
-        return;
+        return reject(new Error("Missing required connection parameters"));
       }
+
+      const client = createLdapClient(settings);
       
-      // Simulate connection success/failure
-      if (settings.server.includes('.') && settings.username.length > 3 && settings.password.length > 3) {
+      client.on('error', (err) => {
+        logger.api.error('LDAP connection error:', err);
+        reject(new Error(`Connection failed: ${err.message}`));
+      });
+      
+      // Bind with the provided credentials
+      client.bind(settings.username, settings.password, (err) => {
+        if (err) {
+          logger.api.error('LDAP bind error:', err);
+          client.destroy();
+          return reject(new Error(`Authentication failed: ${err.message}`));
+        }
+        
+        logger.api.info('LDAP connection successful');
+        client.unbind();
         resolve({ success: true, message: "Connected successfully" });
-      } else {
-        reject(new Error("Connection failed: Invalid server address or credentials"));
-      }
-    }, 1000);
+      });
+    } catch (err) {
+      logger.api.error('LDAP connection setup error:', err);
+      reject(new Error(`Connection setup failed: ${err.message}`));
+    }
   });
 };
 
-const mockCreateADUser = (userData) => {
-  // This is a mock function that simulates creating a user in AD
+const createLdapUser = (settings, userData) => {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    try {
+      // Validate required parameters
       if (!userData.username || !userData.password || !userData.displayName) {
-        reject(new Error("Missing required user parameters"));
-        return;
+        return reject(new Error("Missing required user parameters"));
       }
       
-      // Simulate user creation
-      if (userData.username.length > 2) {
-        resolve({
-          success: true,
-          message: `User ${userData.username} created successfully`,
-          details: {
-            samAccountName: userData.username,
-            displayName: userData.displayName,
-            distinguishedName: `CN=${userData.displayName},${userData.ou}`,
-            groups: [userData.acl, 'VPN-USERS']
+      const client = createLdapClient(settings);
+      
+      client.on('error', (err) => {
+        logger.api.error('LDAP connection error:', err);
+        reject(new Error(`Connection failed: ${err.message}`));
+      });
+      
+      // Bind with admin credentials
+      client.bind(settings.username, settings.password, (err) => {
+        if (err) {
+          logger.api.error('LDAP bind error:', err);
+          client.destroy();
+          return reject(new Error(`Authentication failed: ${err.message}`));
+        }
+        
+        // Create user DN (distinguished name)
+        const userDN = `CN=${userData.displayName},${userData.ou}`;
+        
+        // Prepare user attributes
+        const userEntry = {
+          cn: userData.displayName,
+          sAMAccountName: userData.username,
+          objectClass: ['top', 'person', 'organizationalPerson', 'user'],
+          givenName: userData.firstName,
+          sn: userData.lastName,
+          displayName: userData.displayName,
+          userPrincipalName: `${userData.username}@${settings.domain}`,
+          mail: userData.email,
+          title: userData.title,
+          department: userData.department,
+          company: userData.company,
+          physicalDeliveryOfficeName: userData.office,
+          unicodePwd: encodeUnicodePwd(userData.password)
+        };
+        
+        // Add the user
+        client.add(userDN, userEntry, (err) => {
+          if (err) {
+            logger.api.error('LDAP add user error:', err);
+            client.unbind();
+            return reject(new Error(`Failed to create user: ${err.message}`));
+          }
+          
+          // User created, now add to groups
+          const groups = [userData.acl, 'VPN-USERS'];
+          const addedGroups = [];
+          let groupsProcessed = 0;
+          
+          groups.forEach(groupName => {
+            // Find the group first
+            const groupFilter = `(&(objectClass=group)(cn=${groupName}))`;
+            client.search(settings.baseDN, { 
+              scope: 'sub',
+              filter: groupFilter
+            }, (err, res) => {
+              if (err) {
+                logger.api.warn(`LDAP search for group ${groupName} error:`, err);
+                groupsProcessed++;
+                checkComplete();
+                return;
+              }
+              
+              let groupFound = false;
+              
+              res.on('searchEntry', (entry) => {
+                groupFound = true;
+                const groupDN = entry.objectName;
+                
+                // Modify group to add the new user
+                const change = new ldap.Change({
+                  operation: 'add',
+                  modification: {
+                    member: userDN
+                  }
+                });
+                
+                client.modify(groupDN, change, (modErr) => {
+                  if (modErr) {
+                    logger.api.warn(`Failed to add user to group ${groupName}:`, modErr);
+                  } else {
+                    addedGroups.push(groupName);
+                    logger.api.info(`User added to group ${groupName}`);
+                  }
+                  
+                  groupsProcessed++;
+                  checkComplete();
+                });
+              });
+              
+              res.on('error', (err) => {
+                logger.api.warn(`Group search error for ${groupName}:`, err);
+                groupsProcessed++;
+                checkComplete();
+              });
+              
+              res.on('end', () => {
+                if (!groupFound) {
+                  logger.api.warn(`Group ${groupName} not found`);
+                  groupsProcessed++;
+                  checkComplete();
+                }
+              });
+            });
+          });
+          
+          function checkComplete() {
+            if (groupsProcessed === groups.length) {
+              client.unbind();
+              resolve({
+                success: true,
+                message: `User ${userData.username} created successfully`,
+                details: {
+                  samAccountName: userData.username,
+                  displayName: userData.displayName,
+                  distinguishedName: userDN,
+                  groups: addedGroups
+                }
+              });
+            }
           }
         });
-      } else {
-        reject(new Error("Failed to create user: Invalid username"));
-      }
-    }, 1500);
+      });
+    } catch (err) {
+      logger.api.error('LDAP user creation setup error:', err);
+      reject(new Error(`User creation setup failed: ${err.message}`));
+    }
   });
 };
+
+// Helper function to encode password for AD (requires specific unicode format)
+function encodeUnicodePwd(password) {
+  const encodedPwd = Buffer.from('"' + password + '"', 'utf16le');
+  return encodedPwd;
+}
 
 // Get AD settings
 router.get('/', (req, res) => {
@@ -152,12 +290,13 @@ router.post('/test', async (req, res) => {
   try {
     const settings = req.body;
     
-    // In a real implementation, this would test the connection to your AD server
-    await mockADConnection(settings);
+    // Test connection using ldapjs
+    await testLdapConnection(settings);
     
     res.json({ success: true, message: "Connection successful" });
   } catch (err) {
-    res.status(400).json({ error: `Connection failed: ${err.message}` });
+    logger.api.warn('AD connection test failed:', err);
+    res.status(400).json({ success: false, error: `Connection failed: ${err.message}` });
   }
 });
 
@@ -170,11 +309,14 @@ router.post('/create-user/:id', async (req, res) => {
     // First, check if AD integration is enabled
     const settings = getSettings();
     if (!settings.activeDirectorySettings || !settings.activeDirectorySettings.enabled) {
-      return res.status(400).json({ error: "Active Directory integration is not enabled" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "Active Directory integration is not enabled" 
+      });
     }
     
-    // In a real implementation, this would create a user in your AD server
-    const result = await mockCreateADUser(userData);
+    // Create user in AD using ldapjs
+    const result = await createLdapUser(settings.activeDirectorySettings, userData);
     
     // If successful, update the hire record to mark the account as created
     if (result.success) {
@@ -216,7 +358,10 @@ router.post('/create-user/:id', async (req, res) => {
   } catch (err) {
     // Using the correct logger format for the server
     logger.api.error('Error creating AD user:', err);
-    res.status(500).json({ error: `Failed to create AD user: ${err.message}` });
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to create AD user: ${err.message}` 
+    });
   }
 });
 
