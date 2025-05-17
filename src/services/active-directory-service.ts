@@ -69,10 +69,11 @@ export const activeDirectoryService = {
     }
   },
 
-  // Test AD connection
+  // Test AD connection with improved error handling
   testConnection: async (settings: ActiveDirectorySettings): Promise<{ success: boolean; message: string }> => {
     logger.api.debug('Testing Active Directory connection');
     logger.api.debug(`Using auth format: ${settings.authFormat}, protocol: ${settings.protocol}`);
+    logger.api.debug(`Username: ${settings.username}, Domain: ${settings.domain}`);
     
     try {
       const response = await apiClient.post<{ success: boolean; message: string }>(
@@ -80,29 +81,20 @@ export const activeDirectoryService = {
         settings
       );
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       logger.api.error('AD connection test failed:', error);
       
       // Extract error message from response if available and provide more context
       let errorMessage = "Connection test failed";
       
+      // Check if we have a more specific error from the server
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
-        
-        // Provide more helpful context based on the error
-        if (errorMessage.includes('Invalid Credentials')) {
-          if (settings.authFormat === 'upn') {
-            errorMessage += ". Try using the DN format instead, or check username and password";
-          } else {
-            errorMessage += ". Try using the UPN format instead, or check username and password";
-          }
-        } else if (errorMessage.includes('Invalid DN')) {
-          errorMessage += ". The Distinguished Name format is incorrect";
-        } else if (errorMessage.toLowerCase().includes('timeout')) {
-          errorMessage += ". Server may be unreachable or blocked by a firewall";
-        }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
+      // Throw a clear error to be handled by the UI
       throw new Error(errorMessage);
     }
   },
@@ -126,7 +118,7 @@ export const activeDirectoryService = {
       }
       
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       logger.api.error('Failed to create AD user:', error);
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);

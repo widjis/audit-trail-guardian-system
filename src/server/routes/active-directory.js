@@ -62,7 +62,8 @@ const formatBindCredential = (settings, username) => {
     const userPart = username.includes('@') ? username.split('@')[0] : username;
     
     // Create a simple DN - customize based on your AD structure
-    const formattedDN = `CN=${userPart},${settings.baseDN}`;
+    // Using format CN=username,CN=Users,DC=domain,DC=com which is more standard
+    const formattedDN = `CN=${userPart},CN=Users,${settings.baseDN}`;
     logger.api.debug(`Formatted DN: ${formattedDN}`);
     return formattedDN;
   }
@@ -86,14 +87,10 @@ const createLdapClient = (settings) => {
   
   logger.api.debug(`Creating LDAP client with URL: ${protocol}://${settings.server}:${port}`);
   
-  // Enhanced TLS options for LDAPS
-  const tlsOptions = protocol === 'ldaps' ? {
-    rejectUnauthorized: false, // Set to true in production with proper certificates
-    requestCert: true,
-    // Enable this if you need to provide client certificates
-    // key: fs.readFileSync('client-key.pem'),
-    // cert: fs.readFileSync('client-cert.pem')
-  } : undefined;
+  // Enhanced TLS options for LDAPS, following the example provided
+  const tlsOptions = {
+    rejectUnauthorized: false // Don't validate certificate in dev/test environments
+  };
   
   // Create client with appropriate URL
   const client = ldap.createClient({
@@ -132,6 +129,7 @@ const testLdapConnection = (settings) => {
       
       const client = createLdapClient(settings);
       
+      // Setup error handling
       client.on('error', (err) => {
         logger.api.error('LDAP connection error:', err);
         client.destroy();
@@ -141,8 +139,9 @@ const testLdapConnection = (settings) => {
       // Format the bind credentials based on settings
       const bindDN = formatBindCredential(settings, settings.username);
       logger.api.debug(`Attempting LDAP bind with DN: ${bindDN}`);
+      logger.api.debug(`Password length: ${settings.password ? settings.password.length : 0} characters`);
       
-      // Bind with the provided credentials
+      // Bind with the provided credentials, following example code structure
       client.bind(bindDN, settings.password, (err) => {
         if (err) {
           logger.api.error(`LDAP bind error (using ${settings.authFormat || 'default'} format):`, err);
@@ -197,7 +196,7 @@ router.get('/', (req, res) => {
       baseDN: 'DC=mbma,DC=com',
       protocol: 'ldap',
       enabled: false,
-      authFormat: 'upn' // Default to UPN format
+      authFormat: 'dn' // Default to DN format as per example
     };
     
     // Don't send the password back to the client
@@ -326,5 +325,169 @@ router.post('/create-user/:id', async (req, res) => {
     });
   }
 });
+
+// Create user in AD - similar to the example provided
+const createLdapUser = async (settings, userData) => {
+  return new Promise(async (resolve, reject) => {
+    const client = createLdapClient(settings);
+    
+    try {
+      // Format the bind credentials based on settings
+      const bindDN = formatBindCredential(settings, settings.username);
+      logger.api.debug(`Binding to AD with DN: ${bindDN}`);
+      
+      // Bind with service account
+      await new Promise((resolveBind, rejectBind) => {
+        client.bind(bindDN, settings.password, (err) => {
+          if (err) {
+            logger.api.error('Error binding to AD:', err);
+            return rejectBind(err);
+          }
+          resolveBind();
+        });
+      });
+      
+      logger.api.debug('Successfully bound to AD, creating user');
+      
+      // Create user DN
+      const userDN = `CN=${userData.displayName},${userData.ou}`;
+      logger.api.debug(`User DN will be: ${userDN}`);
+      
+      // Encode password for AD
+      const unicodePwd = encodeUnicodePwd(userData.password);
+      
+      // Create user entry object
+      const entry = {
+        objectClass: ['top', 'person', 'organizationalPerson', 'user'],
+        cn: userData.displayName,
+        sn: userData.lastName || userData.displayName.split(' ').pop(),
+        givenName: userData.firstName || userData.displayName.split(' ')[0],
+        displayName: userData.displayName,
+        sAMAccountName: userData.username,
+        userPrincipalName: userData.email,
+        mail: userData.email,
+        unicodePwd: unicodePwd,
+        userAccountControl: '512', // Enable account
+        title: userData.title || '',
+        department: userData.department || '',
+        company: userData.company || '',
+        physicalDeliveryOfficeName: userData.office || '',
+      };
+      
+      // Create the user
+      await new Promise((resolveAdd, rejectAdd) => {
+        client.add(userDN, entry, (err) => {
+          if (err) {
+            logger.api.error('Error creating user:', err);
+            return rejectAdd(err);
+          }
+          resolveAdd();
+        });
+      });
+      
+      logger.api.debug('User created successfully, will now add to groups');
+      
+      // Add to security groups if specified
+      if (userData.acl) {
+        try {
+          await addUserToGroup(client, userDN, userData.acl);
+          logger.api.debug(`Added user to ${userData.acl} group`);
+        } catch (groupErr) {
+          logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
+          // Continue even if group add fails
+        }
+      }
+      
+      // Always add to VPN-USERS group
+      try {
+        await addUserToGroup(client, userDN, 'VPN-USERS');
+        logger.api.debug(`Added user to VPN-USERS group`);
+      } catch (vpnErr) {
+        logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
+        // Continue even if group add fails
+      }
+      
+      // Unbind when done
+      await new Promise((resolveUnbind) => {
+        client.unbind(() => resolveUnbind());
+      });
+      
+      // Return success
+      resolve({
+        success: true,
+        message: "Active Directory account created successfully",
+        details: {
+          samAccountName: userData.username,
+          displayName: userData.displayName,
+          distinguishedName: userDN,
+          groups: [userData.acl, 'VPN-USERS'].filter(Boolean),
+        }
+      });
+      
+    } catch (err) {
+      logger.api.error('Error in AD user creation process:', err);
+      
+      // Ensure client is unbound in case of error
+      try {
+        client.unbind();
+      } catch (unbindErr) {
+        logger.api.debug('Error unbinding client:', unbindErr);
+      }
+      
+      // Return failure with details
+      reject({
+        success: false,
+        error: `Failed to create AD user: ${err.message}`
+      });
+    }
+  });
+};
+
+// Helper function to add user to a group
+const addUserToGroup = (client, userDN, groupName) => {
+  return new Promise((resolve, reject) => {
+    // First search for the group
+    client.search('', {
+      filter: `(&(objectClass=group)(cn=${groupName}))`,
+      scope: 'sub'
+    }, (err, res) => {
+      if (err) {
+        return reject(err);
+      }
+      
+      let groupDN = null;
+      
+      res.on('searchEntry', (entry) => {
+        groupDN = entry.dn.toString();
+      });
+      
+      res.on('error', (err) => {
+        reject(err);
+      });
+      
+      res.on('end', () => {
+        if (!groupDN) {
+          return reject(new Error(`Group ${groupName} not found`));
+        }
+        
+        // Modify group to add member
+        const change = new ldap.Change({
+          operation: 'add',
+          modification: {
+            type: 'member',
+            values: [userDN]
+          }
+        });
+        
+        client.modify(groupDN, change, (err) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        });
+      });
+    });
+  });
+};
 
 export default router;
