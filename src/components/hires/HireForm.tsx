@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export function HireForm() {
   const [hire, setHire] = useState<Omit<NewHire, "id" | "created_at" | "updated_at">>(emptyHire);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -67,6 +69,7 @@ export function HireForm() {
       fetchHire(id);
     } else {
       logger.ui.info("HireForm", "Creating new hire, using empty form");
+      setIsEmailManuallyEdited(false);
     }
   }, [id, isNewHire]);
 
@@ -99,11 +102,53 @@ export function HireForm() {
     }
   };
   
+  // Helper function to generate email from name
+  const generateEmailFromName = (fullName: string) => {
+    try {
+      // Split the name and handle various formats
+      const nameParts = fullName.trim().split(/\s+/);
+      
+      if (nameParts.length === 0) return "";
+      
+      let firstName = nameParts[0].toLowerCase();
+      
+      // For last name, use the last part of the name
+      let lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : "";
+      
+      // Clean up the names - remove special characters and spaces
+      firstName = firstName.replace(/[^a-z0-9]/g, "");
+      lastName = lastName.replace(/[^a-z0-9]/g, "");
+      
+      if (!firstName || !lastName) return "";
+      
+      return `${firstName}.${lastName}@merdekabattery.com`;
+    } catch (error) {
+      logger.ui.error("HireForm", "Error generating email:", error);
+      return "";
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     logger.ui.debug("HireForm", `Input changed: ${name} = ${value}`);
+    
+    // Update the state with the new value
     setHire((prev) => ({ ...prev, [name]: value }));
+    
+    // If name field is being updated and it's not empty, generate an email
+    if (name === "name" && value && !isEmailManuallyEdited) {
+      const generatedEmail = generateEmailFromName(value);
+      
+      if (generatedEmail) {
+        logger.ui.debug("HireForm", `Generated email: ${generatedEmail}`);
+        setHire((prev) => ({ ...prev, email: generatedEmail }));
+      }
+    }
+    
+    // If user is manually editing the email field, mark it as manually edited
+    if (name === "email") {
+      setIsEmailManuallyEdited(true);
+    }
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
