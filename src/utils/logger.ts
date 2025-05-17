@@ -14,6 +14,7 @@ export interface LoggerConfig {
   enableApi: boolean;
   enableUi: boolean;
   enableLdap: boolean; // Added LDAP logging option
+  enableDb: boolean;   // Added database logging option
 }
 
 // Default configuration
@@ -22,6 +23,7 @@ const defaultConfig: LoggerConfig = {
   enableApi: true,   // API logs enabled by default
   enableUi: true,    // UI logs enabled by default
   enableLdap: true,  // LDAP logs enabled by default
+  enableDb: true,    // Database logs enabled by default
 };
 
 // Get config from environment variables or use defaults
@@ -32,6 +34,7 @@ const getLoggerConfig = (): LoggerConfig => {
     enableApi: import.meta.env.VITE_LOG_API !== 'false',
     enableUi: import.meta.env.VITE_LOG_UI !== 'false',
     enableLdap: import.meta.env.VITE_LOG_LDAP !== 'false',
+    enableDb: import.meta.env.VITE_LOG_DB !== 'false',
   };
 };
 
@@ -168,7 +171,101 @@ export const logger = {
         }
       }
     },
+    // Add enhanced error reporting for LDAP operations
+    errorDetail: (err: any) => {
+      if (config.enableLdap && shouldLog('error')) {
+        console.error(`[${getTimestamp()}] [LDAP] [ERROR-DETAIL] ${err.name || 'Error'}: ${err.message}`);
+        
+        // Interpret LDAP error codes if available
+        if (err.code) {
+          let interpretation = "Unknown error code";
+          
+          // Common LDAP error codes and their meanings
+          switch (err.code) {
+            case 0: interpretation = "Success"; break;
+            case 1: interpretation = "Operations error"; break;
+            case 2: interpretation = "Protocol error"; break;
+            case 3: interpretation = "Time limit exceeded"; break;
+            case 4: interpretation = "Size limit exceeded"; break;
+            case 5: interpretation = "Compare false"; break;
+            case 6: interpretation = "Compare true"; break;
+            case 7: interpretation = "Authentication method not supported"; break;
+            case 8: interpretation = "Strong authentication required"; break;
+            case 10: interpretation = "Referral"; break;
+            case 11: interpretation = "Administrative limit exceeded"; break;
+            case 12: interpretation = "Unavailable critical extension"; break;
+            case 13: interpretation = "Confidentiality required"; break;
+            case 14: interpretation = "SASL bind in progress"; break;
+            case 16: interpretation = "No such attribute"; break;
+            case 17: interpretation = "Undefined attribute type"; break;
+            case 18: interpretation = "Inappropriate matching"; break;
+            case 19: interpretation = "Constraint violation"; break;
+            case 20: interpretation = "Attribute or value exists"; break;
+            case 21: interpretation = "Invalid attribute syntax"; break;
+            case 32: interpretation = "No such object"; break;
+            case 33: interpretation = "Alias problem"; break;
+            case 34: interpretation = "Invalid DN syntax"; break;
+            case 35: interpretation = "Is leaf"; break;
+            case 36: interpretation = "Alias dereferencing problem"; break;
+            case 48: interpretation = "Inappropriate authentication"; break;
+            case 49: interpretation = "Invalid credentials"; break;
+            case 50: interpretation = "Insufficient access rights"; break;
+            case 51: interpretation = "Busy"; break;
+            case 52: interpretation = "Unavailable"; break;
+            case 53: interpretation = "Unwilling to perform"; break;
+            case 54: interpretation = "Loop detect"; break;
+            case 64: interpretation = "Naming violation"; break;
+            case 65: interpretation = "Object class violation"; break;
+            case 66: interpretation = "Not allowed on non-leaf"; break;
+            case 67: interpretation = "Not allowed on RDN"; break;
+            case 68: interpretation = "Entry already exists"; break;
+            case 69: interpretation = "Object class modifications prohibited"; break;
+            case 71: interpretation = "Affects multiple DSAs"; break;
+            case 80: interpretation = "Other"; break;
+          }
+          
+          console.error(`[${getTimestamp()}] [LDAP] [ERROR-CODE] Code ${err.code}: ${interpretation}`);
+        }
+      }
+    }
   },
+
+  // Database related logs
+  db: {
+    debug: (message: string, ...args: any[]) => {
+      if (config.enableDb && shouldLog('debug')) {
+        console.debug(`[${getTimestamp()}] [DATABASE] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    info: (message: string, ...args: any[]) => {
+      if (config.enableDb && shouldLog('info')) {
+        console.info(`[${getTimestamp()}] [DATABASE] [INFO] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    warn: (message: string, ...args: any[]) => {
+      if (config.enableDb && shouldLog('warn')) {
+        console.warn(`[${getTimestamp()}] [DATABASE] [WARN] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    error: (message: string, ...args: any[]) => {
+      if (config.enableDb && shouldLog('error')) {
+        console.error(`[${getTimestamp()}] [DATABASE] [ERROR] ${message}`, ...args.map(sanitizeForLog));
+      }
+    },
+    // Add SQL error details logging
+    sqlError: (err: any) => {
+      if (config.enableDb && shouldLog('error')) {
+        console.error(`[${getTimestamp()}] [DATABASE] [SQL-ERROR] ${err.message}`);
+        if (err.code) {
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-CODE] ${err.code}`);
+        }
+        if (err.originalError?.info) {
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-DETAILS] Number: ${err.originalError.info.number}, State: ${err.originalError.info.state}`);
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-MESSAGE] ${err.originalError.info.message}`);
+        }
+      }
+    }
+  }
 };
 
 export default logger;

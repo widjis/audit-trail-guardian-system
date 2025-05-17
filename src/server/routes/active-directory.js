@@ -349,7 +349,9 @@ router.post('/create-user/:id', async (req, res) => {
     // If successful, update the hire record to mark the account as created
     if (result.success) {
       try {
-        await executeQuery('UPDATE hires SET account_status = ? WHERE id = ?', ['Active', id]);
+        // FIXED: Changed "account_status" to "account_creation_status" to match database schema
+        await executeQuery('UPDATE hires SET account_creation_status = ? WHERE id = ?', ['Active', id]);
+        logger.db.info(`Updated account_creation_status to 'Active' for hire ID ${id}`);
         
         // Add an audit log entry for the AD account creation
         const timestamp = new Date().toISOString();
@@ -367,25 +369,45 @@ router.post('/create-user/:id', async (req, res) => {
         };
         
         // Insert the audit log into the database
-        await executeQuery(
-          'INSERT INTO audit_logs (id, hire_id, action, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [audit.id, audit.hire_id, audit.action, audit.details, audit.created_by, audit.created_at]
-        );
+        try {
+          await executeQuery(
+            'INSERT INTO audit_logs (id, hire_id, action, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [audit.id, audit.hire_id, audit.action, audit.details, audit.created_by, audit.created_at]
+          );
+          logger.db.info(`Created audit log entry for AD account creation for hire ID ${id}`);
+        } catch (auditError) {
+          // Log the specific SQL error details for audit log insertion
+          logger.db.error(`Audit log creation error for hire ID ${id}:`, auditError);
+          if (auditError.originalError?.info) {
+            logger.db.error('SQL error details:', auditError.originalError.info);
+          }
+          // Continue execution even if audit log fails - we still want to return success
+          logger.db.warn('AD account created but audit log creation failed');
+        }
       } catch (dbError) {
-        // Using the correct logger format for the server
-        logger.db.error('Database error after AD account creation:', dbError);
+        // Log detailed information about the database error
+        logger.db.error('Database error when updating account_creation_status:', dbError);
+        if (dbError.originalError?.info) {
+          logger.db.error('SQL error details:', dbError.originalError.info);
+          logger.db.error(`SQL error number: ${dbError.originalError.info.number}, state: ${dbError.originalError.info.state}`);
+          logger.db.error(`SQL error message: ${dbError.originalError.info.message}`);
+        }
+        
         // Still return success, but with a warning
         return res.json({
           ...result,
-          warning: "AD account created but database update failed"
+          warning: "AD account created but database update failed. Please check database schema."
         });
       }
     }
     
     res.json(result);
   } catch (err) {
-    // Using the correct logger format for the server
+    // Using the correct logger format for the server with enhanced error details
     logger.api.error('Error creating AD user:', err);
+    if (err.originalError?.info) {
+      logger.api.error('SQL error details:', err.originalError.info);
+    }
     res.status(500).json({ 
       success: false, 
       error: `Failed to create AD user: ${err.message}` 
@@ -479,6 +501,12 @@ const createLdapUser = async (settings, userData) => {
               logger.api.error('- unicodePwd (password encoding)');
               logger.api.error('- userPrincipalName and mail (must be valid email formats)');
               logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
+              
+              // Log each attribute separately to help identify the problematic one
+              logger.api.debug('Checking individual attributes for syntax issues:');
+              for (const [key, value] of Object.entries(debugEntry)) {
+                logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+              }
             }
             return rejectAdd(err);
           }

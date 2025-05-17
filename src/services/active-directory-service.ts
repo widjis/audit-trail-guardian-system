@@ -80,9 +80,15 @@ export const activeDirectoryService = {
         `${AD_ENDPOINT}/test`,
         settings
       );
+      logger.api.info('Active Directory connection test successful:', response.data.message);
       return response.data;
     } catch (error: any) {
       logger.api.error('AD connection test failed:', error);
+      
+      // Use the enhanced LDAP error logging if available
+      if (error.response?.data?.ldapError) {
+        logger.ldap.errorDetail(error.response.data.ldapError);
+      }
       
       // Extract error message from response if available and provide more context
       let errorMessage = "Connection test failed";
@@ -99,7 +105,7 @@ export const activeDirectoryService = {
     }
   },
 
-  // Create AD user
+  // Create AD user with additional error handling and logging
   createUser: async (hireId: string, userData: ADUserData): Promise<ADUserCreationResult> => {
     logger.api.debug('Creating AD user for hire ID:', hireId);
     
@@ -121,8 +127,16 @@ export const activeDirectoryService = {
     try {
       // Validate required fields before sending to server
       if (!userData.username || !userData.displayName) {
+        logger.api.error('Missing required fields for AD user creation');
         throw new Error("Missing required user parameters: username or displayName");
       }
+      
+      logger.ldap.operation('createUser', {
+        username: userData.username,
+        displayName: userData.displayName,
+        ou: userData.ou,
+        hireId: hireId
+      });
       
       const response = await apiClient.post<ADUserCreationResult>(
         `${AD_ENDPOINT}/create-user/${hireId}`,
@@ -130,12 +144,33 @@ export const activeDirectoryService = {
       );
       
       if (!response.data.success && response.data.error) {
+        logger.api.error('AD user creation failed with error:', response.data.error);
         throw new Error(response.data.error);
       }
+      
+      if (response.data.warning) {
+        logger.api.warn('AD user created with warning:', response.data.warning);
+      }
+      
+      logger.api.info('AD user created successfully:', {
+        username: userData.username,
+        displayName: userData.displayName
+      });
       
       return response.data;
     } catch (error: any) {
       logger.api.error('Failed to create AD user:', error);
+      
+      // Log database errors with detail if available
+      if (error.response?.data?.sqlError) {
+        logger.db.sqlError(error.response.data.sqlError);
+      }
+      
+      // Log LDAP errors with detail if available
+      if (error.response?.data?.ldapError) {
+        logger.ldap.errorDetail(error.response.data.ldapError);
+      }
+      
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       }
