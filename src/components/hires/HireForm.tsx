@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
 
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
@@ -254,10 +252,68 @@ export function HireForm() {
   
   const copyPasswordToClipboard = () => {
     if (hire.password) {
-      navigator.clipboard.writeText(hire.password);
+      try {
+        // Try the modern Clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(hire.password)
+            .then(() => {
+              toast({
+                title: "Password copied",
+                description: "Password has been copied to clipboard",
+              });
+            })
+            .catch(err => {
+              logger.ui.error("HireForm", "Error copying with Clipboard API:", err);
+              // Fallback to the execCommand method
+              fallbackCopyTextToClipboard(hire.password);
+            });
+        } else {
+          // Use fallback method if Clipboard API not available
+          fallbackCopyTextToClipboard(hire.password);
+        }
+      } catch (error) {
+        logger.ui.error("HireForm", "Copy to clipboard error:", error);
+        toast({
+          title: "Copy failed",
+          description: "Could not copy password to clipboard",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Fallback method for copying text using document.execCommand
+  const fallbackCopyTextToClipboard = (text: string) => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Make the textarea out of viewport
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        toast({
+          title: "Password copied",
+          description: "Password has been copied to clipboard",
+        });
+      } else {
+        throw new Error("Copy command was unsuccessful");
+      }
+    } catch (err) {
+      logger.ui.error("HireForm", "Fallback copy error:", err);
       toast({
-        title: "Password copied",
-        description: "Password has been copied to clipboard",
+        title: "Copy failed",
+        description: "Could not copy password to clipboard",
+        variant: "destructive",
       });
     }
   };
