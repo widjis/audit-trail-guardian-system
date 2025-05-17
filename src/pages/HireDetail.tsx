@@ -4,12 +4,12 @@ import { HireForm } from "@/components/hires/HireForm";
 import { AuditLogsList } from "@/components/hires/AuditLogsList";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
 import { Button } from "@/components/ui/button";
-import { Send, UserPlus } from "lucide-react";
+import { Send, UserPlus, RefreshCw } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { SendWhatsAppDialog } from "@/components/hires/SendWhatsAppDialog";
 import { CreateADAccountDialog } from "@/components/hires/CreateADAccountDialog";
@@ -33,33 +33,35 @@ export default function HireDetail() {
   // Check if AD integration is enabled
   const isADEnabled = settings?.activeDirectorySettings?.enabled || false;
   
-  useEffect(() => {
-    // Log the ID to help with debugging
-    console.log("HireDetail page loaded with ID:", id);
+  // Fetch hire details function - made into a callback so it can be called after AD account creation
+  const fetchHireDetails = useCallback(() => {
+    if (!id || id === "new") return;
     
-    // Fetch hire details if we have an ID and it's not a new hire
-    if (id && id !== "new") {
-      setIsLoading(true);
-      hiresApi.getOne(id)
-        .then(data => {
-          console.log("Fetched hire details:", data);
-          setHire(data);
-        })
-        .catch(error => {
-          console.error("Error fetching hire details:", error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch hire details",
-            variant: "destructive",
-          });
-        })
-        .finally(() => {
-          setIsLoading(false);
+    console.log("Fetching hire details for ID:", id);
+    setIsLoading(true);
+    
+    hiresApi.getOne(id)
+      .then(data => {
+        console.log("Fetched hire details:", data);
+        console.log("Account creation status:", data.account_creation_status);
+        setHire(data);
+      })
+      .catch(error => {
+        console.error("Error fetching hire details:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch hire details",
+          variant: "destructive",
         });
-    } else {
-      setIsLoading(false);
-    }
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, [id, toast]);
+
+  useEffect(() => {
+    fetchHireDetails();
+  }, [fetchHireDetails]);
 
   const handleSendWhatsApp = () => {
     setIsWhatsAppDialogOpen(true);
@@ -68,33 +70,53 @@ export default function HireDetail() {
   const handleCreateADAccount = () => {
     setIsADDialogOpen(true);
   };
+  
+  const handleRefresh = () => {
+    fetchHireDetails();
+    toast({
+      title: "Refreshing",
+      description: "Updating hire information..."
+    });
+  };
 
-  // Check if account is already active
-  const isAccountActive = hire?.account_status === "Active";
+  // Check if account is already active - use account_creation_status to be consistent
+  const isAccountActive = hire?.account_creation_status === "Active";
 
   return (
     <MainLayout>
       <div className="space-y-6">
         {!isLoading && id && id !== "new" && hire && (
-          <div className="flex items-center justify-end gap-2 mb-4">
-            {isADEnabled && !isAccountActive && (
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <Button 
+              onClick={handleRefresh} 
+              variant="outline"
+              className="flex items-center gap-2"
+              size="sm"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              {isADEnabled && !isAccountActive && (
+                <Button 
+                  onClick={handleCreateADAccount} 
+                  className="flex items-center gap-2"
+                  variant="outline"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Create AD Account
+                </Button>
+              )}
               <Button 
-                onClick={handleCreateADAccount} 
+                onClick={handleSendWhatsApp} 
                 className="flex items-center gap-2"
                 variant="outline"
               >
-                <UserPlus className="h-4 w-4" />
-                Create AD Account
+                <Send className="h-4 w-4" />
+                Send via WhatsApp
               </Button>
-            )}
-            <Button 
-              onClick={handleSendWhatsApp} 
-              className="flex items-center gap-2"
-              variant="outline"
-            >
-              <Send className="h-4 w-4" />
-              Send via WhatsApp
-            </Button>
+            </div>
           </div>
         )}
         
@@ -122,15 +144,11 @@ export default function HireDetail() {
               onClose={() => setIsADDialogOpen(false)}
               onSuccess={() => {
                 // Refresh hire data after creating AD account
-                if (id) {
-                  hiresApi.getOne(id)
-                    .then(data => {
-                      setHire(data);
-                    })
-                    .catch(error => {
-                      console.error("Error refreshing hire details:", error);
-                    });
-                }
+                fetchHireDetails();
+                toast({
+                  title: "Success",
+                  description: "AD Account created and hire information updated",
+                });
               }}
             />
           </Dialog>
