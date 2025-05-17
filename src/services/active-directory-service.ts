@@ -1,3 +1,4 @@
+
 import apiClient from "./api-client";
 import logger from "@/utils/logger";
 
@@ -205,11 +206,17 @@ export const activeDirectoryService = {
         `${AD_ENDPOINT}/search-users?query=${encodeURIComponent(query)}`
       );
       
-      if (response.data.users && Array.isArray(response.data.users)) {
-        logger.api.info(`Found ${response.data.users.length} AD users matching "${query}"`);
-      }
+      // Ensure users is always an array (prevents the error with cmdk library)
+      const users = response.data.users && Array.isArray(response.data.users) 
+        ? response.data.users 
+        : [];
+        
+      logger.api.info(`Found ${users.length} AD users matching "${query}"`);
       
-      return response.data;
+      return {
+        ...response.data,
+        users: users
+      };
     } catch (error: any) {
       logger.api.error('Failed to search AD users:', error);
       

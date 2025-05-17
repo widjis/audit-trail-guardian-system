@@ -68,7 +68,7 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
         logger.ui.debug('ADUserLookup', 'Searching AD users with query:', searchQuery);
         const result = await activeDirectoryService.searchUsers(searchQuery);
         
-        if (result.success && result.users) {
+        if (result.success && Array.isArray(result.users)) {
           setUsers(result.users);
           if (result.users.length === 0) {
             setError(`No users found matching "${searchQuery}"`);
@@ -141,7 +141,7 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
               </p>
             </CommandEmpty>
           )}
-          {!loading && !error && users.length > 0 && (
+          {!loading && !error && users && users.length > 0 && (
             <CommandGroup>
               {users.map((user) => (
                 <CommandItem
@@ -163,6 +163,15 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
                 </CommandItem>
               ))}
             </CommandGroup>
+          )}
+          {!loading && !error && (!users || users.length === 0) && searchQuery.length >= 2 && (
+            <CommandEmpty className="py-6">
+              <UserSearch className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+              <p className="text-center">No users found</p>
+              <p className="text-xs text-muted-foreground text-center mt-1">
+                Try a different search term
+              </p>
+            </CommandEmpty>
           )}
         </Command>
       </PopoverContent>
