@@ -1,3 +1,4 @@
+
 {
   "accountStatuses": [
     "Pending",
@@ -67,6 +68,7 @@
     "domain": "mbma.com",
     "baseDN": "DC=mbma,DC=com",
     "protocol": "ldaps",
-    "enabled": true
+    "enabled": true,
+    "authFormat": "upn"
   }
 }

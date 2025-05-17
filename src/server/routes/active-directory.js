@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -46,6 +45,29 @@ const saveSettings = (settings) => {
   }
 };
 
+// Format the user's bind DN based on authentication format preference
+const formatBindCredential = (settings, username) => {
+  // If username already looks like a DN, use it as is
+  if (username.startsWith('CN=') || username.startsWith('cn=')) {
+    return username;
+  }
+  
+  // If authFormat is explicitly set to DN, format as DN
+  if (settings.authFormat === 'dn') {
+    // Extract the username part if it's in UPN format (user@domain.com)
+    const userPart = username.includes('@') ? username.split('@')[0] : username;
+    // Create a simple DN - customize based on your AD structure
+    return `CN=${userPart},${settings.baseDN}`;
+  }
+  
+  // Default to UPN format (or keep as is if it already has @domain)
+  if (!username.includes('@')) {
+    return `${username}@${settings.domain}`;
+  }
+  
+  return username;
+};
+
 // Real LDAP/AD Connection using ldapjs
 const createLdapClient = (settings) => {
   // Determine the protocol (ldap or ldaps)
@@ -79,19 +101,24 @@ const testLdapConnection = (settings) => {
         reject(new Error(`Connection failed: ${err.message}`));
       });
       
+      // Format the bind credentials based on settings
+      const bindDN = formatBindCredential(settings, settings.username);
+      logger.api.debug(`Attempting LDAP bind with: ${bindDN}`);
+      
       // Bind with the provided credentials
-      client.bind(settings.username, settings.password, (err) => {
+      client.bind(bindDN, settings.password, (err) => {
         if (err) {
-          logger.api.error('LDAP bind error:', err);
+          logger.api.error(`LDAP bind error (using ${settings.authFormat || 'default'} format):`, err);
           client.destroy();
           return reject(new Error(`Authentication failed: ${err.message}`));
         }
         
         const protocol = settings.protocol || 'ldap';
+        const authFormat = settings.authFormat || 'default';
         const secureMsg = protocol === 'ldaps' ? ' using secure LDAPS connection' : '';
-        logger.api.info(`LDAP connection successful${secureMsg}`);
+        logger.api.info(`LDAP connection successful${secureMsg} with ${authFormat} auth format`);
         client.unbind();
-        resolve({ success: true, message: `Connected successfully${secureMsg}` });
+        resolve({ success: true, message: `Connected successfully${secureMsg} using ${authFormat} auth format` });
       });
     } catch (err) {
       logger.api.error('LDAP connection setup error:', err);
@@ -254,7 +281,8 @@ router.get('/', (req, res) => {
       domain: 'mbma.com',
       baseDN: 'DC=mbma,DC=com',
       protocol: 'ldap',
-      enabled: false
+      enabled: false,
+      authFormat: 'upn' // Default to UPN format
     };
     
     // Don't send the password back to the client

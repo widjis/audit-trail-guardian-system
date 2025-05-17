@@ -10,6 +10,7 @@ interface ActiveDirectorySettings {
   baseDN: string;
   protocol: "ldap" | "ldaps";
   enabled: boolean;
+  authFormat: "upn" | "dn"; // New property to specify auth format
 }
 
 interface ADUserData {

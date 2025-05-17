@@ -20,6 +20,7 @@ interface ActiveDirectorySettings {
   baseDN: string;
   protocol: "ldap" | "ldaps";
   enabled: boolean;
+  authFormat: "upn" | "dn";
 }
 
 export function ActiveDirectorySettings() {
@@ -34,7 +35,8 @@ export function ActiveDirectorySettings() {
     domain: "mbma.com",
     baseDN: "DC=mbma,DC=com",
     protocol: "ldap",
-    enabled: false
+    enabled: false,
+    authFormat: "upn"
   });
 
   useEffect(() => {
@@ -43,10 +45,11 @@ export function ActiveDirectorySettings() {
         setIsLoading(true);
         const data = await activeDirectoryService.getSettings();
         if (data) {
-          // If protocol is not defined in loaded data, set default to "ldap"
+          // If protocol or authFormat is not defined in loaded data, set defaults
           setSettings({
             ...data,
-            protocol: data.protocol || "ldap"
+            protocol: data.protocol || "ldap",
+            authFormat: data.authFormat || "upn"
           });
         }
       } catch (error) {
@@ -174,6 +177,34 @@ export function ActiveDirectorySettings() {
               </p>
             </div>
 
+            {/* Authentication Format */}
+            <div className="space-y-2">
+              <Label>Authentication Format</Label>
+              <RadioGroup 
+                value={settings.authFormat} 
+                onValueChange={(value) => handleChange("authFormat", value as "upn" | "dn")}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="upn" id="upn" />
+                  <Label htmlFor="upn">
+                    UPN Format (username@domain.com)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="dn" id="dn" />
+                  <Label htmlFor="dn">
+                    DN Format (CN=username,DC=domain,DC=com)
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-sm text-gray-500">
+                {settings.authFormat === "dn" ? 
+                  "DN format will construct a distinguishedName from your username and baseDN. Use this if UPN format fails." :
+                  "UPN format uses username@domain format. This is the most common authentication format."}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="server">AD Server Address</Label>
@@ -229,9 +260,14 @@ export function ActiveDirectorySettings() {
                   id="username"
                   value={settings.username}
                   onChange={(e) => handleChange("username", e.target.value)}
-                  placeholder="administrator@example.com"
+                  placeholder={settings.authFormat === "upn" ? "administrator@example.com" : "CN=administrator,DC=example,DC=com"}
                   disabled={isLoading || !settings.enabled}
                 />
+                <p className="text-xs text-gray-500">
+                  {settings.authFormat === "dn" 
+                    ? "For DN format, you may need to specify the full Distinguished Name" 
+                    : "For UPN format, use username@domain format"}
+                </p>
               </div>
               
               <div className="space-y-2">
