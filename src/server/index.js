@@ -24,21 +24,21 @@ const app = express();
 // CORS middleware
 app.use(cors());
 
-// Increase the payload limit to handle larger JSON requests (now 10MB)
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+// Increase the payload limit to handle larger JSON requests (now 50MB)
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // JWT Authentication middleware
-import authMiddleware from './middleware/authMiddleware.js';
+import { extractUser } from './middleware/authMiddleware.js';
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/hires', authMiddleware, hiresRoutes);
-app.use('/api/users', authMiddleware, usersRoutes);
-app.use('/api/settings', authMiddleware, settingsRoutes);
-app.use('/api/database', authMiddleware, dbRoutes);
-app.use('/api/whatsapp', authMiddleware, whatsappRoutes);
-app.use('/api/ad', authMiddleware, adRoutes);
+app.use('/api/hires', extractUser, hiresRoutes);
+app.use('/api/users', extractUser, usersRoutes);
+app.use('/api/settings', extractUser, settingsRoutes);
+app.use('/api/database', extractUser, dbRoutes);
+app.use('/api/whatsapp', extractUser, whatsappRoutes);
+app.use('/api/ad', extractUser, adRoutes);
 
 // Simple healthcheck endpoint
 app.get('/api/health', (req, res) => {
