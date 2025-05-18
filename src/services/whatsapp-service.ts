@@ -58,28 +58,20 @@ Please don't hesitate to contact IT for any question.`,
     }
   },
 
-  // Send WhatsApp message
+  // Send WhatsApp message - UPDATED to use our proxy endpoint
   sendMessage: async (phoneNumber: string, message: string): Promise<any> => {
     logger.ui.info("WhatsApp Service", "Sending WhatsApp message to:", phoneNumber);
-    const settings = await whatsappService.getSettings();
-    if (!settings.apiUrl) {
-      throw new Error("WhatsApp API URL is not configured");
-    }
-
-    // Format the full URL
-    let apiUrl = settings.apiUrl;
-    if (!apiUrl.endsWith('/')) {
-      apiUrl += '/';
-    }
-    apiUrl += 'send-message';
-
+    
     try {
-      logger.ui.debug("WhatsApp Service", "Sending to API:", apiUrl);
-      const response = await apiClient.post(apiUrl, {
+      logger.ui.debug("WhatsApp Service", "Sending to proxy endpoint");
+      
+      // Use our new server-side proxy endpoint instead of direct API call
+      const response = await apiClient.post("/whatsapp/send", {
         number: phoneNumber,
         message: message
       });
-      logger.ui.debug("WhatsApp Service", "API response:", response.data);
+      
+      logger.ui.debug("WhatsApp Service", "Proxy response:", response.data);
       return response.data;
     } catch (error) {
       logger.ui.error("WhatsApp Service", "Error sending message:", error);
