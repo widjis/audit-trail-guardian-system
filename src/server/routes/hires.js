@@ -172,6 +172,12 @@ router.post('/', async (req, res) => {
     const now = new Date().toISOString();
     logger.api.debug(`Generated ID: ${id}, timestamp: ${now}`);
     
+    // Set ICT Support PIC from authenticated user if available
+    if (req.user && !hireData.ict_support_pic) {
+      hireData.ict_support_pic = req.user.username;
+      logger.api.info(`Setting ICT Support PIC to ${hireData.ict_support_pic}`);
+    }
+    
     // Build columns and values for SQL insert
     const columns = ['id', 'created_at', 'updated_at'];
     const placeholders = ['?', '?', '?'];
@@ -271,6 +277,14 @@ router.put('/:id', async (req, res) => {
     }
     
     const now = new Date().toISOString();
+    
+    // Set ICT Support PIC from authenticated user if available
+    if (req.user) {
+      updateData.ict_support_pic = req.user.username;
+      logger.api.info(`Setting ICT Support PIC to ${updateData.ict_support_pic} for hire ${id}`);
+    } else {
+      logger.api.warn(`No authenticated user available for setting ICT Support PIC on hire ${id}`);
+    }
     
     // Build SET clause and values for SQL update
     const setClause = ['updated_at = ?'];
@@ -434,8 +448,9 @@ router.post('/bulk-update', async (req, res) => {
   }
   
   // Add ict_support_pic to the update data if not already present
-  if (!updateData.ict_support_pic && req.user) {
+  if (req.user) {
     updateData.ict_support_pic = req.user.username;
+    logger.api.info(`Setting ICT Support PIC to ${updateData.ict_support_pic} for bulk update`);
   }
 
   try {
