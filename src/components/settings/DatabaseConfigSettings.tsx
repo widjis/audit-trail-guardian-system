@@ -53,7 +53,7 @@ export function DatabaseConfigSettings() {
     const fetchDatabaseConfig = async () => {
       try {
         setIsLoading(true);
-        const response = await apiClient.get("/settings/database-config");
+        const response = await apiClient.get("/database");
         if (response.data) {
           setConfig(response.data);
         }
