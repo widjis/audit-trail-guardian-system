@@ -10,6 +10,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -68,14 +69,12 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
         logger.ui.debug('ADUserLookup', 'Searching AD users with query:', searchQuery);
         const result = await activeDirectoryService.searchUsers(searchQuery);
         
-        if (result.success && Array.isArray(result.users)) {
-          setUsers(result.users);
-          if (result.users.length === 0) {
-            setError(`No users found matching "${searchQuery}"`);
-          }
-        } else {
-          setError(result.error || "Failed to search Active Directory");
-          setUsers([]);
+        // Always ensure users is an array
+        const userResults = Array.isArray(result.users) ? result.users : [];
+        setUsers(userResults);
+        
+        if (userResults.length === 0) {
+          setError(`No users found matching "${searchQuery}"`);
         }
       } catch (err) {
         logger.ui.error('ADUserLookup', 'Error searching AD users:', err);
@@ -126,53 +125,58 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          {loading && (
-            <div className="py-6 text-center">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mt-2">Searching directory...</p>
-            </div>
-          )}
-          {!loading && error && (
-            <CommandEmpty className="py-6">
-              <UserSearch className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-center">{error}</p>
-              <p className="text-xs text-muted-foreground text-center mt-1">
-                Try a different search term or continue typing to search
-              </p>
-            </CommandEmpty>
-          )}
-          {!loading && !error && users && users.length > 0 && (
-            <CommandGroup>
-              {users.map((user) => (
-                <CommandItem
-                  key={user.dn}
-                  value={user.displayName}
-                  onSelect={() => handleSelect(user)}
-                  className="flex flex-col items-start"
-                >
-                  <div className="flex w-full items-center">
-                    <span>{user.displayName}</span>
-                    {value === user.displayName && (
-                      <Check className="ml-auto h-4 w-4 shrink-0" />
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex flex-col w-full">
-                    {user.title && <span>{user.title}</span>}
-                    {user.email && <span>{user.email}</span>}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-          {!loading && !error && (!users || users.length === 0) && searchQuery.length >= 2 && (
-            <CommandEmpty className="py-6">
-              <UserSearch className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-center">No users found</p>
-              <p className="text-xs text-muted-foreground text-center mt-1">
-                Try a different search term
-              </p>
-            </CommandEmpty>
-          )}
+          <CommandList>
+            {loading && (
+              <div className="py-6 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Searching directory...</p>
+              </div>
+            )}
+            
+            {!loading && error && (
+              <CommandEmpty className="py-6">
+                <UserSearch className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-center">{error}</p>
+                <p className="text-xs text-muted-foreground text-center mt-1">
+                  Try a different search term or continue typing to search
+                </p>
+              </CommandEmpty>
+            )}
+            
+            {!loading && !error && users.length > 0 && (
+              <CommandGroup>
+                {users.map((user) => (
+                  <CommandItem
+                    key={user.dn || `${user.username}-${user.displayName}`}
+                    value={user.displayName}
+                    onSelect={() => handleSelect(user)}
+                    className="flex flex-col items-start"
+                  >
+                    <div className="flex w-full items-center">
+                      <span>{user.displayName}</span>
+                      {value === user.displayName && (
+                        <Check className="ml-auto h-4 w-4 shrink-0" />
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground flex flex-col w-full">
+                      {user.title && <span>{user.title}</span>}
+                      {user.email && <span>{user.email}</span>}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            
+            {!loading && !error && users.length === 0 && searchQuery.length >= 2 && (
+              <CommandEmpty className="py-6">
+                <UserSearch className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-center">No users found</p>
+                <p className="text-xs text-muted-foreground text-center mt-1">
+                  Try a different search term
+                </p>
+              </CommandEmpty>
+            )}
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>

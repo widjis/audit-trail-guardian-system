@@ -196,6 +196,7 @@ export const activeDirectoryService = {
   // Search for users in Active Directory
   searchUsers: async (query: string): Promise<ADUserSearchResult> => {
     if (!query || query.length < 2) {
+      logger.api.debug('Search query too short (need at least 2 characters)');
       return { success: false, users: [], error: "Search query must be at least 2 characters" };
     }
     
@@ -206,16 +207,27 @@ export const activeDirectoryService = {
         `${AD_ENDPOINT}/search-users?query=${encodeURIComponent(query)}`
       );
       
-      // Ensure users is always an array (prevents the error with cmdk library)
-      const users = response.data.users && Array.isArray(response.data.users) 
-        ? response.data.users 
-        : [];
+      // Initialize with empty array to ensure safety
+      let users: ADUser[] = [];
+      
+      // Validate response format and structure
+      if (response.data && typeof response.data === 'object') {
+        // Check if users property exists and is an array
+        if (response.data.users && Array.isArray(response.data.users)) {
+          users = response.data.users;
+        } else {
+          logger.api.warn(`Invalid users data format received from server for query: ${query}`);
+        }
+      } else {
+        logger.api.warn(`Invalid response format from server for query: ${query}`);
+      }
         
       logger.api.info(`Found ${users.length} AD users matching "${query}"`);
       
       return {
-        ...response.data,
-        users: users
+        success: response.data?.success ?? true,
+        users: users,
+        error: response.data?.error
       };
     } catch (error: any) {
       logger.api.error('Failed to search AD users:', error);
