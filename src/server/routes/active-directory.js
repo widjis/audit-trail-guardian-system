@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -720,7 +719,7 @@ const searchAdUsers = async (settings, query) => {
         logger.api.debug('Successfully bound to AD, searching users');
         
         // Escape special characters in the query to prevent LDAP injection
-        const safeQuery = ldap.escape(query);
+        const safeQuery = escapeLdapFilterValue(query);
         
         // Create search filter - expanded to include more attributes and make case insensitive
         // Using more relaxed filter with multiple search attributes
@@ -842,5 +841,11 @@ const searchAdUsers = async (settings, query) => {
     }
   });
 };
+
+// Helper function to safely escape special characters in LDAP search filters
+function escapeLdapFilterValue(value) {
+  // Replace special characters that need to be escaped in LDAP filter
+  return value.replace(/[\\()*]/g, (char) => `\\${char.charCodeAt(0).toString(16)}`);
+}
 
 export default router;
