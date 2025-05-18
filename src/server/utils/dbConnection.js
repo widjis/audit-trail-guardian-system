@@ -1,3 +1,4 @@
+
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -16,6 +17,7 @@ if (fs.existsSync(ENV_FILE_PATH)) {
 
 // Database connection pool
 let dbPool = null;
+let isConnecting = false;
 
 // Get database type from environment
 const dbType = process.env.DB_TYPE || 'mssql';
@@ -48,6 +50,21 @@ export const generateFakeData = async () => {
  * Initialize database connection pool
  */
 export const initDbConnection = async () => {
+  // If we already have a connection pool, return it
+  if (dbPool) {
+    return true;
+  }
+  
+  // If a connection attempt is already in progress, wait for it
+  if (isConnecting) {
+    logger.db.info('Connection attempt already in progress, waiting...');
+    // Wait for the connection to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return !!dbPool;
+  }
+  
+  isConnecting = true;
+  
   try {
     logger.db.info('Initializing database connection...');
     logger.db.info(`Using database type: ${dbType}`);
@@ -101,9 +118,11 @@ export const initDbConnection = async () => {
       }
     }
     
+    isConnecting = false;
     return true;
   } catch (error) {
     logger.db.error('Failed to initialize database connection:', error);
+    isConnecting = false;
     return false;
   }
 };
