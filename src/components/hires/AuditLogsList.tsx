@@ -1,58 +1,33 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { AuditLog } from "@/types/types";
-import { hiresApi } from "@/services/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle, Info, MessageSquare, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { useAuditLogs } from "@/hooks/useAuditLogs";
 
 interface AuditLogsListProps {
   hireId: string;
   refreshKey?: string; // Optional prop to trigger refresh when hire is updated
 }
 
-export function AuditLogsList({ hireId, refreshKey }: AuditLogsListProps) {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+export function AuditLogsList({ hireId }: AuditLogsListProps) {
   const { toast } = useToast();
-
-  const fetchLogs = async () => {
-    try {
-      setIsLoading(true);
-      // Use the direct endpoint for audit logs instead of the general hire API
-      console.log("Fetching logs for hire ID:", hireId);
-      const data = await hiresApi.getOne(hireId).then(hire => {
-        console.log("Full hire data:", hire);
-        return hire.audit_logs || [];
-      });
-      
-      console.log("Fetched audit logs:", data);
-      setLogs(data);
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch audit logs",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (hireId) {
-      fetchLogs();
-    }
-  }, [hireId, refreshKey]); // Include refreshKey in dependencies to trigger refresh
+  const { 
+    data: logs = [], 
+    isLoading, 
+    isRefetching, 
+    refetch 
+  } = useAuditLogs(hireId);
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
-    fetchLogs();
+    refetch();
+    toast({
+      title: "Refreshing",
+      description: "Updating audit logs..."
+    });
   };
 
   const getStatusIcon = (status: string) => {
@@ -95,10 +70,10 @@ export function AuditLogsList({ hireId, refreshKey }: AuditLogsListProps) {
           variant="outline" 
           size="sm" 
           onClick={handleRefresh} 
-          disabled={isRefreshing}
+          disabled={isRefetching}
           className="h-8 px-2 lg:px-3"
         >
-          <RefreshCw className="h-4 w-4 mr-1" />
+          <RefreshCw className={`h-4 w-4 mr-1 ${isRefetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </CardHeader>

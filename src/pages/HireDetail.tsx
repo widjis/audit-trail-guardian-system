@@ -4,7 +4,7 @@ import { HireForm } from "@/components/hires/HireForm";
 import { AuditLogsList } from "@/components/hires/AuditLogsList";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
@@ -19,8 +19,6 @@ import { useAuth } from "@/services/api";
 
 export default function HireDetail() {
   const { id } = useParams<{ id: string }>();
-  const [hire, setHire] = useState<NewHire | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
   const [isADDialogOpen, setIsADDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -33,40 +31,26 @@ export default function HireDetail() {
     queryFn: settingsService.getSettings
   });
   
+  // Query to get hire details with proper caching
+  const { 
+    data: hire,
+    isLoading,
+    refetch
+  } = useQuery({
+    queryKey: ['hire', id],
+    queryFn: async () => {
+      if (!id || id === "new") return null;
+      console.log("Fetching hire details with React Query for ID:", id);
+      const data = await hiresApi.getOne(id);
+      return data;
+    },
+    enabled: !!id && id !== "new",
+    staleTime: 10000, // 10 seconds before refetching
+    gcTime: 300000, // Keep in cache for 5 minutes
+  });
+  
   // Check if AD integration is enabled
   const isADEnabled = settings?.activeDirectorySettings?.enabled || false;
-  
-  // Fetch hire details function - made into a callback so it can be called after AD account creation
-  const fetchHireDetails = useCallback(() => {
-    if (!id || id === "new") return;
-    
-    console.log("Fetching hire details for ID:", id);
-    setIsLoading(true);
-    
-    hiresApi.getOne(id)
-      .then(data => {
-        console.log("Fetched hire details:", data);
-        console.log("Account creation status:", data.account_creation_status);
-        console.log("ICT Support PIC:", data.ict_support_pic);
-        console.log("Current logged in user:", currentUser?.username);
-        setHire(data);
-      })
-      .catch(error => {
-        console.error("Error fetching hire details:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch hire details",
-          variant: "destructive",
-        });
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [id, toast, currentUser]);
-
-  useEffect(() => {
-    fetchHireDetails();
-  }, [fetchHireDetails]);
 
   const handleSendWhatsApp = () => {
     setIsWhatsAppDialogOpen(true);
@@ -77,7 +61,7 @@ export default function HireDetail() {
   };
   
   const handleRefresh = () => {
-    fetchHireDetails();
+    refetch();
     toast({
       title: "Refreshing",
       description: "Updating hire information..."
@@ -129,7 +113,7 @@ export default function HireDetail() {
         {id && id !== "new" && (
           <>
             <Separator className="my-6" />
-            <AuditLogsList hireId={id} refreshKey={hire?.updated_at || ''} />
+            <AuditLogsList hireId={id} />
           </>
         )}
       </div>
@@ -149,7 +133,7 @@ export default function HireDetail() {
               onClose={() => setIsADDialogOpen(false)}
               onSuccess={() => {
                 // Refresh hire data after creating AD account
-                fetchHireDetails();
+                refetch();
                 toast({
                   title: "Success",
                   description: "AD Account created and hire information updated",
