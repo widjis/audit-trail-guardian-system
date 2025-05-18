@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,8 @@ export function HiresTable() {
     department: "",
     email: "",
     status: "",
-    license: "", // Added license filter
+    license: "", 
+    ictSupportPic: "", // Added ICT Support PIC filter
   });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -235,8 +237,15 @@ export function HiresTable() {
       hireLicense === licenseLower ||
       (licenseLower === "none" && (!hire.microsoft_365_license || hire.microsoft_365_license === ""));
     
+    // ICT Support PIC filter
+    const ictSupportPicLower = filters.ictSupportPic.toLowerCase();
+    const hireIctSupportPic = (hire.ict_support_pic || "").toLowerCase();
+    const matchesIctSupportPic = filters.ictSupportPic === "" ||
+      hireIctSupportPic.includes(ictSupportPicLower);
+    
     return matchesSearch && matchesName && matchesTitle && 
-           matchesDepartment && matchesEmail && matchesStatus && matchesLicense;
+           matchesDepartment && matchesEmail && matchesStatus && 
+           matchesLicense && matchesIctSupportPic;
   });
 
   // Apply sorting to filtered data
@@ -450,6 +459,27 @@ export function HiresTable() {
                     </TableHead>
                     <TableHead className="min-w-[120px]">
                       <div className="flex items-center space-x-1">
+                        ICT Support PIC
+                        <SortButton 
+                          direction={getSortDirectionForField("ict_support_pic")}
+                          onClick={() => handleSort("ict_support_pic")}
+                        />
+                        <FilterPopover 
+                          isActive={isFilterActive("ictSupportPic")}
+                          onClear={() => clearFilter("ictSupportPic")}
+                        >
+                          <Label className="text-xs">Filter by ICT Support</Label>
+                          <Input
+                            placeholder="Type to filter..."
+                            value={filters.ictSupportPic}
+                            onChange={(e) => setFilters(prev => ({ ...prev, ictSupportPic: e.target.value }))}
+                            className="h-8 mt-1"
+                          />
+                        </FilterPopover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center space-x-1">
                         Status
                         <SortButton 
                           direction={getSortDirectionForField("account_creation_status")}
@@ -503,7 +533,7 @@ export function HiresTable() {
                       <TableCell>{hire.title}</TableCell>
                       <TableCell>{hire.department}</TableCell>
                       <TableCell>{hire.email}</TableCell>
-                      <TableCell>{new Date(hire.on_site_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{hire.on_site_date ? new Date(hire.on_site_date).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
@@ -513,6 +543,7 @@ export function HiresTable() {
                           {hire.microsoft_365_license || "None"}
                         </span>
                       </TableCell>
+                      <TableCell>{hire.ict_support_pic || "Unassigned"}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           hire.account_creation_status === "Active" ? 
