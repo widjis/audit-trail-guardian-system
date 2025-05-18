@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -325,19 +324,19 @@ export function HiresTable() {
         </div>
       ) : (
         <div className="border rounded-md overflow-hidden">
-            <ScrollArea className="w-full h-[calc(100vh-250px)]" showHorizontalScrollbar>
-             <div className="min-w-[1200px] relative">
+          <ScrollArea className="w-full h-[calc(100vh-250px)]" showHorizontalScrollbar>
+            <div className="min-w-[1200px] relative">
               <Table>
-                <TableHeader>
+                <TableHeader sticky>
                   <TableRow>
-                    <TableHead className="w-[50px]">
+                    <TableHead className="w-[50px] bg-background">
                       <Checkbox 
                         checked={sortedHires.length > 0 && selectedHires.length === sortedHires.length} 
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead className="min-w-[150px]">
+                    <TableHead className="min-w-[150px] bg-background">
                       <div className="flex items-center space-x-1">
                         Name
                         <SortButton 
@@ -358,7 +357,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[150px]">
+                    <TableHead className="min-w-[150px] bg-background">
                       <div className="flex items-center space-x-1">
                         Title
                         <SortButton 
@@ -379,7 +378,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[150px]">
+                    <TableHead className="min-w-[150px] bg-background">
                       <div className="flex items-center space-x-1">
                         Department
                         <SortButton 
@@ -400,7 +399,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[200px]">
+                    <TableHead className="min-w-[200px] bg-background">
                       <div className="flex items-center space-x-1">
                         Email
                         <SortButton 
@@ -421,7 +420,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">
+                    <TableHead className="min-w-[120px] bg-background">
                       <div className="flex items-center space-x-1">
                         Onsite Date
                         <SortButton 
@@ -430,7 +429,7 @@ export function HiresTable() {
                         />
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">
+                    <TableHead className="min-w-[120px] bg-background">
                       <div className="flex items-center space-x-1">
                         <Laptop className="h-3 w-3 mr-1" /> 
                         License
@@ -457,7 +456,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">
+                    <TableHead className="min-w-[120px] bg-background">
                       <div className="flex items-center space-x-1">
                         ICT Support PIC
                         <SortButton 
@@ -478,7 +477,7 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">
+                    <TableHead className="min-w-[120px] bg-background">
                       <div className="flex items-center space-x-1">
                         Status
                         <SortButton 
