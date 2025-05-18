@@ -15,6 +15,7 @@ import { SendWhatsAppDialog } from "@/components/hires/SendWhatsAppDialog";
 import { CreateADAccountDialog } from "@/components/hires/CreateADAccountDialog";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
+import { useAuth } from "@/services/api";
 
 export default function HireDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,8 @@ export default function HireDetail() {
   const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
   const [isADDialogOpen, setIsADDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { getCurrentUser } = useAuth();
+  const currentUser = getCurrentUser();
   
   // Query to get Active Directory settings
   const { data: settings } = useQuery({
@@ -44,6 +47,8 @@ export default function HireDetail() {
       .then(data => {
         console.log("Fetched hire details:", data);
         console.log("Account creation status:", data.account_creation_status);
+        console.log("ICT Support PIC:", data.ict_support_pic);
+        console.log("Current logged in user:", currentUser?.username);
         setHire(data);
       })
       .catch(error => {
@@ -57,7 +62,7 @@ export default function HireDetail() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [id, toast]);
+  }, [id, toast, currentUser]);
 
   useEffect(() => {
     fetchHireDetails();
@@ -120,7 +125,7 @@ export default function HireDetail() {
           </div>
         )}
         
-        <HireForm />
+        <HireForm currentUser={currentUser} />
         {id && id !== "new" && (
           <>
             <Separator className="my-6" />

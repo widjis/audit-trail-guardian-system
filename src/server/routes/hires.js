@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -278,8 +277,8 @@ router.put('/:id', async (req, res) => {
     
     const now = new Date().toISOString();
     
-    // Set ICT Support PIC from authenticated user if available
-    if (req.user) {
+    // Always set ICT Support PIC from authenticated user if available
+    if (req.user && req.user.username) {
       updateData.ict_support_pic = req.user.username;
       logger.api.info(`Setting ICT Support PIC to ${updateData.ict_support_pic} for hire ${id}`);
     } else {
@@ -447,10 +446,12 @@ router.post('/bulk-update', async (req, res) => {
     return res.status(400).json({ error: 'No update data provided' });
   }
   
-  // Add ict_support_pic to the update data if not already present
-  if (req.user) {
+  // Always set ICT Support PIC from authenticated user if available
+  if (req.user && req.user.username) {
     updateData.ict_support_pic = req.user.username;
     logger.api.info(`Setting ICT Support PIC to ${updateData.ict_support_pic} for bulk update`);
+  } else {
+    logger.api.warn('No authenticated user available for setting ICT Support PIC on bulk update');
   }
 
   try {

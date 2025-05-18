@@ -31,7 +31,7 @@ export const extractUser = (req, res, next) => {
       const token = authHeader.substring(7);
       
       try {
-        // Verify and decode token
+        // Try JWT verification first
         const decoded = jwt.verify(token, JWT_SECRET);
         
         // Attach user info to request object
@@ -41,11 +41,26 @@ export const extractUser = (req, res, next) => {
           role: decoded.role
         };
         
-        logger.api.debug(`Authenticated user: ${req.user.username} with role ${req.user.role}`);
-      } catch (error) {
-        logger.api.warn('Invalid or expired token:', error.message);
-        // Don't reject, just don't attach user info
-        req.user = null;
+        logger.api.debug(`Authenticated user via JWT: ${req.user.username} with role ${req.user.role}`);
+      } catch (jwtError) {
+        logger.api.debug('JWT verification failed, trying base64 decode:', jwtError.message);
+        
+        // Fall back to base64 decode for compatibility with old tokens
+        try {
+          const decodedToken = JSON.parse(Buffer.from(token, 'base64').toString());
+          
+          // Add user information to the request object
+          req.user = {
+            id: decodedToken.userId,
+            username: decodedToken.username,
+            role: decodedToken.role
+          };
+          
+          logger.api.debug(`Authenticated user via base64: ${req.user.username} with role ${req.user.role}`);
+        } catch (base64Error) {
+          logger.api.warn('Invalid or malformed token:', base64Error.message);
+          req.user = null;
+        }
       }
     } else {
       logger.api.debug('No authorization token provided');

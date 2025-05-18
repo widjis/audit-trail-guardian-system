@@ -1,4 +1,3 @@
-
 import { AuthResponse, ImportResponse, LoginCredentials, NewHire, AuditLog } from "../types/types";
 import { toast } from "../components/ui/use-toast";
 import apiClient from './api-client';
@@ -333,8 +332,11 @@ export const useAuth = () => {
     if (!userStr) return null;
     
     try {
-      return JSON.parse(userStr);
+      const user = JSON.parse(userStr);
+      console.log("Current user from localStorage:", user);
+      return user;
     } catch (error) {
+      console.error("Error parsing user from localStorage:", error);
       return null;
     }
   };

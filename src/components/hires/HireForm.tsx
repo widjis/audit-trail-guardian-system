@@ -29,6 +29,15 @@ interface ADAccountDetails {
   acl: string;
 }
 
+// Define the prop type for the component
+interface HireFormProps {
+  currentUser?: { 
+    id: string;
+    username: string;
+    role: string;
+  } | null;
+}
+
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
   title: "",
@@ -50,7 +59,7 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   ict_support_pic: "",
 };
 
-export function HireForm() {
+export function HireForm({ currentUser }: HireFormProps) {
   const { id } = useParams<{ id: string }>();
   const isNewHire = id === "new";
   const [hire, setHire] = useState<Omit<NewHire, "id" | "created_at" | "updated_at">>(emptyHire);
@@ -107,6 +116,17 @@ export function HireForm() {
     }
   }, [hire.name, hire.department]);
 
+  // Set ICT Support PIC when creating a new hire
+  useEffect(() => {
+    if (isNewHire && currentUser?.username) {
+      setHire(prev => ({
+        ...prev,
+        ict_support_pic: currentUser.username
+      }));
+      console.log("Set initial ICT Support PIC to:", currentUser.username);
+    }
+  }, [isNewHire, currentUser]);
+
   const fetchHire = async (hireId: string) => {
     setIsFetching(true);
     try {
@@ -127,6 +147,12 @@ export function HireForm() {
       
       // Update AD account details
       updateADAccountDetails(hireData.name, hireData.department);
+      
+      // Set the current user's username as ICT Support PIC if it's empty
+      if (!hireData.ict_support_pic && currentUser?.username) {
+        hireData.ict_support_pic = currentUser.username;
+        console.log("Set missing ICT Support PIC to:", currentUser.username);
+      }
     } catch (error) {
       console.error("Error fetching hire:", error);
       toast({
@@ -405,10 +431,19 @@ export function HireForm() {
     
     logger.ui.info("HireForm", "Form submitted");
     
-    // Create a copy of hire data without sensitive or large fields
+    // Create a copy of hire data for submission
     const hireToSubmit = { ...hire };
-    delete hireToSubmit.ict_support_pic; // Remove this field before submission
-    delete hireToSubmit.audit_logs; // Remove audit logs to prevent payload size issues
+    
+    // Ensure the ICT Support PIC is set
+    if (currentUser?.username) {
+      hireToSubmit.ict_support_pic = currentUser.username;
+      logger.ui.info("HireForm", `Setting ICT Support PIC to ${currentUser.username}`);
+    } else {
+      logger.ui.warn("HireForm", "No current user available to set ICT Support PIC");
+    }
+    
+    // Remove audit logs to prevent payload size issues
+    delete hireToSubmit.audit_logs;
     
     logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hireToSubmit));
     logger.ui.debug("HireForm", "Is new hire?", isNewHire);
