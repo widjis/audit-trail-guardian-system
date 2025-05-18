@@ -24,7 +24,7 @@ const getWhatsAppSettings = () => {
     }
     return {};
   } catch (err) {
-    logger.error('Error reading WhatsApp settings:', err);
+    logger.api.error('Error reading WhatsApp settings:', err);
     return {};
   }
 };
@@ -57,7 +57,7 @@ router.post('/send', async (req, res) => {
     }
     apiUrl += 'send-message';
 
-    logger.info(`Proxying WhatsApp message to ${apiUrl} for number: ${number}`);
+    logger.api.info(`Proxying WhatsApp message to ${apiUrl} for number: ${number}`);
     
     // Make the request to the WhatsApp API
     const response = await axios.post(apiUrl, {
@@ -72,10 +72,10 @@ router.post('/send', async (req, res) => {
     });
 
     // Return the response from the WhatsApp API
-    logger.info('WhatsApp API response:', response.data);
+    logger.api.info('WhatsApp API response:', response.data);
     return res.status(response.status).json(response.data);
   } catch (error) {
-    logger.error('Error proxying WhatsApp message:', error);
+    logger.api.error('Error proxying WhatsApp message:', error);
     
     // Structured error response
     const status = error.response?.status || 500;
