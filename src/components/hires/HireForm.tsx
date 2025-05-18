@@ -405,9 +405,10 @@ export function HireForm() {
     
     logger.ui.info("HireForm", "Form submitted");
     
-    // Create a copy of hire data without ict_support_pic
+    // Create a copy of hire data without sensitive or large fields
     const hireToSubmit = { ...hire };
     delete hireToSubmit.ict_support_pic; // Remove this field before submission
+    delete hireToSubmit.audit_logs; // Remove audit logs to prevent payload size issues
     
     logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hireToSubmit));
     logger.ui.debug("HireForm", "Is new hire?", isNewHire);

@@ -1,150 +1,51 @@
 
 import express from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
-import fs from 'fs';
 import path from 'path';
+import cors from 'cors';
 import { fileURLToPath } from 'url';
-import { initDbConnection } from './utils/dbConnection.js';
-import { initializeSchema } from './utils/schemaInit.js';
-import { extractUser } from './middleware/authMiddleware.js';
+import bodyParser from 'body-parser';
 
-// Get current directory path using ES module approach
+// Import routes
+import authRoutes from './routes/auth.js';
+import hiresRoutes from './routes/hires.js';
+import usersRoutes from './routes/users.js';
+import settingsRoutes from './routes/settings.js';
+import dbRoutes from './routes/database.js';
+import whatsappRoutes from './routes/whatsapp.js';
+import adRoutes from './routes/active-directory.js';
+import { checkDatabaseConnection, generateFakeData } from './utils/dbConnection.js';
+import logger from './utils/logger.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize app
 const app = express();
-const PORT = process.env.PORT || 3001;
 
-// CORS configuration - accept requests from all origins or specific ones
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
+// CORS middleware
+app.use(cors());
 
-// Middleware
-app.use(cors(corsOptions));
-app.use(bodyParser.json());
-app.use(extractUser);
+// Increase the payload limit to handle larger JSON requests (now 10MB)
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
-// Data storage paths
-const DATA_DIR = path.join(__dirname, 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const HIRES_FILE = path.join(DATA_DIR, 'hires.json');
-const AUDIT_LOGS_FILE = path.join(DATA_DIR, 'auditLogs.json');
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Initialize data files if they don't exist
-const initializeDataFile = (filePath, initialData) => {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(initialData), 'utf8');
-  }
-};
-
-// Initialize files with default data
-initializeDataFile(USERS_FILE, [
-  {
-    id: "1",
-    username: "admin",
-    password: "password123",
-    role: "admin",
-  }
-]);
-initializeDataFile(HIRES_FILE, []);
-initializeDataFile(AUDIT_LOGS_FILE, []);
-initializeDataFile(SETTINGS_FILE, {
-  accountStatuses: ["Pending", "Active", "Inactive", "Suspended"],
-  mailingLists: [
-    { id: "1", name: "General Updates", isDefault: true },
-    { id: "2", name: "Technical Team", isDefault: false },
-    { id: "3", name: "Marketing", isDefault: false },
-    { id: "4", name: "Management", isDefault: false }
-  ],
-  departments: [
-    { id: "1", name: "Engineering", code: "ENG" },
-    { id: "2", name: "Human Resources", code: "HR" },
-    { id: "3", name: "Finance", code: "FIN" },
-    { id: "4", name: "Marketing", code: "MKT" },
-    { id: "5", name: "Sales", code: "SLS" }
-  ],
-  mailingListDisplayAsDropdown: true
-});
-
-// Helper functions
-const readDataFile = (filePath) => {
-  if (fs.existsSync(filePath)) {
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
-  }
-  return null;
-};
-
-const writeDataFile = (filePath, data) => {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-};
-
-// Generate a unique ID
-const generateId = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
-
-// Simulate JWT token
-const generateToken = (userId, username, role) => {
-  return Buffer.from(JSON.stringify({ userId, username, role, exp: Date.now() + 3600000 })).toString('base64');
-};
-
-// Initialize database connection
-(async () => {
-  try {
-    const dbConnected = await initDbConnection();
-    console.log(`Database connection ${dbConnected ? 'successful' : 'failed'}`);
-    
-    if (dbConnected) {
-      // Initialize schema if database is connected
-      const schemaInitialized = await initializeSchema();
-      console.log(`Schema initialization ${schemaInitialized ? 'successful' : 'failed or not needed'}`);
-    }
-  } catch (error) {
-    console.error('Error initializing database:', error);
-  }
-})();
+// JWT Authentication middleware
+import authMiddleware from './middleware/authMiddleware.js';
 
 // API Routes
-// Import API route modules (converting to ES module imports)
-import authRoutes from './routes/auth.js';
-import hiresRoutes from './routes/hires.js';
-import settingsRoutes from './routes/settings.js';
-import databaseRoutes from './routes/database.js';
-import usersRoutes from './routes/users.js';
-import activeDirectoryRoutes from './routes/active-directory.js';
-import whatsappRoutes from './routes/whatsapp.js';
-
-// Use routes
 app.use('/api/auth', authRoutes);
-app.use('/api/hires', hiresRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/settings/database-config', databaseRoutes);
-app.use('/api/settings/active-directory', activeDirectoryRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/hires', authMiddleware, hiresRoutes);
+app.use('/api/users', authMiddleware, usersRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/database', authMiddleware, dbRoutes);
+app.use('/api/whatsapp', authMiddleware, whatsappRoutes);
+app.use('/api/ad', authMiddleware, adRoutes);
 
-// Test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'Backend server is running!' });
+// Simple healthcheck endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'UP', timestamp: new Date() });
 });
 
-// Start server - listen on all network interfaces (0.0.0.0)
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}, accessible at http://localhost:${PORT}`);
-  console.log(`Also accessible at http://<your-network-ip>:${PORT}`);
-});
+// Set port
+const PORT = process.env.PORT || 3001;
 
 export default app;

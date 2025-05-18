@@ -1,3 +1,4 @@
+
 import { AuthResponse, ImportResponse, LoginCredentials, NewHire, AuditLog } from "../types/types";
 import { toast } from "../components/ui/use-toast";
 import apiClient from './api-client';
@@ -184,7 +185,11 @@ export const hiresApi = {
   update: async (id: string, hire: Partial<NewHire>): Promise<NewHire> => {
     console.log('[hiresApi] Updating hire with ID:', id, 'Data:', JSON.stringify(hire));
     try {
-      const response = await apiClient.put(`/hires/${id}`, hire);
+      // Create a clean copy of the hire data, removing audit_logs to prevent payload size issues
+      const hireToUpdate = { ...hire };
+      delete hireToUpdate.audit_logs;
+      
+      const response = await apiClient.put(`/hires/${id}`, hireToUpdate);
       console.log('[hiresApi] Update hire response:', response.data);
       return response.data;
     } catch (error) {
@@ -264,7 +269,11 @@ export const hiresApi = {
   bulkUpdate: async (ids: string[], updateData: Partial<NewHire>): Promise<void> => {
     console.log('[hiresApi] Bulk updating hires with IDs:', ids, 'Data:', updateData);
     try {
-      await apiClient.post('/hires/bulk-update', { ids, updateData });
+      // Remove audit_logs from the update data to prevent payload size issues
+      const cleanUpdateData = { ...updateData };
+      delete cleanUpdateData.audit_logs;
+      
+      await apiClient.post('/hires/bulk-update', { ids, updateData: cleanUpdateData });
       console.log('[hiresApi] Hires bulk updated successfully');
     } catch (error) {
       console.error('[hiresApi] Error bulk updating hires:', error);
