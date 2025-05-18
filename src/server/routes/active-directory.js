@@ -714,17 +714,22 @@ const searchAdUsers = async (settings, query) => {
           }
           
           res.on('searchEntry', (entry) => {
-            const user = {
-              displayName: entry.object.displayName || '',
-              username: entry.object.sAMAccountName || '',
-              email: entry.object.mail || '',
-              title: entry.object.title || '',
-              department: entry.object.department || '',
-              dn: entry.object.distinguishedName || ''
-            };
-            
-            logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
-            users.push(user);
+            // FIX: Add null checks to ensure we don't try to access properties of undefined
+            if (entry && entry.object) {
+              const user = {
+                displayName: entry.object.displayName || '',
+                username: entry.object.sAMAccountName || '',
+                email: entry.object.mail || '',
+                title: entry.object.title || '',
+                department: entry.object.department || '',
+                dn: entry.object.distinguishedName || ''
+              };
+              
+              logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
+              users.push(user);
+            } else {
+              logger.api.warn('Received incomplete search entry from AD:', entry);
+            }
           });
           
           res.on('error', (err) => {

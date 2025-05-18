@@ -193,7 +193,7 @@ export const activeDirectoryService = {
     }
   },
 
-  // Search for users in Active Directory
+  // Search for users in Active Directory with improved error handling and data validation
   searchUsers: async (query: string): Promise<ADUserSearchResult> => {
     if (!query || query.length < 2) {
       logger.api.debug('Search query too short (need at least 2 characters)');
@@ -207,14 +207,21 @@ export const activeDirectoryService = {
         `${AD_ENDPOINT}/search-users?query=${encodeURIComponent(query)}`
       );
       
-      // Initialize with empty array to ensure safety
+      // Initialize users array to ensure it's always an array, even if the response is invalid
       let users: ADUser[] = [];
       
-      // Validate response format and structure
-      if (response.data && typeof response.data === 'object') {
-        // Check if users property exists and is an array
-        if (response.data.users && Array.isArray(response.data.users)) {
-          users = response.data.users;
+      // Validate response format and structure with comprehensive null checks
+      if (response?.data) {
+        if (Array.isArray(response.data.users)) {
+          // Make sure each user object has the required properties
+          users = response.data.users.map(user => ({
+            displayName: user?.displayName || '',
+            username: user?.username || '',
+            email: user?.email || '',
+            title: user?.title || '',
+            department: user?.department || '',
+            dn: user?.dn || ''
+          }));
         } else {
           logger.api.warn(`Invalid users data format received from server for query: ${query}`);
         }
@@ -225,9 +232,8 @@ export const activeDirectoryService = {
       logger.api.info(`Found ${users.length} AD users matching "${query}"`);
       
       return {
-        success: response.data?.success ?? true,
-        users: users,
-        error: response.data?.error
+        success: true,
+        users: users
       };
     } catch (error: any) {
       logger.api.error('Failed to search AD users:', error);
