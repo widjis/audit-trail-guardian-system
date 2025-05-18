@@ -87,16 +87,19 @@ const createLdapClient = (settings) => {
   
   logger.api.debug(`Creating LDAP client with URL: ${protocol}://${settings.server}:${port}`);
   
-  // Enhanced TLS options for LDAPS, following the example provided
+  // Enhanced TLS options for LDAPS - more permissive for troubleshooting
   const tlsOptions = {
-    rejectUnauthorized: false // Don't validate certificate in dev/test environments
+    rejectUnauthorized: false, // Don't validate certificate in dev/test environments
+    requestCert: true,
+    ciphers: 'ALL',
+    secureProtocol: 'TLSv1_2_method' // Force TLSv1.2
   };
   
   // Create client with appropriate URL and explicitly set protocol version to v3
   const client = ldap.createClient({
     url: `${protocol}://${settings.server}:${port}`,
-    timeout: 5000,
-    connectTimeout: 10000,
+    timeout: 10000, // Increased timeout
+    connectTimeout: 15000, // Increased connect timeout
     tlsOptions: tlsOptions,
     reconnect: false, // Disable automatic reconnection to avoid hanging
     idleTimeout: 30000,
@@ -681,6 +684,7 @@ const searchAdUsers = async (settings, query) => {
       // Format the bind credentials based on settings
       const bindDN = formatBindCredential(settings, settings.username);
       logger.api.debug(`Binding to AD with DN: ${bindDN} for user search`);
+      logger.api.debug(`Using baseDN: ${settings.baseDN}`);
       
       // Bind with service account
       client.bind(bindDN, settings.password, (err) => {
@@ -692,20 +696,27 @@ const searchAdUsers = async (settings, query) => {
         
         logger.api.debug('Successfully bound to AD, searching users');
         
-        // Create search filter (search by displayName, sAMAccountName, or mail)
-        const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${query}*)(sAMAccountName=*${query}*)(mail=*${query}*)))`;
+        // Escape special characters in the query to prevent LDAP injection
+        const safeQuery = ldap.escape(query);
+        
+        // Create search filter - expanded to include more attributes and make case insensitive
+        // Using more relaxed filter with multiple search attributes
+        const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${safeQuery}*)(sAMAccountName=*${safeQuery}*)(mail=*${safeQuery}*)(givenName=*${safeQuery}*)(sn=*${safeQuery}*)))`;
         
         // Specify which attributes to return
         const searchOptions = {
           filter: searchFilter,
           scope: 'sub',
-          attributes: ['displayName', 'sAMAccountName', 'mail', 'title', 'department', 'distinguishedName']
+          sizeLimit: 100, // Limit results but more generous
+          attributes: ['displayName', 'sAMAccountName', 'mail', 'title', 'department', 'distinguishedName', 'givenName', 'sn']
         };
         
         logger.api.debug(`Searching with filter: ${searchFilter}`);
+        logger.api.debug(`Search base: ${settings.baseDN}`);
         
         const users = [];
         
+        // Perform the search with better error handling
         client.search(settings.baseDN, searchOptions, (err, res) => {
           if (err) {
             logger.api.error('Error searching AD:', err);
@@ -714,10 +725,13 @@ const searchAdUsers = async (settings, query) => {
           }
           
           res.on('searchEntry', (entry) => {
-            // FIX: Add null checks to ensure we don't try to access properties of undefined
+            // Only process complete entries with object property
             if (entry && entry.object) {
+              // Log the raw entry for debugging
+              logger.api.debug(`Raw search entry: ${JSON.stringify(entry.object)}`);
+              
               const user = {
-                displayName: entry.object.displayName || '',
+                displayName: entry.object.displayName || entry.object.cn || '',
                 username: entry.object.sAMAccountName || '',
                 email: entry.object.mail || '',
                 title: entry.object.title || '',
@@ -728,18 +742,64 @@ const searchAdUsers = async (settings, query) => {
               logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
               users.push(user);
             } else {
+              // For incomplete entries, log details to help troubleshoot
               logger.api.warn('Received incomplete search entry from AD:', entry);
+              
+              // Try to extract any useful information from the entry
+              if (entry && entry.attributes) {
+                try {
+                  const extractedUser = {
+                    displayName: '',
+                    username: '',
+                    email: '',
+                    title: '',
+                    department: '',
+                    dn: ''
+                  };
+                  
+                  // Try to extract attributes directly from attributes array
+                  entry.attributes.forEach(attr => {
+                    const name = attr.type;
+                    const value = attr.values && attr.values.length > 0 ? attr.values[0] : '';
+                    
+                    if (name === 'displayName' || name === 'cn') extractedUser.displayName = value;
+                    if (name === 'sAMAccountName') extractedUser.username = value;
+                    if (name === 'mail') extractedUser.email = value;
+                    if (name === 'title') extractedUser.title = value;
+                    if (name === 'department') extractedUser.department = value;
+                    if (name === 'distinguishedName') extractedUser.dn = value;
+                  });
+                  
+                  // Only add if we got at least some info
+                  if (extractedUser.displayName || extractedUser.username) {
+                    logger.api.debug(`Recovered partial user data: ${JSON.stringify(extractedUser)}`);
+                    users.push(extractedUser);
+                  }
+                } catch (extractErr) {
+                  logger.api.error('Failed to extract user from incomplete entry:', extractErr);
+                }
+              }
             }
           });
           
           res.on('error', (err) => {
             logger.api.error('AD search error:', err);
-            client.destroy();
-            reject(err);
+            // Don't reject here, as we might have already found some users
+            // Just log the error and continue
           });
           
           res.on('end', (result) => {
             logger.api.info(`AD user search complete, found ${users.length} users`);
+            
+            // If we got empty results but no error, log more debug info
+            if (users.length === 0) {
+              logger.api.debug('No users found. This could be due to:');
+              logger.api.debug('1. No matching users exist');
+              logger.api.debug('2. BaseDN is incorrect');
+              logger.api.debug('3. Search filter is too restrictive');
+              logger.api.debug('4. Service account lacks permissions');
+            }
+            
             client.unbind();
             resolve(users);
           });
