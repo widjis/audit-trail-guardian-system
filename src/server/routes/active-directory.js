@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -140,10 +141,15 @@ const createLdapClient = (settings) => {
 const testLdapConnection = (settings) => {
   return new Promise((resolve, reject) => {
     try {
-      if (!settings.server || !settings.username || !settings.password) {
+      if (!settings.server || !settings.username) {
         return reject(new Error("Missing required connection parameters"));
       }
+      
+      if (!settings.password) {
+        return reject(new Error("Password is required for authentication"));
+      }
 
+      // Log connection attempt without password
       logger.api.debug(`Testing LDAP connection to server: ${settings.server} with protocol: ${settings.protocol}`);
       logger.api.debug(`Using authentication format: ${settings.authFormat}`);
       
@@ -287,18 +293,35 @@ router.put('/', (req, res) => {
 // Test AD connection
 router.post('/test', async (req, res) => {
   try {
-    const settings = req.body;
+    const receivedSettings = req.body;
     logger.api.debug('Testing AD connection with settings:', JSON.stringify({
-      server: settings.server,
-      username: settings.username,
-      domain: settings.domain,
-      protocol: settings.protocol,
-      baseDN: settings.baseDN,
-      authFormat: settings.authFormat
+      server: receivedSettings.server,
+      username: receivedSettings.username,
+      domain: receivedSettings.domain,
+      protocol: receivedSettings.protocol,
+      baseDN: receivedSettings.baseDN,
+      authFormat: receivedSettings.authFormat
     }));
     
+    // Handle masked password case - get the actual password from stored settings if needed
+    let finalSettings = { ...receivedSettings };
+    
+    // If password is masked and we need to use stored password
+    if (finalSettings.password === '••••••••') {
+      const storedSettings = getSettings();
+      if (storedSettings.activeDirectorySettings && storedSettings.activeDirectorySettings.password) {
+        logger.api.debug('Using stored password for connection test');
+        finalSettings.password = storedSettings.activeDirectorySettings.password;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Cannot use masked password. Please provide the actual password." 
+        });
+      }
+    }
+    
     // Test connection using ldapjs
-    const result = await testLdapConnection(settings);
+    const result = await testLdapConnection(finalSettings);
     
     res.json(result);
   } catch (err) {

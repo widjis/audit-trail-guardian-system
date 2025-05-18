@@ -59,6 +59,11 @@ interface ADUserSearchResult {
 // The API client already includes /api in its baseURL
 const AD_ENDPOINT = "/settings/active-directory";
 
+// Add in-memory cache for sensitive information that shouldn't be in localStorage
+const memoryCache = {
+  actualPassword: "" // Store the actual password in memory (not persisted)
+};
+
 export const activeDirectoryService = {
   // Get AD settings
   getSettings: async (): Promise<ActiveDirectorySettings> => {
@@ -76,6 +81,11 @@ export const activeDirectoryService = {
   updateSettings: async (settings: ActiveDirectorySettings): Promise<ActiveDirectorySettings> => {
     logger.api.debug('Updating Active Directory settings');
     try {
+      // If this is an actual password (not masked), save it to memory cache
+      if (settings.password && settings.password !== '••••••••') {
+        memoryCache.actualPassword = settings.password;
+      }
+      
       const response = await apiClient.put<ActiveDirectorySettings>(AD_ENDPOINT, settings);
       return response.data;
     } catch (error) {
@@ -91,9 +101,15 @@ export const activeDirectoryService = {
     logger.api.debug(`Username: ${settings.username}, Domain: ${settings.domain}`);
     
     try {
+      // If password is masked and we have the actual password in memory, use it
+      const testSettings = { ...settings };
+      if (testSettings.password === '••••••••' && memoryCache.actualPassword) {
+        testSettings.password = memoryCache.actualPassword;
+      }
+      
       const response = await apiClient.post<{ success: boolean; message: string }>(
         `${AD_ENDPOINT}/test`,
-        settings
+        testSettings
       );
       logger.api.info('Active Directory connection test successful:', response.data.message);
       return response.data;

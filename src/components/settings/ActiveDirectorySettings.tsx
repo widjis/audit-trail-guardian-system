@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,8 @@ export function ActiveDirectorySettings() {
     authFormat: "upn"
   });
   const [lastTestError, setLastTestError] = useState<string | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [actualPassword, setActualPassword] = useState<string>("");
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -59,6 +60,17 @@ export function ActiveDirectorySettings() {
             protocol: data.protocol || "ldap",
             authFormat: data.authFormat || "upn"
           });
+          
+          // Store the masked password state
+          if (data.password === '••••••••') {
+            // Password is masked, we'll keep the actual password separate
+            setActualPassword(""); // We don't know the actual password here
+          } else if (data.password) {
+            // This is a real password from first load
+            setActualPassword(data.password);
+          }
+          
+          setSettingsLoaded(true);
         }
       } catch (error) {
         console.error("Error fetching Active Directory settings:", error);
@@ -80,6 +92,12 @@ export function ActiveDirectorySettings() {
       ...prev,
       [field]: value
     }));
+    
+    // If the password field is being changed, also update the actualPassword state
+    if (field === 'password' && typeof value === 'string' && value !== '•••••••') {
+      setActualPassword(value);
+    }
+    
     // Clear previous test error when settings change
     if (lastTestError) setLastTestError(null);
   };
@@ -88,7 +106,15 @@ export function ActiveDirectorySettings() {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await activeDirectoryService.updateSettings(settings);
+      
+      // If password is masked and we have an actual password, use it for submission
+      const submissionSettings = {...settings};
+      if (submissionSettings.password === '••••••••' && actualPassword) {
+        // Use the actual password internally but don't update the UI
+        submissionSettings.password = actualPassword;
+      }
+      
+      await activeDirectoryService.updateSettings(submissionSettings);
       toast({
         title: "Success",
         description: "Active Directory settings saved successfully"
@@ -109,7 +135,14 @@ export function ActiveDirectorySettings() {
     try {
       setTestingConnection(true);
       setLastTestError(null);
-      const response = await activeDirectoryService.testConnection(settings);
+      
+      // Prepare test settings - if password is masked, use the actual password if we have it
+      const testSettings = {...settings};
+      if (testSettings.password === '••••••••' && actualPassword) {
+        testSettings.password = actualPassword;
+      }
+      
+      const response = await activeDirectoryService.testConnection(testSettings);
       
       toast({
         title: "Connection Successful",
@@ -340,7 +373,7 @@ export function ActiveDirectorySettings() {
             variant="outline" 
             className="mt-2"
             onClick={testConnection}
-            disabled={testingConnection || isLoading || !settings.enabled || !settings.server || !settings.username || !settings.password}
+            disabled={testingConnection || isLoading || !settings.enabled || !settings.server || !settings.username || (!settings.password && !actualPassword)}
           >
             {testingConnection ? "Testing..." : "Test Connection"}
           </Button>
