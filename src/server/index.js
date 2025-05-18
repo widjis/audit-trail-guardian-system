@@ -13,7 +13,7 @@ import settingsRoutes from './routes/settings.js';
 import dbRoutes from './routes/database.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import adRoutes from './routes/active-directory.js';
-import { checkDatabaseConnection, generateFakeData } from './utils/dbConnection.js';
+import { initDbConnection } from './utils/dbConnection.js';
 import logger from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,5 +47,10 @@ app.get('/api/health', (req, res) => {
 
 // Set port
 const PORT = process.env.PORT || 3001;
+
+// Initialize database connection on server start
+initDbConnection().catch(err => {
+  logger.db.error('Failed to initialize database on startup:', err);
+});
 
 export default app;

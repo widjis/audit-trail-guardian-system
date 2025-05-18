@@ -21,6 +21,30 @@ let dbPool = null;
 const dbType = process.env.DB_TYPE || 'mssql';
 
 /**
+ * Check database connection
+ * @returns {Promise<boolean>} True if connection is available
+ */
+export const checkDatabaseConnection = async () => {
+  try {
+    if (!dbPool) {
+      await initDbConnection();
+    }
+    return !!dbPool;
+  } catch (error) {
+    logger.db.error('Database connection check failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Generate fake data for testing (placeholder)
+ */
+export const generateFakeData = async () => {
+  logger.db.info('Generating fake data not implemented yet');
+  return true;
+};
+
+/**
  * Initialize database connection pool
  */
 export const initDbConnection = async () => {
