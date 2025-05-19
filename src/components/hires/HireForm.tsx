@@ -16,6 +16,7 @@ import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MultiSelectMailingList } from "./MultiSelectMailingList";
 import { ADUserLookup } from "./ADUserLookup";
 
 // Type definition for Active Directory account details
@@ -45,7 +46,7 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   email: "",
   direct_report: "",
   phone_number: "",
-  mailing_list: "",
+  mailing_list: [],  // Update this to be an array instead of a string
   remarks: "",
   account_creation_status: "Pending",
   license_assigned: false,
@@ -966,13 +967,22 @@ export function HireForm({ currentUser }: HireFormProps) {
                 <label htmlFor="mailing_list" className="text-sm font-medium">
                   Mailing Lists
                 </label>
-                <Input
-                  id="mailing_list"
-                  name="mailing_list"
-                  value={hire.mailing_list}
-                  onChange={handleInputChange}
-                  placeholder="Comma-separated list"
-                />
+                {settingsData?.mailingListDisplayAsDropdown ? (
+                  <MultiSelectMailingList
+                    value={Array.isArray(hire.mailing_list) ? hire.mailing_list : hire.mailing_list.split(',').filter(Boolean).map(item => item.trim())}
+                    onChange={handleMailingListChange}
+                    lists={settingsData?.mailingLists || []}
+                    placeholder="Select mailing lists..."
+                  />
+                ) : (
+                  <Input
+                    id="mailing_list"
+                    name="mailing_list"
+                    value={Array.isArray(hire.mailing_list) ? hire.mailing_list.join(', ') : hire.mailing_list}
+                    onChange={handleInputChange}
+                    placeholder="Comma-separated list"
+                  />
+                )}
               </div>
             </div>
 

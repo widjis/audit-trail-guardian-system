@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,9 +30,8 @@ export function MailingListSettings() {
       if (data.mailingLists) {
         setMailingLists(data.mailingLists);
       }
-      if (data.mailingListDisplayAsDropdown !== undefined) {
-        setUseAsDropdown(data.mailingListDisplayAsDropdown);
-      }
+      // Always set to true - dropdown is now permanently enabled
+      setUseAsDropdown(true);
     }
   }, [data]);
   
@@ -99,9 +97,10 @@ export function MailingListSettings() {
   };
 
   const handleSaveSettings = () => {
+    // Always save with dropdown set to true
     saveMailingListsMutation.mutate({ 
       lists: mailingLists, 
-      dropdown: useAsDropdown 
+      dropdown: true 
     });
   };
 
@@ -131,18 +130,11 @@ export function MailingListSettings() {
       <CardHeader>
         <CardTitle>Mailing List Settings</CardTitle>
         <CardDescription>
-          Manage mailing lists and display options for new hires.
+          Manage mailing lists for new hires. Multiple mailing lists can be selected for each hire.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center space-x-2">
-          <Switch 
-            id="use-dropdown" 
-            checked={useAsDropdown} 
-            onCheckedChange={setUseAsDropdown} 
-          />
-          <Label htmlFor="use-dropdown">Display as dropdown menu in forms</Label>
-        </div>
+        {/* Remove the dropdown toggle option as it's now permanently enabled */}
         
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Available Mailing Lists</h3>
