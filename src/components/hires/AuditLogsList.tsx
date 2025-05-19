@@ -99,16 +99,16 @@ export function AuditLogsList({ hireId }: AuditLogsListProps) {
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                    <TableCell>{log.action_type}</TableCell>
+                    <TableCell>{log.action_type || log.action}</TableCell>
                     <TableCell>
                       <div className="flex items-center">
-                        {getStatusIcon(log.status)}
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(log.status)}`}>
-                          {log.status}
+                        {log.status && getStatusIcon(log.status)}
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${log.status ? getStatusClass(log.status) : ""}`}>
+                          {log.status || "INFO"}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{log.message}</TableCell>
+                    <TableCell>{log.message || "-"}</TableCell>
                     <TableCell>{log.performed_by || "System"}</TableCell>
                   </TableRow>
                 ))}

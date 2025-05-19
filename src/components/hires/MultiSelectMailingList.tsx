@@ -45,7 +45,7 @@ export function MultiSelectMailingList({
 
   // Update component state when prop value changes
   useEffect(() => {
-    setSelectedLists(value);
+    setSelectedLists(Array.isArray(value) ? value : []);
   }, [value]);
 
   const handleSelect = (listName: string) => {

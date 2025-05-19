@@ -67,7 +67,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
       lastName,
       password,
       email: hire.email || '',
-      title: hire.job_title || '',
+      title: hire.title || hire.job_title || '',
       department,
       ou,
       acl,
