@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Upload, AlertCircle, CheckCircle2, Download, FileText, X } from "lucide-react";
-import { ImportResponse } from "@/types/types";
+import { ImportResponse, ImportError } from "@/types/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function FileImporter() {
@@ -54,7 +53,7 @@ export function FileImporter() {
       if (response.success) {
         toast({
           title: "Import Successful",
-          description: `Successfully imported ${response.rowsImported} of ${response.totalRows} records`,
+          description: `Successfully imported ${response.imported || response.rowsImported} of ${response.totalRows || 'all'} records`,
         });
       } else {
         toast({

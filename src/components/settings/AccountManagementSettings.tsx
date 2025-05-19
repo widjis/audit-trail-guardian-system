@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -55,7 +54,7 @@ import { UserAccount } from "@/types/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function AccountManagementSettings() {
-  const [newAccount, setNewAccount] = useState<Partial<UserAccount>>({
+  const [newAccount, setNewAccount] = useState<Partial<UserAccount & { password: string }>>({
     username: "",
     password: "",
     role: "support"
@@ -199,7 +198,7 @@ export function AccountManagementSettings() {
       });
       return;
     }
-    addAccountMutation.mutate(newAccount as UserAccount);
+    addAccountMutation.mutate(newAccount as UserAccount & { password: string });
   };
 
   const handleUpdateAccount = () => {

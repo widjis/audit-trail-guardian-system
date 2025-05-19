@@ -65,7 +65,15 @@ export interface ImportResponse {
   message: string;
   imported?: number;
   failed?: number;
-  errors?: string[];
+  errors?: ImportError[];
+  rowsImported?: number;  // Added for FileImporter.tsx
+  totalRows?: number;     // Added for FileImporter.tsx
+}
+
+export interface ImportError {
+  row: number;
+  error: string;
+  data?: Record<string, any>;
 }
 
 // Add missing type for user account
@@ -74,6 +82,8 @@ export interface UserAccount {
   username: string;
   role: string;
   email?: string;
+  password?: string;     // Added for AccountManagementSettings.tsx
+  approved?: boolean;    // Added for AccountManagementSettings.tsx
   created_at?: string;
   updated_at?: string;
 }

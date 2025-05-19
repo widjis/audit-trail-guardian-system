@@ -506,6 +506,14 @@ export function HireForm({ currentUser }: HireFormProps) {
   // Check if AD is enabled to decide whether to show the AD user lookup
   const isADEnabled = settingsData?.activeDirectorySettings?.enabled || false;
 
+  // Add the missing handleMailingListChange function
+  const handleMailingListChange = (value: string[]) => {
+    setHire(prev => ({
+      ...prev,
+      mailing_list: value
+    }));
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
