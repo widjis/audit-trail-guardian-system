@@ -26,7 +26,7 @@ interface MailingList {
 }
 
 interface MultiSelectMailingListProps {
-  value: string[];
+  value: string[] | string;
   onChange: (value: string[]) => void;
   lists: MailingList[];
   disabled?: boolean;
@@ -41,12 +41,22 @@ export function MultiSelectMailingList({
   placeholder = "Select mailing lists..." 
 }: MultiSelectMailingListProps) {
   const [open, setOpen] = useState(false);
-  const [selectedLists, setSelectedLists] = useState<string[]>(value);
+  const [selectedLists, setSelectedLists] = useState<string[]>([]);
 
   // Update component state when prop value changes
   useEffect(() => {
-    setSelectedLists(Array.isArray(value) ? value : []);
-  }, [value]);
+    if (Array.isArray(value)) {
+      setSelectedLists(value);
+    } else if (typeof value === 'string' && value) {
+      // Handle legacy format (comma-separated string)
+      const listArray = value.split(',').map(item => item.trim());
+      setSelectedLists(listArray);
+      onChange(listArray);
+    } else {
+      // Handle case when value is empty
+      setSelectedLists([]);
+    }
+  }, [value, onChange]);
 
   const handleSelect = (listName: string) => {
     // If already selected, don't add it again
@@ -64,18 +74,6 @@ export function MultiSelectMailingList({
     setSelectedLists(newSelectedLists);
     onChange(newSelectedLists);
   };
-
-  // Convert comma-separated string to array if needed
-  useEffect(() => {
-    if (Array.isArray(value)) {
-      setSelectedLists(value);
-    } else if (typeof value === 'string' && value) {
-      // Handle legacy format (comma-separated string)
-      const listArray = value.split(',').map(item => item.trim());
-      setSelectedLists(listArray);
-      onChange(listArray);
-    }
-  }, []);
 
   return (
     <div className="space-y-2">
