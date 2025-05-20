@@ -49,7 +49,7 @@ export function MultiSelectMailingList({
       setSelectedLists(value);
     } else if (typeof value === 'string' && value) {
       // Handle legacy format (comma-separated string)
-      const listArray = value.split(',').map(item => item.trim());
+      const listArray = value.split(',').map(item => item.trim()).filter(Boolean);
       setSelectedLists(listArray);
       onChange(listArray);
     } else {
@@ -90,10 +90,10 @@ export function MultiSelectMailingList({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-0 w-full" align="start">
+        <PopoverContent className="p-0 w-[300px] max-h-[300px]" align="start">
           <Command>
             <CommandInput placeholder="Search mailing lists..." />
-            <CommandList>
+            <CommandList className="max-h-[250px]">
               <CommandEmpty>No mailing list found</CommandEmpty>
               <CommandGroup>
                 {lists.map((list) => (
