@@ -24,10 +24,10 @@ export function EmailLicenseRequestDialog({ isOpen, onClose, selectedHires }: Em
     }
   }, [isOpen]);
 
-  // Generate the email content
-  const generateEmailContent = () => {
-    // Create table header
-    let tableContent = "Name\tTitle\tLicense Type\tJoin Date\n";
+  // Generate the email content in HTML format
+  const generateEmailHTMLContent = () => {
+    // Create table HTML
+    let tableRows = '';
     
     // Add table rows
     selectedHires.forEach(hire => {
@@ -35,24 +35,42 @@ export function EmailLicenseRequestDialog({ isOpen, onClose, selectedHires }: Em
         format(new Date(hire.on_site_date), 'dd MMM yyyy') : 'N/A';
       const licenseType = hire.microsoft_365_license || "Not specified";
       
-      tableContent += `${hire.name}\t${hire.title}\t${licenseType}\t${joinDate}\n`;
+      tableRows += `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${licenseType}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${joinDate}</td>
+        </tr>
+      `;
     });
     
-    // Assemble the full email content
-    const emailContent = `Dear Mas Ricky,
+    // Assemble the full email content in HTML
+    const emailHTML = `
+      <p>Dear Mas Ricky,</p>
+      <p>Mohon bantuannya untuk assign license untuk Tim Morowali dengan SRF terlampir.</p>
+      <p>Berikut detail user:</p>
+      <table style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #f2f2f2;">Name</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #f2f2f2;">Title</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #f2f2f2;">License Type</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #f2f2f2;">Join Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+      <p>Terima kasih,</p>
+    `;
 
-Mohon bantuannya untuk assign license untuk Tim Morowali dengan SRF terlampir.
-
-Berikut detail user:
-${tableContent}
-
-Terima kasih,`;
-
-    return emailContent;
+    return emailHTML;
   };
 
   const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(generateEmailContent())
+    navigator.clipboard.writeText(generateEmailHTMLContent())
       .then(() => {
         setCopied(true);
         // Reset the icon after 3 seconds
@@ -114,6 +132,9 @@ Terima kasih,`;
         </ScrollArea>
         
         <DialogFooter className="pt-4">
+          <p className="text-xs text-muted-foreground mr-auto">
+            HTML format will be copied for better email compatibility
+          </p>
           <Button onClick={onClose} variant="outline">Close</Button>
           <Button onClick={handleCopyToClipboard} className="gap-2">
             {copied ? (
