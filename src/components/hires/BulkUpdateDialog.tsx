@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,7 @@ interface BulkUpdateDialogProps {
   onClose: () => void;
   onUpdate: (updateData: Record<string, any>) => Promise<void>;
   selectedCount: number;
-  onEmailLicenseRequest?: () => void;
+  onExcelReport?: () => void;
   selectedHires?: NewHire[];
 }
 
@@ -25,7 +24,7 @@ export function BulkUpdateDialog({
   onClose, 
   onUpdate, 
   selectedCount, 
-  onEmailLicenseRequest,
+  onExcelReport,
   selectedHires 
 }: BulkUpdateDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,9 +51,9 @@ export function BulkUpdateDialog({
   const handleSubmit = async () => {
     if (!updateFields.field) return;
     
-    // If Email License Request is selected, call the handler and close
-    if (updateFields.field === "email_license_request" && onEmailLicenseRequest) {
-      onEmailLicenseRequest();
+    // If Excel Report is selected, call the handler and close
+    if (updateFields.field === "excel_report" && onExcelReport) {
+      onExcelReport();
       onClose();
       return;
     }
@@ -94,11 +93,11 @@ export function BulkUpdateDialog({
   const renderValueInput = () => {
     if (!updateFields.field) return null;
     
-    // If Email License Request is selected, no need for value input
-    if (updateFields.field === "email_license_request") {
+    // If Excel Report is selected, no need for value input
+    if (updateFields.field === "excel_report") {
       return (
         <p className="text-sm text-muted-foreground">
-          This will generate an email template for license request that you can copy to your clipboard.
+          This will generate an Excel report for license requests that you can download.
         </p>
       );
     }
@@ -210,7 +209,7 @@ export function BulkUpdateDialog({
                 <SelectItem value="license_assigned">License Assigned</SelectItem>
                 <SelectItem value="status_srf">SRF Status</SelectItem>
                 <SelectItem value="microsoft_365_license">Microsoft 365 License</SelectItem>
-                <SelectItem value="email_license_request">Email License Request</SelectItem>
+                <SelectItem value="excel_report">Excel Report</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -229,7 +228,7 @@ export function BulkUpdateDialog({
             onClick={handleSubmit} 
             disabled={
               (!updateFields.field) || 
-              (updateFields.field !== "email_license_request" && !updateFields.value) || 
+              (updateFields.field !== "excel_report" && !updateFields.value) || 
               isSubmitting
             }
           >
@@ -238,8 +237,8 @@ export function BulkUpdateDialog({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Updating...
               </>
-            ) : updateFields.field === "email_license_request" ? (
-              'Generate Email'
+            ) : updateFields.field === "excel_report" ? (
+              'Generate Report'
             ) : (
               'Update Selected'
             )}
