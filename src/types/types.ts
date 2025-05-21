@@ -1,4 +1,3 @@
-
 export interface AuditLog {
   id: string;
   hire_id: string;

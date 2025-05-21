@@ -9,15 +9,25 @@ import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import { licenseService } from "@/services/license-service";
+import { NewHire } from "@/types/types";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (updateData: Record<string, any>) => Promise<void>;
   selectedCount: number;
+  onEmailLicenseRequest?: () => void;
+  selectedHires?: NewHire[];
 }
 
-export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: BulkUpdateDialogProps) {
+export function BulkUpdateDialog({ 
+  isOpen, 
+  onClose, 
+  onUpdate, 
+  selectedCount, 
+  onEmailLicenseRequest,
+  selectedHires 
+}: BulkUpdateDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [updateFields, setUpdateFields] = useState({
     field: "",
@@ -41,6 +51,13 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
   
   const handleSubmit = async () => {
     if (!updateFields.field) return;
+    
+    // If Email License Request is selected, call the handler and close
+    if (updateFields.field === "email_license_request" && onEmailLicenseRequest) {
+      onEmailLicenseRequest();
+      onClose();
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -76,6 +93,15 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
   // Render appropriate input based on field type
   const renderValueInput = () => {
     if (!updateFields.field) return null;
+    
+    // If Email License Request is selected, no need for value input
+    if (updateFields.field === "email_license_request") {
+      return (
+        <p className="text-sm text-muted-foreground">
+          This will generate an email template for license request that you can copy to your clipboard.
+        </p>
+      );
+    }
     
     switch (updateFields.field) {
       case "account_creation_status":
@@ -184,6 +210,7 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
                 <SelectItem value="license_assigned">License Assigned</SelectItem>
                 <SelectItem value="status_srf">SRF Status</SelectItem>
                 <SelectItem value="microsoft_365_license">Microsoft 365 License</SelectItem>
+                <SelectItem value="email_license_request">Email License Request</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -200,13 +227,19 @@ export function BulkUpdateDialog({ isOpen, onClose, onUpdate, selectedCount }: B
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={!updateFields.field || !updateFields.value || isSubmitting}
+            disabled={
+              (!updateFields.field) || 
+              (updateFields.field !== "email_license_request" && !updateFields.value) || 
+              isSubmitting
+            }
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Updating...
               </>
+            ) : updateFields.field === "email_license_request" ? (
+              'Generate Email'
             ) : (
               'Update Selected'
             )}

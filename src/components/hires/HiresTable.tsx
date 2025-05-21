@@ -15,8 +15,8 @@ import { FilterPopover } from "./FilterPopover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { licenseService } from "@/services/license-service";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SortButton } from "./SortButton";
+import { EmailLicenseRequestDialog } from "./EmailLicenseRequestDialog";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -25,6 +25,7 @@ export function HiresTable() {
   const [selectedHires, setSelectedHires] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBulkUpdateDialog, setShowBulkUpdateDialog] = useState(false);
+  const [showEmailLicenseDialog, setShowEmailLicenseDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
@@ -276,6 +277,16 @@ export function HiresTable() {
     if (valueA > valueB) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
+
+  // Get selected hire details (complete objects not just IDs)
+  const getSelectedHireDetails = (): NewHire[] => {
+    return hires.filter(hire => selectedHires.includes(hire.id));
+  };
+
+  // Handler for email license request
+  const handleEmailLicenseRequest = () => {
+    setShowEmailLicenseDialog(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -605,6 +616,14 @@ export function HiresTable() {
         onClose={() => setShowBulkUpdateDialog(false)}
         onUpdate={handleBulkUpdate}
         selectedCount={selectedHires.length}
+        onEmailLicenseRequest={handleEmailLicenseRequest}
+        selectedHires={getSelectedHireDetails()}
+      />
+      
+      <EmailLicenseRequestDialog 
+        isOpen={showEmailLicenseDialog}
+        onClose={() => setShowEmailLicenseDialog(false)}
+        selectedHires={getSelectedHireDetails()}
       />
     </div>
   );
