@@ -13,6 +13,7 @@ import Hires from "./pages/Hires";
 import HireDetail from "./pages/HireDetail";
 import Import from "./pages/Import";
 import Settings from "./pages/Settings";
+import HrisSync from "./pages/HrisSync";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,11 @@ const App = () => (
           <Route path="/hires" element={<Hires />} />
           <Route path="/hires/:id" element={<HireDetail />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/hris-sync" element={
+            <AdminRoute>
+              <HrisSync />
+            </AdminRoute>
+          } />
           <Route path="/settings" element={
             <AdminRoute>
               <Settings />
