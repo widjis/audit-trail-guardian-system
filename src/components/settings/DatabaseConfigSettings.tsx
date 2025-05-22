@@ -60,7 +60,7 @@ export function DatabaseConfigSettings() {
         
         // Fetch schema if available
         try {
-          const schemaResponse = await apiClient.get("/settings/database-config/schema");
+          const schemaResponse = await apiClient.get("/database/schema");
           if (schemaResponse.data && schemaResponse.data.schema) {
             setSchema(schemaResponse.data.schema);
           }
@@ -120,7 +120,7 @@ export function DatabaseConfigSettings() {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await apiClient.put("/settings/database-config", config);
+      await apiClient.put("/database", config);
       toast({
         title: "Success",
         description: "Database configuration saved successfully",
@@ -141,7 +141,7 @@ export function DatabaseConfigSettings() {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await apiClient.put("/settings/database-config/schema", { schema });
+      await apiClient.put("/database/schema", { schema });
       toast({
         title: "Success",
         description: "Database schema saved successfully",
@@ -163,7 +163,7 @@ export function DatabaseConfigSettings() {
     setTestResult(null);
     
     try {
-      const response = await apiClient.post("/settings/database-config/test-connection", config);
+      const response = await apiClient.post("/database/test-connection", config);
       setTestResult({
         success: true,
         message: response.data.message || "Connection successful!"
