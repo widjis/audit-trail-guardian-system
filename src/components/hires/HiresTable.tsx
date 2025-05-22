@@ -16,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { licenseService } from "@/services/license-service";
 import { SortButton } from "./SortButton";
-import { EmailLicenseRequestDialog } from "./EmailLicenseRequestDialog";
+import { ExcelReportDialog } from "./ExcelReportDialog";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -25,7 +25,7 @@ export function HiresTable() {
   const [selectedHires, setSelectedHires] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBulkUpdateDialog, setShowBulkUpdateDialog] = useState(false);
-  const [showEmailLicenseDialog, setShowEmailLicenseDialog] = useState(false);
+  const [showExcelReportDialog, setShowExcelReportDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
@@ -283,9 +283,9 @@ export function HiresTable() {
     return hires.filter(hire => selectedHires.includes(hire.id));
   };
 
-  // Handler for email license request
-  const handleEmailLicenseRequest = () => {
-    setShowEmailLicenseDialog(true);
+  // Handler for showing Excel report dialog
+  const handleShowExcelReport = () => {
+    setShowExcelReportDialog(true);
   };
 
   return (
@@ -616,13 +616,13 @@ export function HiresTable() {
         onClose={() => setShowBulkUpdateDialog(false)}
         onUpdate={handleBulkUpdate}
         selectedCount={selectedHires.length}
-        onEmailLicenseRequest={handleEmailLicenseRequest}
+        onExcelReport={handleShowExcelReport}
         selectedHires={getSelectedHireDetails()}
       />
       
-      <EmailLicenseRequestDialog 
-        isOpen={showEmailLicenseDialog}
-        onClose={() => setShowEmailLicenseDialog(false)}
+      <ExcelReportDialog
+        isOpen={showExcelReportDialog}
+        onClose={() => setShowExcelReportDialog(false)}
         selectedHires={getSelectedHireDetails()}
       />
     </div>
