@@ -83,7 +83,7 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+      <DialogContent className="pt-6 max-w-6xl w-full max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Generate License Report</DialogTitle>
         </DialogHeader>
@@ -95,7 +95,7 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
             </p>
             
             <div className="border rounded-md">
-              <Table>
+              <Table className="mb-2 min-w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead>SRF No.</TableHead>
