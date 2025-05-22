@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
@@ -8,10 +9,14 @@ import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSett
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
 import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
-import { HrisDatabaseSettings } from "@/components/settings/HrisDatabaseSettings";
 import { Database, MessageSquare, Send, Users, Server, Cloud } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Settings() {
+  const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState("account-status");
+
+  // For mobile, we use a simpler layout with a dropdown or scrollable tabs
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -22,32 +27,35 @@ export default function Settings() {
           </p>
         </div>
         
-        <Tabs defaultValue="account-status" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="account-status">Account Status</TabsTrigger>
-            <TabsTrigger value="mailing-list">Mailing List</TabsTrigger>
-            <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="whatsapp" className="flex items-center gap-1">
-              <Send className="h-4 w-4" />
-              <span>WhatsApp</span>
-            </TabsTrigger>
-            <TabsTrigger value="active-directory" className="flex items-center gap-1">
-              <Server className="h-4 w-4" />
-              <span>Active Directory</span>
-            </TabsTrigger>
-            <TabsTrigger value="database" className="flex items-center gap-1">
-              <Database className="h-4 w-4" />
-              <span>Database</span>
-            </TabsTrigger>
-            <TabsTrigger value="hris-database" className="flex items-center gap-1">
-              <Cloud className="h-4 w-4" />
-              <span>HRIS Database</span>
-            </TabsTrigger>
-            <TabsTrigger value="account-management" className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              <span>ICT Support Accounts</span>
-            </TabsTrigger>
-          </TabsList>
+        <Tabs 
+          defaultValue="account-status" 
+          className="space-y-4"
+          value={activeTab}
+          onValueChange={setActiveTab}
+        >
+          <div className={`${isMobile ? 'overflow-x-auto pb-2' : ''}`}>
+            <TabsList className={`${isMobile ? 'inline-flex w-max' : 'flex flex-wrap'}`}>
+              <TabsTrigger value="account-status">Account Status</TabsTrigger>
+              <TabsTrigger value="mailing-list">Mailing List</TabsTrigger>
+              <TabsTrigger value="departments">Departments</TabsTrigger>
+              <TabsTrigger value="whatsapp" className="flex items-center gap-1">
+                <Send className="h-4 w-4" />
+                <span>WhatsApp</span>
+              </TabsTrigger>
+              <TabsTrigger value="active-directory" className="flex items-center gap-1">
+                <Server className="h-4 w-4" />
+                <span>Active Directory</span>
+              </TabsTrigger>
+              <TabsTrigger value="database" className="flex items-center gap-1">
+                <Database className="h-4 w-4" />
+                <span>Databases</span>
+              </TabsTrigger>
+              <TabsTrigger value="account-management" className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                <span>ICT Support Accounts</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
           <TabsContent value="account-status" className="space-y-4">
             <AccountStatusSettings />
@@ -71,10 +79,6 @@ export default function Settings() {
           
           <TabsContent value="database" className="space-y-4">
             <DatabaseConfigSettings />
-          </TabsContent>
-          
-          <TabsContent value="hris-database" className="space-y-4">
-            <HrisDatabaseSettings />
           </TabsContent>
           
           <TabsContent value="account-management" className="space-y-4">

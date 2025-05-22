@@ -4,19 +4,19 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertCircle, Database, Server, Table, CheckCircle2, XCircle } from "lucide-react";
-import apiClient from "@/services/api-client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Database, CheckCircle2, XCircle, AlertCircle, Cloud } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { settingsService } from "@/services/settings-service";
 
+// Main database configuration types
 interface DatabaseConfig {
-  type: "postgres" | "mssql";
+  type: string;
   host: string;
   port: string;
   database: string;
@@ -26,107 +26,179 @@ interface DatabaseConfig {
   encrypt?: boolean;
 }
 
+// HRIS database configuration types
+interface HrisDatabaseConfig {
+  server: string;
+  port: string;
+  database: string;
+  username: string;
+  password: string;
+  enabled: boolean;
+}
+
 export function DatabaseConfigSettings() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  
+  // Main database state
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
+  const [testResult, setTestResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+  const [schema, setSchema] = useState("");
+  
+  const [dbConfig, setDbConfig] = useState<DatabaseConfig>({
+    type: "postgres",
+    host: "",
+    port: "",
+    database: "",
+    username: "",
+    password: "",
+  });
+
+  // HRIS database state
+  const [isHrisLoading, setIsHrisLoading] = useState(false);
+  const [isHrisTesting, setIsHrisTesting] = useState(false);
+  const [hrisTestResult, setHrisTestResult] = useState<{
     success?: boolean;
     message?: string;
     error?: string;
   } | null>(null);
   
-  const [config, setConfig] = useState<DatabaseConfig>({
-    type: "postgres",
-    host: "",
-    port: "5432",
+  const [hrisConfig, setHrisConfig] = useState<HrisDatabaseConfig>({
+    server: "",
+    port: "1433", // Default SQL Server port
     database: "",
     username: "",
     password: "",
-    instance: "",
-    encrypt: false
+    enabled: false
   });
-  
-  const [schema, setSchema] = useState("");
 
+  // Fetch both database configurations when component mounts
   useEffect(() => {
-    const fetchDatabaseConfig = async () => {
-      try {
-        setIsLoading(true);
-        const response = await apiClient.get("/database");
-        if (response.data) {
-          setConfig(response.data);
-        }
-        
-        // Fetch schema if available
-        try {
-          const schemaResponse = await apiClient.get("/database/schema");
-          if (schemaResponse.data && schemaResponse.data.schema) {
-            setSchema(schemaResponse.data.schema);
-          }
-        } catch (schemaError) {
-          // Schema may not exist yet, which is fine
-          console.log("Schema not found or not yet created");
-        }
-      } catch (error) {
-        console.error("Failed to fetch database config:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load database configuration",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
+    const fetchAllConfigurations = async () => {
+      await fetchDatabaseConfig();
+      await fetchHrisDatabaseConfig();
     };
+    fetchAllConfigurations();
+  }, []);
 
-    fetchDatabaseConfig();
-  }, [toast]);
+  // Main database functions
+  const fetchDatabaseConfig = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/database");
+      if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+      
+      const config = await response.json();
+      setDbConfig(config);
 
-  const handleTypeChange = (type: "postgres" | "mssql") => {
-    setConfig(prev => ({
-      ...prev,
-      type,
-      port: type === "postgres" ? "5432" : "1433"
-    }));
-    // Clear the test result when the database type changes
+      // Also fetch database schema
+      try {
+        const schemaResponse = await fetch("/api/database/schema");
+        if (schemaResponse.ok) {
+          const { schema } = await schemaResponse.json();
+          setSchema(schema || "");
+        } else {
+          console.warn("Schema not found or not yet created");
+        }
+      } catch (err) {
+        console.error("Error fetching schema:", err);
+      }
+    } catch (err) {
+      console.error("Error fetching database config:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load database configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // HRIS database functions
+  const fetchHrisDatabaseConfig = async () => {
+    try {
+      setIsHrisLoading(true);
+      const response = await settingsService.getHrisDatabaseConfig();
+      if (response) {
+        setHrisConfig(response);
+      }
+    } catch (error) {
+      console.error("Failed to fetch HRIS database configuration:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load HRIS database configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsHrisLoading(false);
+    }
+  };
+
+  // Main database handlers
+  const handleDbInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setDbConfig(prev => ({ ...prev, [name]: value }));
+    // Clear the test result when any configuration changes
     setTestResult(null);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDbTypeChange = (value: string) => {
+    setDbConfig(prev => ({
+      ...prev,
+      type: value,
+      port: value === "postgres" ? "5432" : "1433", // Default ports
+    }));
+    // Clear the test result when database type changes
+    setTestResult(null);
+  };
+
+  const handleDbBooleanChange = (name: string, value: boolean) => {
+    setDbConfig(prev => ({ ...prev, [name]: value }));
+    // Clear the test result when any configuration changes
+    setTestResult(null);
+  };
+
+  // HRIS database handlers
+  const handleHrisChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setConfig(prev => ({
+    setHrisConfig(prev => ({
       ...prev,
       [name]: value,
     }));
     // Clear the test result when any configuration changes
-    setTestResult(null);
+    setHrisTestResult(null);
   };
 
-  const handleSwitchChange = (name: string, checked: boolean) => {
-    setConfig(prev => ({
+  const handleHrisSwitchChange = (checked: boolean) => {
+    setHrisConfig(prev => ({
       ...prev,
-      [name]: checked,
+      enabled: checked,
     }));
-    // Clear the test result when any configuration changes
-    setTestResult(null);
+    // Clear the test result when the enabled status changes
+    setHrisTestResult(null);
   };
 
-  const handleSchemaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSchema(e.target.value);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Main database actions
+  const handleDbSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await apiClient.put("/database", config);
+      const response = await fetch("/api/database", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbConfig),
+      });
+
+      if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+      
       toast({
         title: "Success",
         description: "Database configuration saved successfully",
       });
-    } catch (error) {
-      console.error("Failed to save database config:", error);
+    } catch (err) {
+      console.error("Error saving database config:", err);
       toast({
         title: "Error",
         description: "Failed to save database configuration",
@@ -137,20 +209,28 @@ export function DatabaseConfigSettings() {
     }
   };
 
-  const handleSchemaSubmit = async (e: React.FormEvent) => {
+  const handleSchemaUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await apiClient.put("/database/schema", { schema });
+      const response = await fetch("/api/database/schema", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schema }),
+      });
+
+      if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+      
+      const result = await response.json();
       toast({
         title: "Success",
-        description: "Database schema saved successfully",
+        description: `Schema saved to ${result.filePath}`,
       });
-    } catch (error) {
-      console.error("Failed to save database schema:", error);
+    } catch (err) {
+      console.error("Error saving schema:", err);
       toast({
         title: "Error",
-        description: "Failed to save database schema",
+        description: "Failed to save schema",
         variant: "destructive",
       });
     } finally {
@@ -163,17 +243,84 @@ export function DatabaseConfigSettings() {
     setTestResult(null);
     
     try {
-      const response = await apiClient.post("/database/test-connection", config);
+      const response = await fetch("/api/database/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbConfig),
+      });
+      
+      const result = await response.json();
+      
       setTestResult({
-        success: true,
-        message: response.data.message || "Connection successful!"
+        success: result.success,
+        message: result.message,
+        error: result.error
       });
       
       toast({
+        title: result.success ? "Success" : "Connection Failed",
+        description: result.message || (result.success ? "Database connection test successful!" : "Failed to connect to database"),
+        variant: result.success ? "default" : "destructive",
+      });
+      
+    } catch (error: any) {
+      console.error("Connection test error:", error);
+      setTestResult({
+        success: false,
+        message: "Request failed",
+        error: error.message
+      });
+      
+      toast({
+        title: "Error",
+        description: error.message || "Test connection request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  // HRIS database actions
+  const handleHrisSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsHrisLoading(true);
+      await settingsService.updateHrisDatabaseConfig(hrisConfig);
+      toast({
         title: "Success",
-        description: "Database connection test successful!",
+        description: "HRIS database configuration saved successfully",
       });
     } catch (error) {
+      console.error("Failed to save HRIS database configuration:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save HRIS database configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsHrisLoading(false);
+    }
+  };
+
+  const handleHrisTestConnection = async () => {
+    setIsHrisTesting(true);
+    setHrisTestResult(null);
+    
+    try {
+      const response = await settingsService.testHrisDatabaseConnection(hrisConfig);
+      setHrisTestResult({
+        success: response.success,
+        message: response.message || "Connection successful!",
+        error: response.error
+      });
+      
+      toast({
+        title: response.success ? "Success" : "Connection Failed",
+        description: response.message || (response.success ? "Database connection test successful!" : "Failed to connect to database"),
+        variant: response.success ? "default" : "destructive",
+      });
+    } catch (error: any) {
       console.error("Connection test failed:", error);
       const errorMessage = 
         error.response?.data?.error || 
@@ -181,7 +328,7 @@ export function DatabaseConfigSettings() {
         error.message || 
         "Unable to connect to database";
       
-      setTestResult({
+      setHrisTestResult({
         success: false,
         message: "Connection failed",
         error: errorMessage
@@ -193,78 +340,26 @@ export function DatabaseConfigSettings() {
         variant: "destructive",
       });
     } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const getSchemaTemplate = () => {
-    if (config.type === 'postgres') {
-      return `-- PostgreSQL Sample Schema
-CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(100) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS departments (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  code VARCHAR(10) NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS employees (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  department_id INTEGER REFERENCES departments(id),
-  hire_date DATE NOT NULL
-);`;
-    } else {
-      return `-- MS SQL Server Sample Schema
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
-CREATE TABLE users (
-  id INT IDENTITY(1,1) PRIMARY KEY,
-  username NVARCHAR(100) NOT NULL,
-  email NVARCHAR(255) NOT NULL UNIQUE,
-  password NVARCHAR(255) NOT NULL,
-  created_at DATETIME DEFAULT GETDATE()
-);
-
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='departments' AND xtype='U')
-CREATE TABLE departments (
-  id INT IDENTITY(1,1) PRIMARY KEY,
-  name NVARCHAR(100) NOT NULL,
-  code NVARCHAR(10) NOT NULL UNIQUE
-);
-
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U')
-CREATE TABLE employees (
-  id INT IDENTITY(1,1) PRIMARY KEY,
-  name NVARCHAR(255) NOT NULL,
-  email NVARCHAR(255) NOT NULL UNIQUE,
-  department_id INT FOREIGN KEY REFERENCES departments(id),
-  hire_date DATE NOT NULL
-);`;
+      setIsHrisTesting(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <Tabs defaultValue="connection" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="connection" className="flex items-center gap-2">
-            <Server className="h-4 w-4" />
-            Connection Settings
+    <div className="space-y-6">
+      <Tabs defaultValue="main-db">
+        <TabsList className="mb-4">
+          <TabsTrigger value="main-db" className="flex items-center gap-1">
+            <Database className="h-4 w-4" />
+            <span>Main Database</span>
           </TabsTrigger>
-          <TabsTrigger value="schema" className="flex items-center gap-2">
-            <Table className="h-4 w-4" />
-            Database Schema
+          <TabsTrigger value="hris-db" className="flex items-center gap-1">
+            <Cloud className="h-4 w-4" />
+            <span>HRIS Database</span>
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="connection">
+        {/* Main Database Tab */}
+        <TabsContent value="main-db">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -272,47 +367,46 @@ CREATE TABLE employees (
                 Database Connection
               </CardTitle>
               <CardDescription>
-                Configure your database connection settings
+                Configure connection to your application database
               </CardDescription>
             </CardHeader>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleDbSave}>
               <CardContent className="space-y-4">
-                <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+                <Alert className="bg-blue-50 text-blue-800 border-blue-200">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Important</AlertTitle>
+                  <AlertTitle>Information</AlertTitle>
                   <AlertDescription>
-                    These settings will be stored in environment variables. After saving, a server restart might be required for changes to take effect.
+                    These settings will be saved to your local .env file.
+                    Changes may require a server restart to take effect.
                   </AlertDescription>
                 </Alert>
 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Database Type</Label>
-                    <RadioGroup 
-                      value={config.type} 
-                      onValueChange={(value) => handleTypeChange(value as "postgres" | "mssql")}
-                      className="flex space-x-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="postgres" id="postgres" />
-                        <Label htmlFor="postgres">PostgreSQL</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="mssql" id="mssql" />
-                        <Label htmlFor="mssql">MS SQL Server</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="host">Database Host</Label>
+                      <Label htmlFor="type">Database Type</Label>
+                      <Select 
+                        value={dbConfig.type} 
+                        onValueChange={handleDbTypeChange}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select database type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="postgres">PostgreSQL</SelectItem>
+                          <SelectItem value="mssql">Microsoft SQL Server</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="host">Host / IP Address</Label>
                       <Input 
                         id="host"
                         name="host"
-                        value={config.host}
-                        onChange={handleChange}
-                        placeholder={config.type === "postgres" ? "localhost" : "localhost\\SQLEXPRESS"}
+                        value={dbConfig.host}
+                        onChange={handleDbInputChange}
                         disabled={isLoading}
                       />
                     </div>
@@ -322,9 +416,8 @@ CREATE TABLE employees (
                       <Input 
                         id="port"
                         name="port"
-                        value={config.port}
-                        onChange={handleChange}
-                        placeholder={config.type === "postgres" ? "5432" : "1433"}
+                        value={dbConfig.port}
+                        onChange={handleDbInputChange}
                         disabled={isLoading}
                       />
                     </div>
@@ -334,69 +427,64 @@ CREATE TABLE employees (
                       <Input 
                         id="database"
                         name="database"
-                        value={config.database}
-                        onChange={handleChange}
-                        placeholder="my_database"
+                        value={dbConfig.database}
+                        onChange={handleDbInputChange}
                         disabled={isLoading}
                       />
                     </div>
-                    
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="username">Username</Label>
                       <Input 
                         id="username"
                         name="username"
-                        value={config.username}
-                        onChange={handleChange}
-                        placeholder={config.type === "postgres" ? "postgres" : "sa"}
+                        value={dbConfig.username}
+                        onChange={handleDbInputChange}
                         disabled={isLoading}
                       />
                     </div>
                     
-                    <div className="space-y-2 md:col-span-2">
+                    <div className="space-y-2">
                       <Label htmlFor="password">Password</Label>
                       <Input 
                         id="password"
                         name="password"
                         type="password"
-                        value={config.password}
-                        onChange={handleChange}
-                        placeholder="********"
+                        value={dbConfig.password}
+                        onChange={handleDbInputChange}
                         disabled={isLoading}
                       />
                     </div>
-
-                    {config.type === "mssql" && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="instance">Instance Name (optional)</Label>
-                          <Input 
-                            id="instance"
-                            name="instance"
-                            value={config.instance}
-                            onChange={handleChange}
-                            placeholder="SQLEXPRESS"
-                            disabled={isLoading}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            Leave empty if not using a named instance
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-2 flex items-center pt-6">
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="encrypt"
-                              checked={config.encrypt}
-                              onCheckedChange={(checked) => handleSwitchChange('encrypt', checked)}
-                              disabled={isLoading}
-                            />
-                            <Label htmlFor="encrypt">Encrypt Connection</Label>
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
+                  
+                  {/* SQL Server specific settings */}
+                  {dbConfig.type === "mssql" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="instance">Instance Name (optional)</Label>
+                        <Input 
+                          id="instance"
+                          name="instance"
+                          value={dbConfig.instance || ""}
+                          onChange={handleDbInputChange}
+                          disabled={isLoading}
+                          placeholder="Leave empty if not using a named instance"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 pt-8">
+                        <Switch
+                          id="encrypt"
+                          checked={!!dbConfig.encrypt}
+                          onCheckedChange={(checked) => handleDbBooleanChange("encrypt", checked)}
+                          disabled={isLoading}
+                        />
+                        <Label htmlFor="encrypt">Encrypt Connection</Label>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Test Connection Section */}
                   <div className="pt-4 border-t">
@@ -439,6 +527,31 @@ CREATE TABLE employees (
                       </div>
                     )}
                   </div>
+                
+                  {/* Schema Section */}
+                  <div className="pt-4 border-t">
+                    <div className="flex flex-col space-y-2">
+                      <Label htmlFor="schema">Database Schema</Label>
+                      <Textarea
+                        id="schema"
+                        placeholder="Enter your schema SQL here..."
+                        value={schema}
+                        onChange={(e) => setSchema(e.target.value)}
+                        disabled={isLoading}
+                        className="font-mono h-64"
+                      />
+                    </div>
+
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={handleSchemaUpdate}
+                      disabled={isLoading}
+                      className="mt-4"
+                    >
+                      Save Schema
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
               
@@ -448,64 +561,165 @@ CREATE TABLE employees (
                   disabled={isLoading}
                   className="flex items-center gap-2"
                 >
-                  <Server className="h-4 w-4" />
+                  <Database className="h-4 w-4" />
                   {isLoading ? "Saving..." : "Save Configuration"}
                 </Button>
               </CardFooter>
             </form>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="schema">
+
+        {/* HRIS Database Tab */}
+        <TabsContent value="hris-db">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Table className="h-5 w-5" />
-                Database Schema
+                <Cloud className="h-5 w-5" />
+                HRIS Database Connection
               </CardTitle>
               <CardDescription>
-                Define your initial database schema with SQL statements
+                Configure connection to your Human Resource Information System database
               </CardDescription>
             </CardHeader>
-            <form onSubmit={handleSchemaSubmit}>
+            <form onSubmit={handleHrisSubmit}>
               <CardContent className="space-y-4">
                 <Alert className="bg-blue-50 text-blue-800 border-blue-200">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Schema Format</AlertTitle>
+                  <AlertTitle>Information</AlertTitle>
                   <AlertDescription>
-                    Enter SQL statements to initialize your database schema. The syntax will vary slightly between PostgreSQL and MS SQL Server.
+                    These settings will connect to your HRIS database for employee synchronization.
+                    Currently supporting Microsoft SQL Server.
                   </AlertDescription>
                 </Alert>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="schema">SQL Schema</Label>
-                  <Textarea 
-                    id="schema"
-                    value={schema}
-                    onChange={handleSchemaChange}
-                    placeholder={getSchemaTemplate()}
-                    className="font-mono text-sm h-[400px]"
-                    disabled={isLoading}
-                  />
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="server">Database Server</Label>
+                      <Input 
+                        id="server"
+                        name="server"
+                        value={hrisConfig.server}
+                        onChange={handleHrisChange}
+                        placeholder="e.g., 10.1.1.75"
+                        disabled={isHrisLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="port">Port</Label>
+                      <Input 
+                        id="port"
+                        name="port"
+                        value={hrisConfig.port}
+                        onChange={handleHrisChange}
+                        placeholder="1433"
+                        disabled={isHrisLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="database">Database Name</Label>
+                      <Input 
+                        id="database"
+                        name="database"
+                        value={hrisConfig.database}
+                        onChange={handleHrisChange}
+                        placeholder="e.g., ORANGE-PROD"
+                        disabled={isHrisLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input 
+                        id="username"
+                        name="username"
+                        value={hrisConfig.username}
+                        onChange={handleHrisChange}
+                        placeholder="e.g., IT.MTI"
+                        disabled={isHrisLoading}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input 
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={hrisConfig.password}
+                        onChange={handleHrisChange}
+                        placeholder="********"
+                        disabled={isHrisLoading}
+                      />
+                    </div>
+
+                    <div className="space-y-2 flex items-center pt-2 md:col-span-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enabled"
+                          checked={hrisConfig.enabled}
+                          onCheckedChange={handleHrisSwitchChange}
+                          disabled={isHrisLoading}
+                        />
+                        <Label htmlFor="enabled">Enable HRIS Database Connection</Label>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Test Connection Section */}
+                  <div className="pt-4 border-t">
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={handleHrisTestConnection}
+                      disabled={isHrisLoading || isHrisTesting}
+                      className="flex items-center gap-2"
+                    >
+                      {isHrisTesting ? "Testing..." : "Test Connection"}
+                    </Button>
+                    
+                    {hrisTestResult && (
+                      <div className={`mt-4 p-4 rounded-md ${
+                        hrisTestResult.success 
+                          ? "bg-green-50 border border-green-200 text-green-800" 
+                          : "bg-red-50 border border-red-200 text-red-800"
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          {hrisTestResult.success 
+                            ? <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" /> 
+                            : <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                          }
+                          <div>
+                            <p className="font-medium">
+                              {hrisTestResult.success 
+                                ? "Connection Successful" 
+                                : "Connection Failed"
+                              }
+                            </p>
+                            {hrisTestResult.message && (
+                              <p className="mt-1">{hrisTestResult.message}</p>
+                            )}
+                            {hrisTestResult.error && (
+                              <p className="mt-1 text-sm">{hrisTestResult.error}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
               
-              <CardFooter className="flex justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => setSchema(getSchemaTemplate())}
-                  disabled={isLoading}
-                >
-                  Load {config.type === 'postgres' ? 'PostgreSQL' : 'SQL Server'} Sample Schema
-                </Button>
+              <CardFooter>
                 <Button 
                   type="submit" 
-                  disabled={isLoading}
+                  disabled={isHrisLoading}
                   className="flex items-center gap-2"
                 >
-                  <Table className="h-4 w-4" />
-                  {isLoading ? "Saving..." : "Save Schema"}
+                  <Cloud className="h-4 w-4" />
+                  {isHrisLoading ? "Saving..." : "Save Configuration"}
                 </Button>
               </CardFooter>
             </form>

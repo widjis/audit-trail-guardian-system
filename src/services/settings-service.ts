@@ -27,6 +27,8 @@ interface ActiveDirectorySettings {
   domain: string;
   baseDN: string;
   enabled: boolean;
+  protocol: string;
+  authFormat: string;
 }
 
 interface HrisDatabaseConfig {

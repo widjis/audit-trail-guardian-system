@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
+import sql from 'mssql';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -312,6 +313,140 @@ router.put('/whatsapp', (req, res) => {
   } catch (error) {
     console.error('Error updating WhatsApp settings:', error);
     res.status(500).json({ error: 'Failed to update WhatsApp settings' });
+  }
+});
+
+// Add routes for Active Directory settings
+router.get('/active-directory', (req, res) => {
+  try {
+    const settings = getSettings();
+    const adSettings = settings.activeDirectorySettings || {
+      server: '',
+      username: '',
+      password: '',
+      domain: '',
+      baseDN: '',
+      enabled: false,
+      protocol: 'ldap',
+      authFormat: 'userPrincipalName'
+    };
+    
+    res.json(adSettings);
+  } catch (error) {
+    console.error('Error fetching Active Directory settings:', error);
+    res.status(500).json({ error: 'Failed to fetch Active Directory settings' });
+  }
+});
+
+router.put('/active-directory', (req, res) => {
+  try {
+    const { server, username, password, domain, baseDN, enabled, protocol, authFormat } = req.body;
+    
+    const settings = getSettings();
+    settings.activeDirectorySettings = {
+      server,
+      username,
+      password,
+      domain,
+      baseDN,
+      enabled,
+      protocol: protocol || 'ldap',
+      authFormat: authFormat || 'userPrincipalName'
+    };
+    
+    saveSettings(settings);
+    
+    res.json(settings.activeDirectorySettings);
+  } catch (error) {
+    console.error('Error updating Active Directory settings:', error);
+    res.status(500).json({ error: 'Failed to update Active Directory settings' });
+  }
+});
+
+// Add endpoints for HRIS database configuration
+router.get('/hris-database', (req, res) => {
+  try {
+    const settings = getSettings();
+    const hrisDbConfig = settings.hrisDbConfig || {
+      server: '',
+      port: '1433',
+      database: '',
+      username: '',
+      password: '',
+      enabled: false
+    };
+    
+    res.json(hrisDbConfig);
+  } catch (error) {
+    console.error('Error fetching HRIS database config:', error);
+    res.status(500).json({ error: 'Failed to fetch HRIS database configuration' });
+  }
+});
+
+router.put('/hris-database', (req, res) => {
+  try {
+    const { server, port, database, username, password, enabled } = req.body;
+    
+    const settings = getSettings();
+    settings.hrisDbConfig = {
+      server,
+      port,
+      database,
+      username,
+      password,
+      enabled
+    };
+    
+    saveSettings(settings);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating HRIS database config:', error);
+    res.status(500).json({ error: 'Failed to update HRIS database configuration' });
+  }
+});
+
+// Test HRIS database connection
+router.post('/hris-database/test-connection', async (req, res) => {
+  const { server, port, database, username, password } = req.body;
+  
+  try {
+    // Configure SQL Server connection
+    const config = {
+      server,
+      port: parseInt(port) || 1433,
+      database,
+      user: username,
+      password,
+      options: {
+        encrypt: true,
+        trustServerCertificate: true,
+        connectTimeout: 15000
+      }
+    };
+    
+    // Test connection
+    let pool = null;
+    try {
+      pool = await new sql.ConnectionPool(config).connect();
+      await pool.request().query('SELECT 1 as testConnection');
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully connected to ${database} on ${server}:${port}`
+      });
+    } finally {
+      if (pool) {
+        await pool.close();
+      }
+    }
+  } catch (error) {
+    console.error('HRIS database connection test failed:', error);
+    res.status(400).json({ 
+      success: false, 
+      message: 'Failed to connect to HRIS database', 
+      error: error.message 
+    });
   }
 });
 
