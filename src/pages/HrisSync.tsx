@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Database, Server, Users, Sync } from "lucide-react";
+import { Database, Server, Users, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function HrisSync() {
@@ -128,7 +127,7 @@ export default function HrisSync() {
         <Tabs defaultValue="sync" className="space-y-4">
           <TabsList>
             <TabsTrigger value="sync" className="flex items-center gap-1">
-              <Sync className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" />
               <span>Sync Operation</span>
             </TabsTrigger>
             <TabsTrigger value="export" className="flex items-center gap-1">
@@ -160,7 +159,7 @@ export default function HrisSync() {
                   >
                     {testStatus === "loading" ? (
                       <>
-                        <Sync className="mr-2 h-4 w-4 animate-spin" />
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                         Running Test...
                       </>
                     ) : (
@@ -195,7 +194,7 @@ export default function HrisSync() {
                   >
                     {syncStatus === "loading" ? (
                       <>
-                        <Sync className="mr-2 h-4 w-4 animate-spin" />
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                         Syncing...
                       </>
                     ) : (
@@ -273,7 +272,7 @@ export default function HrisSync() {
                 >
                   {exportStatus === "loading" ? (
                     <>
-                      <Sync className="mr-2 h-4 w-4 animate-spin" />
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                       Generating Export...
                     </>
                   ) : (

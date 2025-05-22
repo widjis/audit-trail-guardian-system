@@ -2,7 +2,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/services/auth-service";
-import { UserCircle, LayoutDashboard, Upload, Users, LogOut, Settings, Sync, Server } from "lucide-react";
+import { UserCircle, LayoutDashboard, Upload, Users, LogOut, Settings, RefreshCw, Server } from "lucide-react";
 
 export function Sidebar() {
   const location = useLocation();
@@ -19,7 +19,7 @@ export function Sidebar() {
   
   // Admin-only navigation items
   const adminNavItems = [
-    { label: "HRIS Sync", path: "/hris-sync", icon: <Sync className="mr-2 h-4 w-4" /> },
+    { label: "HRIS Sync", path: "/hris-sync", icon: <RefreshCw className="mr-2 h-4 w-4" /> },
     { label: "Settings", path: "/settings", icon: <Settings className="mr-2 h-4 w-4" /> }
   ];
   
