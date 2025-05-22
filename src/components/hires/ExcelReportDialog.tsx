@@ -30,24 +30,24 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
     
     try {
       // Create CSV content with headers
-      let csvContent = "SRF No.,Name,Title,Department,License Type,Join Date\n";
+      let csvContent = "SRF No.,Name,Title,Department,License Type,Email,Join Date\n";
       
       // Add data rows
       selectedHires.forEach(hire => {
         const joinDate = hire.on_site_date ? 
           format(new Date(hire.on_site_date), 'dd/MM/yyyy') : 'N/A';
         const licenseType = hire.microsoft_365_license || "Not specified";
-        
-        // Format: SRF No. (empty), Name, Title, Department, License Type, Join Date
+        const email = hire.email || "";
+        // Format: SRF No. (empty), Name, Title, Department, License Type, Email, Join Date
         const row = [
           "", // SRF No. (empty as requested)
           hire.name,
           hire.title,
           hire.department,
           licenseType,
+          email,
           joinDate
         ];
-        
         // Properly escape fields for CSV format
         const escapedRow = row.map(field => {
           // If field contains commas or quotes, wrap in quotes and escape any quotes
@@ -56,7 +56,6 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
           }
           return field;
         });
-        
         csvContent += escapedRow.join(',') + "\n";
       });
       
@@ -104,6 +103,7 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
                     <TableHead>Title</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>License Type</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Join Date</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -115,6 +115,7 @@ export function ExcelReportDialog({ isOpen, onClose, selectedHires }: ExcelRepor
                       <TableCell>{hire.title}</TableCell>
                       <TableCell>{hire.department}</TableCell>
                       <TableCell>{hire.microsoft_365_license || "Not specified"}</TableCell>
+                      <TableCell>{hire.email || ""}</TableCell>
                       <TableCell>
                         {hire.on_site_date 
                           ? format(new Date(hire.on_site_date), 'dd/MM/yyyy')
