@@ -29,6 +29,15 @@ interface ActiveDirectorySettings {
   enabled: boolean;
 }
 
+interface HrisDatabaseConfig {
+  server: string;
+  port: string;
+  database: string;
+  username: string;
+  password: string;
+  enabled: boolean;
+}
+
 interface SettingsData {
   accountStatuses?: string[];
   mailingLists?: MailingList[];
@@ -36,6 +45,7 @@ interface SettingsData {
   mailingListDisplayAsDropdown?: boolean;
   whatsappSettings?: WhatsAppSettings;
   activeDirectorySettings?: ActiveDirectorySettings;
+  hrisDbConfig?: HrisDatabaseConfig;
 }
 
 // The API client already includes /api in its baseURL, so we don't need to include it again
@@ -101,6 +111,30 @@ export const settingsService = {
     const response = await apiClient.put<ActiveDirectorySettings>(
       `${SETTINGS_ENDPOINT}/active-directory`,
       settings
+    );
+    return response.data;
+  },
+
+  // Get HRIS database configuration
+  getHrisDatabaseConfig: async () => {
+    const response = await apiClient.get<HrisDatabaseConfig>(`${SETTINGS_ENDPOINT}/hris-database`);
+    return response.data;
+  },
+
+  // Update HRIS database configuration
+  updateHrisDatabaseConfig: async (config: HrisDatabaseConfig) => {
+    const response = await apiClient.put<{ success: boolean }>(
+      `${SETTINGS_ENDPOINT}/hris-database`,
+      config
+    );
+    return response.data;
+  },
+
+  // Test HRIS database connection
+  testHrisDatabaseConnection: async (config: HrisDatabaseConfig) => {
+    const response = await apiClient.post<{ success: boolean; message?: string; error?: string }>(
+      `${SETTINGS_ENDPOINT}/hris-database/test-connection`,
+      config
     );
     return response.data;
   }

@@ -8,7 +8,8 @@ import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSett
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
 import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
-import { Database, MessageSquare, Send, Users, Server } from "lucide-react";
+import { HrisDatabaseSettings } from "@/components/settings/HrisDatabaseSettings";
+import { Database, MessageSquare, Send, Users, Server, Cloud } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -38,6 +39,10 @@ export default function Settings() {
               <Database className="h-4 w-4" />
               <span>Database</span>
             </TabsTrigger>
+            <TabsTrigger value="hris-database" className="flex items-center gap-1">
+              <Cloud className="h-4 w-4" />
+              <span>HRIS Database</span>
+            </TabsTrigger>
             <TabsTrigger value="account-management" className="flex items-center gap-1">
               <Users className="h-4 w-4" />
               <span>ICT Support Accounts</span>
@@ -66,6 +71,10 @@ export default function Settings() {
           
           <TabsContent value="database" className="space-y-4">
             <DatabaseConfigSettings />
+          </TabsContent>
+          
+          <TabsContent value="hris-database" className="space-y-4">
+            <HrisDatabaseSettings />
           </TabsContent>
           
           <TabsContent value="account-management" className="space-y-4">

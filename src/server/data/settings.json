@@ -1,3 +1,4 @@
+
 {
   "accountStatuses": [
     "Pending",
@@ -69,5 +70,13 @@
     "protocol": "ldaps",
     "enabled": true,
     "authFormat": "dn"
+  },
+  "hrisDbConfig": {
+    "server": "10.1.1.75",
+    "port": "1433",
+    "database": "ORANGE-PROD",
+    "username": "IT.MTI",
+    "password": "",
+    "enabled": false
   }
 }
