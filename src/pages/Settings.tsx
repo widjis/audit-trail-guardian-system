@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
@@ -9,14 +9,13 @@ import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSett
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
 import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
-import { Database, MessageSquare, Send, Users, Server, Cloud } from "lucide-react";
+import { Database, MessageSquare, Users, Server, BadgeCheck } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Settings() {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("account-status");
 
-  // For mobile, we use a simpler layout with a dropdown or scrollable tabs
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -34,12 +33,21 @@ export default function Settings() {
           onValueChange={setActiveTab}
         >
           <div className={`${isMobile ? 'overflow-x-auto pb-2' : ''}`}>
-            <TabsList className={`${isMobile ? 'inline-flex w-max' : 'flex flex-wrap'}`}>
-              <TabsTrigger value="account-status">Account Status</TabsTrigger>
-              <TabsTrigger value="mailing-list">Mailing List</TabsTrigger>
-              <TabsTrigger value="departments">Departments</TabsTrigger>
+            <TabsList className={`${isMobile ? 'inline-flex w-max' : 'flex flex-wrap'} bg-slate-100`}>
+              <TabsTrigger value="account-status" className="flex items-center gap-1">
+                <BadgeCheck className="h-4 w-4" />
+                <span>Account Status</span>
+              </TabsTrigger>
+              <TabsTrigger value="mailing-list" className="flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" />
+                <span>Mailing List</span>
+              </TabsTrigger>
+              <TabsTrigger value="departments" className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                <span>Departments</span>
+              </TabsTrigger>
               <TabsTrigger value="whatsapp" className="flex items-center gap-1">
-                <Send className="h-4 w-4" />
+                <MessageSquare className="h-4 w-4" />
                 <span>WhatsApp</span>
               </TabsTrigger>
               <TabsTrigger value="active-directory" className="flex items-center gap-1">
@@ -52,7 +60,7 @@ export default function Settings() {
               </TabsTrigger>
               <TabsTrigger value="account-management" className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                <span>ICT Support Accounts</span>
+                <span>ICT Support</span>
               </TabsTrigger>
             </TabsList>
           </div>
