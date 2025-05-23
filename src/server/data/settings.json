@@ -1,4 +1,3 @@
-
 {
   "accountStatuses": [
     "Pending",
@@ -63,10 +62,10 @@
   },
   "activeDirectorySettings": {
     "server": "10.60.10.56",
-    "username": "CN=MTI Admin,OU=IT,OU=Merdeka Battery Materials,DC=mbma,DC=com",
-    "password": "MT!@T$1ng5h4n#2@24",
+    "username": "CN=MTI SysAdmin,OU=Testing Environment,OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com",
+    "password": "Sy54dm1n@#Mb25",
     "domain": "mbma.com",
-    "baseDN": "DC=mbma,DC=com",
+    "baseDN": "OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com",
     "protocol": "ldaps",
     "enabled": true,
     "authFormat": "dn"
@@ -76,7 +75,7 @@
     "port": "1433",
     "database": "ORANGE-PROD",
     "username": "IT.MTI",
-    "password": "",
-    "enabled": false
+    "password": "morowali",
+    "enabled": true
   }
 }
