@@ -1,4 +1,3 @@
-
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -14,7 +13,7 @@ import dbRoutes from './routes/database.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import adRoutes from './routes/active-directory.js';
 import logger from './utils/logger.js';
-import hrisSyncRouter from './routes/hris-sync.js';
+import hrisSyncRoutes from './routes/hris-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +38,7 @@ app.use('/api/settings', extractUser, settingsRoutes);
 app.use('/api/database', extractUser, dbRoutes);
 app.use('/api/whatsapp', extractUser, whatsappRoutes);
 app.use('/api/ad', extractUser, adRoutes);
-app.use('/api/hris-sync', hrisSyncRouter);
+app.use('/api/hris-sync', hrisSyncRoutes);
 
 // Simple healthcheck endpoint
 app.get('/api/health', (req, res) => {

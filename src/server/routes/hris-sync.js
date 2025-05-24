@@ -1,12 +1,14 @@
+
 // server/routes/hrisSyncRoutes.js
 
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { format } from 'date-fns';  // npm install date-fns
+import { format, addDays, addWeeks, addMonths, setHours, setMinutes, setSeconds } from 'date-fns';  // npm install date-fns
 import {
   syncToActiveDirectory,
+  syncSelectedUsersToAD,
   findUsersInAD,
   loadSettings
 } from '../services/hrisSyncService.js';
@@ -17,6 +19,72 @@ const __dirname  = path.dirname(__filename);
 
 const router = express.Router();
 
+// Schedule settings file path
+const scheduleSettingsPath = path.join(__dirname, '../data/scheduleSettings.json');
+
+// Helper function to load schedule settings
+function loadScheduleSettings() {
+  if (!fs.existsSync(scheduleSettingsPath)) {
+    const defaultSettings = {
+      enabled: false,
+      frequency: "daily",
+      lastRun: null,
+      nextRun: null
+    };
+    fs.writeFileSync(scheduleSettingsPath, JSON.stringify(defaultSettings, null, 2));
+    return defaultSettings;
+  }
+  return JSON.parse(fs.readFileSync(scheduleSettingsPath, 'utf8'));
+}
+
+// Helper function to save schedule settings
+function saveScheduleSettings(settings) {
+  fs.writeFileSync(scheduleSettingsPath, JSON.stringify(settings, null, 2));
+  return settings;
+}
+
+// Helper function to calculate the next run time based on frequency
+function calculateNextRunTime(frequency) {
+  const now = new Date();
+  let nextRun;
+  
+  switch (frequency) {
+    case 'daily':
+      // Next day at midnight
+      nextRun = addDays(now, 1);
+      nextRun = setHours(nextRun, 0);
+      nextRun = setMinutes(nextRun, 0);
+      nextRun = setSeconds(nextRun, 0);
+      break;
+    case 'weekly':
+      // Next Sunday at midnight
+      nextRun = addWeeks(now, 1);
+      // Set to Sunday (0)
+      while (nextRun.getDay() !== 0) {
+        nextRun = addDays(nextRun, 1);
+      }
+      nextRun = setHours(nextRun, 0);
+      nextRun = setMinutes(nextRun, 0);
+      nextRun = setSeconds(nextRun, 0);
+      break;
+    case 'monthly':
+      // 1st of next month at midnight
+      nextRun = addMonths(now, 1);
+      nextRun.setDate(1);
+      nextRun = setHours(nextRun, 0);
+      nextRun = setMinutes(nextRun, 0);
+      nextRun = setSeconds(nextRun, 0);
+      break;
+    default:
+      // Default to daily
+      nextRun = addDays(now, 1);
+      nextRun = setHours(nextRun, 0);
+      nextRun = setMinutes(nextRun, 0);
+      nextRun = setSeconds(nextRun, 0);
+  }
+  
+  return nextRun;
+}
 
 /**
  * Safely quote any CSV field.
@@ -107,6 +175,29 @@ router.get('/test', async (req, res) => {
 });
 
 /**
+ * POST /api/hris-sync/manual
+ * Syncs only selected users from the employeeIDs array
+ */
+router.post('/manual', async (req, res) => {
+  try {
+    const { employeeIDs } = req.body;
+    
+    if (!employeeIDs || !Array.isArray(employeeIDs) || employeeIDs.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid request: employeeIDs array required' 
+      });
+    }
+    
+    const { test, results } = await syncSelectedUsersToAD(employeeIDs);
+    res.json({ success: true, test, results });
+  } catch (err) {
+    console.error('[HRIS] /manual sync error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/hris-sync/
  * Runs a real sync (writes to AD) and returns JSON details of applied changes.
  */
@@ -116,6 +207,54 @@ router.post('/', async (req, res) => {
     res.json({ success: true, test, results });
   } catch (err) {
     console.error('[HRIS] / sync error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/hris-sync/schedule
+ * Gets the current schedule settings
+ */
+router.get('/schedule', (req, res) => {
+  try {
+    const settings = loadScheduleSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error('[HRIS] /schedule error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/hris-sync/schedule
+ * Updates schedule settings
+ */
+router.post('/schedule', (req, res) => {
+  try {
+    const { enabled, frequency } = req.body;
+    const settings = loadScheduleSettings();
+    
+    settings.enabled = enabled;
+    if (frequency) {
+      settings.frequency = frequency;
+    }
+    
+    // Calculate next run time if enabled
+    if (enabled) {
+      settings.nextRun = calculateNextRunTime(settings.frequency).toISOString();
+    } else {
+      settings.nextRun = null;
+    }
+    
+    saveScheduleSettings(settings);
+    
+    res.json({ 
+      success: true, 
+      settings,
+      nextRun: settings.nextRun
+    });
+  } catch (err) {
+    console.error('[HRIS] /schedule update error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

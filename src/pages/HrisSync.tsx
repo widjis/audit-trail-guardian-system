@@ -8,19 +8,48 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Database, Server, Users, RefreshCw, AlertTriangle } from "lucide-react";
+import { Database, Server, Users, RefreshCw, AlertTriangle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function HrisSync() {
   const [syncStatus, setSyncStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [manualSyncStatus, setManualSyncStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [syncResults, setSyncResults] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
+  const [nextScheduledRun, setNextScheduledRun] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Replace mock logic with real API call
+  // Selection handlers for checkboxes
+  const isSelected = (employeeID: string) => selectedUsers.includes(employeeID);
+  
+  const handleSelectOne = (employeeID: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(prev => [...prev, employeeID]);
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== employeeID));
+    }
+  };
+  
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(syncResults.map(row => row.employeeID));
+    } else {
+      setSelectedUsers([]);
+    }
+  };
+
+  // Test sync functionality
   const handleTestSync = async () => {
     setTestStatus("loading");
+    setSelectedUsers([]); // Clear previous selections
     try {
       const response = await fetch("/api/hris-sync/test");
       if (!response.ok) throw new Error("Failed to fetch test sync results");
@@ -41,27 +70,94 @@ export default function HrisSync() {
     }
   };
 
-  const handleRealSync = async () => {
-    setSyncStatus("loading");
+  // Manual sync for selected users
+  const handleManualSync = async () => {
+    if (selectedUsers.length === 0) return;
+    
+    setManualSyncStatus("loading");
     try {
-      const response = await fetch("/api/hris-sync/real", { method: "POST" });
-      if (!response.ok) throw new Error("Failed to perform real sync");
+      const response = await fetch("/api/hris-sync/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeIDs: selectedUsers })
+      });
+      
+      if (!response.ok) throw new Error("Failed to perform manual sync");
+      
       const data = await response.json();
       setSyncResults(data.results || []);
-      setSyncStatus("success");
+      setSelectedUsers([]);
+      setManualSyncStatus("success");
+      
       toast({
-        title: "Sync completed",
+        title: "Manual sync completed",
         description: `${data.results?.length || 0} users successfully updated in Active Directory`,
       });
     } catch (error) {
-      setSyncStatus("error");
+      setManualSyncStatus("error");
       toast({
-        title: "Sync failed",
+        title: "Manual sync failed",
         description: (error as Error).message,
         variant: "destructive",
       });
     }
   };
+
+  // Update schedule settings
+  const handleUpdateSchedule = async () => {
+    setSyncStatus("loading");
+    try {
+      const response = await fetch("/api/hris-sync/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          enabled: scheduleEnabled,
+          frequency: scheduleFrequency 
+        })
+      });
+      
+      if (!response.ok) throw new Error("Failed to update schedule");
+      
+      const data = await response.json();
+      setNextScheduledRun(data.nextRun || null);
+      setSyncStatus("success");
+      
+      toast({
+        title: "Schedule updated",
+        description: scheduleEnabled 
+          ? `HRIS sync will run ${scheduleFrequency}` 
+          : "Automatic sync is now disabled",
+      });
+    } catch (error) {
+      setSyncStatus("error");
+      toast({
+        title: "Failed to update schedule",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Load schedule settings on component mount
+  useState(() => {
+    const fetchScheduleSettings = async () => {
+      try {
+        const response = await fetch("/api/hris-sync/schedule");
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (data.success) {
+          setScheduleEnabled(data.settings.enabled);
+          setScheduleFrequency(data.settings.frequency);
+          setNextScheduledRun(data.settings.nextRun);
+        }
+      } catch (error) {
+        console.error("Failed to fetch schedule settings:", error);
+      }
+    };
+    
+    fetchScheduleSettings();
+  });
 
   const handleExportData = () => {
     setExportStatus("loading");
@@ -153,33 +249,65 @@ export default function HrisSync() {
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Real Sync</CardTitle>
+                  <CardTitle>Automated Sync</CardTitle>
                   <CardDescription>
-                    Perform actual synchronization to update Active Directory
+                    Configure automatic synchronization schedule
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    This will update Active Directory with current data from MyOrange HRIS,
-                    including departments, titles, and relationships.
-                  </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="auto-sync-enabled"
+                        checked={scheduleEnabled}
+                        onCheckedChange={setScheduleEnabled}
+                      />
+                      <Label htmlFor="auto-sync-enabled">Enable automatic sync</Label>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-frequency">Frequency</Label>
+                      <Select 
+                        value={scheduleFrequency} 
+                        onValueChange={setScheduleFrequency}
+                        disabled={!scheduleEnabled}
+                      >
+                        <SelectTrigger id="schedule-frequency" className="w-full">
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily at midnight</SelectItem>
+                          <SelectItem value="weekly">Weekly (Sunday at midnight)</SelectItem>
+                          <SelectItem value="monthly">Monthly (1st of month)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {nextScheduledRun && (
+                      <div className="pt-2 text-sm">
+                        <p className="font-medium">Next sync:</p>
+                        <p className="text-muted-foreground">
+                          {new Date(nextScheduledRun).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
                 <CardFooter>
                   <Button 
-                    onClick={handleRealSync} 
+                    onClick={handleUpdateSchedule} 
                     disabled={syncStatus === "loading"} 
-                    variant="destructive"
                     className="w-full"
                   >
                     {syncStatus === "loading" ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing...
+                        Updating Schedule...
                       </>
                     ) : (
                       <>
-                        <Users className="mr-2 h-4 w-4" />
-                        Perform Real Sync
+                        <Clock className="mr-2 h-4 w-4" />
+                        Update Schedule
                       </>
                     )}
                   </Button>
@@ -211,6 +339,12 @@ export default function HrisSync() {
                       <table className="min-w-[1200px] border text-xs">
                         <thead>
                           <tr>
+                            <th className="border px-2 py-1">
+                              <Checkbox 
+                                checked={syncResults.length > 0 && selectedUsers.length === syncResults.length} 
+                                onCheckedChange={handleSelectAll}
+                              />
+                            </th>
                             <th className="border px-2 py-1">EmployeeID</th>
                             <th className="border px-2 py-1">DisplayName</th>
                             <th className="border px-2 py-1">Department (Current)</th>
@@ -227,6 +361,12 @@ export default function HrisSync() {
                         <tbody>
                           {syncResults.map((row, idx) => (
                             <tr key={idx}>
+                              <td className="border px-2 py-1">
+                                <Checkbox 
+                                  checked={isSelected(row.employeeID)}
+                                  onCheckedChange={(checked) => handleSelectOne(row.employeeID, !!checked)}
+                                />
+                              </td>
                               <td className="border px-2 py-1">{row.employeeID}</td>
                               <td className="border px-2 py-1">{row.displayName}</td>
                               <td className="border px-2 py-1">{row.current.department}</td>
@@ -252,6 +392,28 @@ export default function HrisSync() {
                       </table>
                     </div>
                   </ScrollArea>
+                  
+                  {syncResults.length > 0 && selectedUsers.length > 0 && (
+                    <div className="mt-4">
+                      <Button 
+                        onClick={handleManualSync}
+                        disabled={manualSyncStatus === "loading" || selectedUsers.length === 0}
+                        variant="default"
+                      >
+                        {manualSyncStatus === "loading" ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Syncing Selected Users...
+                          </>
+                        ) : (
+                          <>
+                            <Users className="mr-2 h-4 w-4" />
+                            Sync Selected Users ({selectedUsers.length})
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

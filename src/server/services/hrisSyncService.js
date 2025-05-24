@@ -1,3 +1,4 @@
+
 // server/services/hrisSyncService.js
 
 import fs from 'fs';
@@ -161,8 +162,6 @@ export async function findUsersInAD(baseDN) {
 /**
  * Main sync function: dry-run or real apply
  */
-// Remove the inline diff/apply blocks and replace with calls to our helpers
-
 export async function syncToActiveDirectory(testOnly = true) {
   const { activeDirectorySettings: ad } = loadSettings();
   const adBaseDN = ad.baseDN;
@@ -219,14 +218,6 @@ export async function syncToActiveDirectory(testOnly = true) {
       // 4) If no diffs, skip
       if (Object.keys(diffs).length === 0) continue;
 
-      // 5) Record result
-      // syncResults.push({
-      //   employeeID: empId,
-      //   displayName: adUser.displayName,
-      //   diffs,
-      //   action: testOnly ? 'Test' : 'Updated'
-      // });
-
       //5) Record result, include current values
       syncResults.push({
         employeeID: empId,
@@ -254,6 +245,91 @@ export async function syncToActiveDirectory(testOnly = true) {
   return { test: testOnly, results: syncResults };
 }
 
+/**
+ * Sync selected users to Active Directory
+ * @param {string[]} employeeIDs - Array of employee IDs to sync
+ */
+export async function syncSelectedUsersToAD(employeeIDs) {
+  const { activeDirectorySettings: ad } = loadSettings();
+  const adBaseDN = ad.baseDN;
+  
+  // Get data from both sources
+  const [dbUsers, adUsers] = await Promise.all([
+    gatherEmployeeData(),
+    findUsersInAD(adBaseDN)
+  ]);
+  
+  // Filter dbUsers to only include selected employeeIDs
+  const selectedDbUsers = dbUsers.filter(user => 
+    employeeIDs.includes(user.employee_id)
+  );
+  
+  const syncResults = [];
+  
+  for (const row of selectedDbUsers) {
+    try {
+      const empId = row.employee_id;
+      const empName = row.employee_name?.trim();
+      const empGender = row.gender;
+      
+      if (!empName) continue;
+      
+      // Find matching AD user
+      let adUser = adUsers.find(u => u.employeeID === empId);
+      
+      if (!adUser) {
+        // Fuzzy fallback
+        const fuzzy = fuzzyMatchAdUser(adUsers, empName);
+        if (fuzzy) {
+          adUser = fuzzy;
+          await ldapModify(fuzzy.dn, [
+            { operation:'replace', modification:{ employeeID: empId } },
+            { operation:'replace', modification:{ gender: empGender } }
+          ]);
+        }
+      }
+      
+      if (!adUser) {
+        console.warn(`No AD match for ${empName}`);
+        continue;
+      }
+      
+      // Compute diffs
+      const diffs = computeDiffs(row, adUser);
+      
+      // Manager diff
+      if (row.supervisor_id && isValidEmployeeId(row.supervisor_id)) {
+        const mgrDN = await ldapGetDn(row.supervisor_id);
+        if (mgrDN && mgrDN !== adUser.manager) {
+          diffs.manager = mgrDN;
+        }
+      }
+      
+      if (Object.keys(diffs).length === 0) continue;
+      
+      // Record result with current values
+      syncResults.push({
+        employeeID: empId,
+        displayName: adUser.displayName || "",
+        current: {
+          department: adUser.department || "",
+          title: adUser.title || "",
+          manager: adUser.manager || "",
+          mobile: adUser.mobile || ""
+        },
+        diffs,
+        action: 'Updated'
+      });
+      
+      // Apply changes to AD
+      await applyDiffs(adUser, diffs, adBaseDN);
+    } catch (err) {
+      console.error(`Error processing ${row.employee_id}:`, err);
+    }
+  }
+  
+  return { test: false, results: syncResults };
+}
 
 /**
  * Optional: export HRIS vs AD comparison to CSV
