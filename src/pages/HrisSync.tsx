@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Database, Server, Users, RefreshCw } from "lucide-react";
+import { Database, Server, Users, RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function HrisSync() {
@@ -77,6 +78,11 @@ export default function HrisSync() {
       element.click();
       document.body.removeChild(element);
     }, 2000);
+  };
+
+  // Helper function to determine if a cell should be highlighted
+  const shouldHighlight = (currentValue: any, newValue: any): boolean => {
+    return newValue !== undefined && newValue !== null && newValue !== currentValue;
   };
 
   return (
@@ -190,6 +196,16 @@ export default function HrisSync() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Legend for highlighted cells */}
+                  <div className="mb-4 flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-1">
+                      <div className="h-4 w-4 rounded bg-yellow-100 border border-yellow-300"></div>
+                      <span>New Value</span>
+                    </div>
+                    <AlertTriangle className="ml-2 h-4 w-4 text-amber-500" />
+                    <span className="text-muted-foreground">Highlighted cells indicate changes that will be applied</span>
+                  </div>
+                  
                   <ScrollArea style={{ width: '100%' }}>
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                       <table className="min-w-[1200px] border text-xs">
@@ -214,13 +230,21 @@ export default function HrisSync() {
                               <td className="border px-2 py-1">{row.employeeID}</td>
                               <td className="border px-2 py-1">{row.displayName}</td>
                               <td className="border px-2 py-1">{row.current.department}</td>
-                              <td className="border px-2 py-1">{row.diffs.department}</td>
+                              <td className={`border px-2 py-1 ${shouldHighlight(row.current.department, row.diffs.department) ? 'bg-yellow-100 font-medium border-yellow-300' : ''}`}>
+                                {row.diffs.department}
+                              </td>
                               <td className="border px-2 py-1">{row.current.title}</td>
-                              <td className="border px-2 py-1">{row.diffs.title}</td>
+                              <td className={`border px-2 py-1 ${shouldHighlight(row.current.title, row.diffs.title) ? 'bg-yellow-100 font-medium border-yellow-300' : ''}`}>
+                                {row.diffs.title}
+                              </td>
                               <td className="border px-2 py-1">{row.current.manager}</td>
-                              <td className="border px-2 py-1">{row.diffs.manager}</td>
+                              <td className={`border px-2 py-1 ${shouldHighlight(row.current.manager, row.diffs.manager) ? 'bg-yellow-100 font-medium border-yellow-300' : ''}`}>
+                                {row.diffs.manager}
+                              </td>
                               <td className="border px-2 py-1">{row.current.mobile}</td>
-                              <td className="border px-2 py-1">{row.diffs.mobile}</td>
+                              <td className={`border px-2 py-1 ${shouldHighlight(row.current.mobile, row.diffs.mobile) ? 'bg-yellow-100 font-medium border-yellow-300' : ''}`}>
+                                {row.diffs.mobile}
+                              </td>
                               <td className="border px-2 py-1">{row.action}</td>
                             </tr>
                           ))}
