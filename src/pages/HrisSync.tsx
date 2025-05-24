@@ -17,92 +17,65 @@ export default function HrisSync() {
   const [syncResults, setSyncResults] = useState<any[]>([]);
   const { toast } = useToast();
 
-  // These functions would be connected to actual API endpoints in a real implementation
-  const handleTestSync = () => {
+  // Replace mock logic with real API call
+  const handleTestSync = async () => {
     setTestStatus("loading");
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/hris-sync/test");
+      if (!response.ok) throw new Error("Failed to fetch test sync results");
+      const data = await response.json();
+      setSyncResults(data.results || []);
       setTestStatus("success");
-      setSyncResults([
-        {
-          employeeId: "MTI230279",
-          displayName: "John Smith",
-          departmentCurrent: "IT",
-          departmentNew: "ICT",
-          titleCurrent: "Software Developer",
-          titleNew: "Senior Developer",
-          action: "Test"
-        },
-        {
-          employeeId: "MTI230280",
-          displayName: "Jane Doe",
-          departmentCurrent: "HR",
-          departmentNew: null,
-          titleCurrent: "HR Specialist",
-          titleNew: "HR Manager",
-          action: "Test"
-        }
-      ]);
       toast({
         title: "Test sync completed",
-        description: "2 users would be updated in Active Directory",
+        description: `${data.results?.length || 0} users would be updated in Active Directory`,
       });
-    }, 2000);
+    } catch (error) {
+      setTestStatus("error");
+      toast({
+        title: "Test sync failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRealSync = () => {
+  const handleRealSync = async () => {
     setSyncStatus("loading");
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/hris-sync/real", { method: "POST" });
+      if (!response.ok) throw new Error("Failed to perform real sync");
+      const data = await response.json();
+      setSyncResults(data.results || []);
       setSyncStatus("success");
-      setSyncResults([
-        {
-          employeeId: "MTI230279",
-          displayName: "John Smith",
-          departmentCurrent: "IT",
-          departmentNew: "ICT",
-          titleCurrent: "Software Developer",
-          titleNew: "Senior Developer",
-          action: "Updated"
-        },
-        {
-          employeeId: "MTI230280",
-          displayName: "Jane Doe",
-          departmentCurrent: "HR",
-          departmentNew: null,
-          titleCurrent: "HR Specialist",
-          titleNew: "HR Manager",
-          action: "Updated"
-        }
-      ]);
       toast({
         title: "Sync completed",
-        description: "2 users successfully updated in Active Directory",
+        description: `${data.results?.length || 0} users successfully updated in Active Directory`,
       });
-    }, 3000);
+    } catch (error) {
+      setSyncStatus("error");
+      toast({
+        title: "Sync failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportData = () => {
     setExportStatus("loading");
-    
-    // Simulate API call
     setTimeout(() => {
       setExportStatus("success");
       toast({
         title: "Export completed",
         description: "Data comparison exported successfully",
       });
-      
-      // In a real implementation, this would trigger a file download
       const element = document.createElement("a");
       element.href = "data:text/csv;charset=utf-8," + encodeURIComponent("employee_id,employeeID,employee_name,displayName\nMTI230279,MTI230279,John Smith,John Smith\nMTI230280,MTI230280,Jane Doe,Jane Doe");
       element.download = "orange_vs_ad_comparison.csv";
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
-      
     }, 2000);
   };
 
@@ -217,33 +190,43 @@ export default function HrisSync() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-[300px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee ID</TableHead>
-                          <TableHead>Display Name</TableHead>
-                          <TableHead>Current Dept.</TableHead>
-                          <TableHead>New Dept.</TableHead>
-                          <TableHead>Current Title</TableHead>
-                          <TableHead>New Title</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {syncResults.map((result, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{result.employeeId}</TableCell>
-                            <TableCell>{result.displayName}</TableCell>
-                            <TableCell>{result.departmentCurrent}</TableCell>
-                            <TableCell>{result.departmentNew || "—"}</TableCell>
-                            <TableCell>{result.titleCurrent}</TableCell>
-                            <TableCell>{result.titleNew || "—"}</TableCell>
-                            <TableCell>{result.action}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <ScrollArea style={{ width: '100%' }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                      <table className="min-w-[1200px] border text-xs">
+                        <thead>
+                          <tr>
+                            <th className="border px-2 py-1">EmployeeID</th>
+                            <th className="border px-2 py-1">DisplayName</th>
+                            <th className="border px-2 py-1">Department (Current)</th>
+                            <th className="border px-2 py-1">Department (New)</th>
+                            <th className="border px-2 py-1">Title (Current)</th>
+                            <th className="border px-2 py-1">Title (New)</th>
+                            <th className="border px-2 py-1">Manager (Current)</th>
+                            <th className="border px-2 py-1">Manager (New)</th>
+                            <th className="border px-2 py-1">Phone (Current)</th>
+                            <th className="border px-2 py-1">Phone (New)</th>
+                            <th className="border px-2 py-1">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {syncResults.map((row, idx) => (
+                            <tr key={idx}>
+                              <td className="border px-2 py-1">{row.employeeID}</td>
+                              <td className="border px-2 py-1">{row.displayName}</td>
+                              <td className="border px-2 py-1">{row.departmentCurrent}</td>
+                              <td className="border px-2 py-1">{row.departmentNew}</td>
+                              <td className="border px-2 py-1">{row.titleCurrent}</td>
+                              <td className="border px-2 py-1">{row.titleNew}</td>
+                              <td className="border px-2 py-1">{row.managerCurrent}</td>
+                              <td className="border px-2 py-1">{row.managerNew}</td>
+                              <td className="border px-2 py-1">{row.mobileCurrent}</td>
+                              <td className="border px-2 py-1">{row.mobileNew}</td>
+                              <td className="border px-2 py-1">{row.action}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>

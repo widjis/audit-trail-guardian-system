@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import mssql from 'mssql';
+import Fuse from 'fuse.js';
 import { fileURLToPath } from 'url';
 import {
   search as ldapSearch,
@@ -11,22 +12,16 @@ import {
   moveDN as ldapMoveDn
 } from '../lib/ldapService.js';
 
-// Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname  = path.dirname(__filename);
 
-/**
- * Load settings.json from server/data
- */
+/** ─── Helpers ────────────────────────────────────────────────────────────── */
+
+/** Load and parse settings.json */
 export function loadSettings() {
-  const settingsPath = path.join(__dirname, '../data/settings.json');
-  console.log(`[HRIS] Loading settings from: ${settingsPath}`);
-  if (!fs.existsSync(settingsPath)) {
-    console.error(`[HRIS] settings.json not found at ${settingsPath}`);
-    throw new Error(`settings.json not found at ${settingsPath}`);
-  }
-  console.log(`[HRIS] settings.json loaded successfully.`);
-  return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const cfg = path.join(__dirname, '../data/settings.json');
+  if (!fs.existsSync(cfg)) throw new Error(`settings.json not found at ${cfg}`);
+  return JSON.parse(fs.readFileSync(cfg, 'utf8'));
 }
 
 /** Validate MTI employee ID like 'MTI123456' */
@@ -38,146 +33,255 @@ function isValidEmployeeId(id) {
 function isValidPhoneNumber(num) {
   if (!num) return false;
   const cleaned = String(num).replace(/[^\d+]/g, '');
-  const digits = cleaned.replace(/^\+/, '');
+  const digits  = cleaned.replace(/^\+/, '');
   return digits.length >= 10 && digits.length <= 15 && /^(?:0|62)/.test(digits);
 }
 
 /** Standardize phone to '62...' */
 function standardizePhoneNumber(num) {
-  const digits = String(num).replace(/[^\d]/g, '');
+  const digits = String(num).replace(/\D/g, '');
   return digits.startsWith('62') ? digits : '62' + digits.replace(/^0+/, '');
 }
 
 /**
- * Fetch HRIS employee data from SQL Server
+ * Fuzzy-match an AD user by name
+ * @param {Array} adUsers – list of objects with a `name` property
+ * @param {string} targetName
+ * @param {number} threshold – max Fuse.js score (lower = better)
  */
-export async function gatherEmployeeData() {
-  const { hrisDbConfig: hris } = loadSettings();
-  console.log(`[HRIS] HRIS DB Config:`, hris);
-  if (!hris.enabled) {
-    console.warn('[HRIS] HRIS sync is disabled in settings.json');
-    throw new Error('HRIS sync is disabled in settings.json');
-  }
-
-  console.log(`[HRIS] Connecting to SQL Server: ${hris.server}:${hris.port}, DB: ${hris.database}`);
-  let pool;
-  try {
-    pool = await mssql.connect({
-      server: hris.server,
-      port: parseInt(hris.port, 10),
-      database: hris.database,
-      user: hris.username,
-      password: hris.password,
-      options: { encrypt: false, trustServerCertificate: true }
-    });
-    console.log('[HRIS] SQL Server connection established.');
-  } catch (err) {
-    console.error('[HRIS] Failed to connect to SQL Server:', err);
-    throw err;
-  }
-
-  const schema = hris.schema || 'dbo';
-  const sql = `
-    SELECT *
-      FROM [${schema}].[it_mti_employee_database_tbl]
-     WHERE grade_interval <> 'Non Staff'
-  `;
-  console.log(`[HRIS] Executing SQL: ${sql}`);
-  let result;
-  try {
-    result = await pool.request().query(sql);
-    console.log(`[HRIS] Query successful. Rows fetched: ${result.recordset.length}`);
-  } catch (err) {
-    console.error('[HRIS] SQL query failed:', err);
-    throw err;
-  } finally {
-    await pool.close();
-    console.log('[HRIS] SQL Server connection closed.');
-  }
-  return result.recordset;
+function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.3) {
+  const fuse = new Fuse(adUsers, {
+    keys: ['name'],
+    threshold,
+    distance: 100,
+    includeScore: true
+  });
+  const [best] = fuse.search(targetName);
+  return best && best.score <= threshold ? best.item : null;
 }
 
 /**
- * Fetch users from Active Directory
+ * Compute LDAP diffs between one DB row and one AD user
+ * @returns {Object} diffs map
+ */
+function computeDiffs(dbRow, adUser) {
+  const diffs = {};
+
+  if (dbRow.department !== adUser.department) {
+    diffs.department = dbRow.department;
+    console.log(`[DIFF] Department mismatch for ${dbRow.employee_id}: DB="${dbRow.department}" AD="${adUser.department}"`);
+  }
+  if (dbRow.position_title !== adUser.title) {
+    diffs.title = dbRow.position_title;
+    console.log(`[DIFF] Title mismatch for ${dbRow.employee_id}: DB="${dbRow.position_title}" AD="${adUser.title}"`);
+  }
+
+  // if (dbRow.supervisor_id && isValidEmployeeId(dbRow.supervisor_id)) {
+  //   diffs.manager = null; // placeholder—will fill below
+  //   console.log(`[DIFF] Supervisor/Manager check for ${dbRow.employee_id}: DB supervisor_id="${dbRow.supervisor_id}"`);
+  // }
+
+  if (isValidPhoneNumber(dbRow.phone)) {
+    const std = standardizePhoneNumber(dbRow.phone);
+    if (std !== adUser.mobile) {
+      diffs.mobile = std;
+      console.log(`[DIFF] Mobile mismatch for ${dbRow.employee_id}: DB="${std}" AD="${adUser.mobile}"`);
+    }
+  }
+
+  return diffs;
+}
+
+/** Apply the computed diffs to AD (modify + optional move) */
+async function applyDiffs(adUser, diffs, adBaseDN) {
+  const mods = Object.entries(diffs).map(
+    ([attr, val]) => ({ operation: 'replace', modification: { [attr]: val } })
+  );
+  await ldapModify(adUser.dn, mods);
+
+  if (diffs.department) {
+    const newOU = `OU=${diffs.department},${adBaseDN}`;
+    await ldapMoveDn(adUser.dn, newOU);
+  }
+}
+
+/**
+ * Fetch HRIS rows from SQL Server
+ */
+export async function gatherEmployeeData() {
+  const { hrisDbConfig } = loadSettings();
+  if (!hrisDbConfig.enabled) throw new Error('HRIS sync disabled in settings.json');
+
+  const pool = await mssql.connect({
+    server: hrisDbConfig.server,
+    port:   parseInt(hrisDbConfig.port, 10),
+    database: hrisDbConfig.database,
+    user:     hrisDbConfig.username,
+    password: hrisDbConfig.password,
+    options: { encrypt: false, trustServerCertificate: true }
+  });
+  const schema = hrisDbConfig.schema || 'dbo';
+  const sql = `
+    SELECT *
+      FROM [${schema}].[it_mti_employee_database_tbl]
+     WHERE grade_interval <> 'Non Staff';`;
+
+  const { recordset } = await pool.request().query(sql);
+  await pool.close();
+  return recordset;
+}
+
+/**
+ * Fetch and normalize AD users under a given baseDN
  */
 export async function findUsersInAD(baseDN) {
-  const settings = loadSettings();
-  console.log(`[HRIS] LDAP RAW dump — searching under baseDN: ${baseDN}`);
+  // raw check
+  const raw = await ldapSearch(baseDN, '(objectClass=user)', ['dn']);
+  console.info(`Raw AD entries: ${raw.length}`);
 
-  // Broad filter to fetch any user objects
-  const rawEntries = await ldapSearch(baseDN, '(objectClass=user)', []);
-  console.log('[HRIS] Sample raw LDAP entries:', rawEntries.slice(0, 5));
-  console.log(`[HRIS] Total raw LDAP entries returned: ${rawEntries.length}`);
-
-  // Now refine with specific filter and attributes
+  // refined fetch
   const filter = '(&(objectClass=user)(objectCategory=user))';
-  const attrs = ['sAMAccountName','displayName','employeeID','department','title','manager','mobile','distinguishedName'];
+  const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','dn'];
   const entries = await ldapSearch(baseDN, filter, attrs);
 
-  console.log(`[HRIS] Refined LDAP entries found: ${entries.length}`);
-  entries.slice(0,5).forEach((o,i) => {
-    console.log(`[HRIS] Entry ${i+1}:`, 'keys=', Object.keys(o));
-  });
-
-  return entries.map(o => ({
-    sAMAccountName: o.sAMAccountName,
-    displayName:    o.displayName,
-    employeeID:     o.employeeID,
-    department:     o.department,
-    title:          o.title,
-    manager:        o.manager,
-    mobile:         o.mobile,
-    dn:             o.distinguishedName
+  // map into consistent shape
+  return entries.map(e => ({
+    sAMAccountName: e.sAMAccountName,
+    displayName:    e.displayName,
+    name:           e.name,
+    employeeID:     e.employeeID,
+    department:     e.department,
+    title:          e.title,
+    manager:        e.manager,
+    mobile:         e.mobile,
+    dn:             e.dn
   }));
 }
 
 /**
- * Sync HRIS data into Active Directory
+ * Main sync function: dry-run or real apply
  */
+// Remove the inline diff/apply blocks and replace with calls to our helpers
+
 export async function syncToActiveDirectory(testOnly = true) {
   const { activeDirectorySettings: ad } = loadSettings();
-  console.log(`[HRIS] Starting sync. testOnly=${testOnly}`);
+  const adBaseDN = ad.baseDN;
 
   const [dbUsers, adUsers] = await Promise.all([
     gatherEmployeeData(),
-    findUsersInAD(ad.baseDN)
+    findUsersInAD(adBaseDN)
   ]);
-  console.log(`[HRIS] Fetched ${dbUsers.length} DB users and ${adUsers.length} AD users.`);
 
-  const results = [];
+  const syncResults = [];
+
   for (const row of dbUsers) {
-    const empId = row.employee_id;
-    if (!isValidEmployeeId(empId)) continue;
+    try {
+      const empId   = row.employee_id;
+      const empName = row.employee_name?.trim();
+      const empGender = row.gender;
 
-    const match = adUsers.find(u => u.employeeID === empId);
-    if (!match) continue;
+      if (!empName) continue;
 
-    const wantedMgr = row.supervisor_id && isValidEmployeeId(row.supervisor_id)
-      ? await ldapGetDn(row.supervisor_id)
-      : null;
+      // 1) Exact match
+      let adUser = adUsers.find(u => u.employeeID === empId);
 
-    const diffs = {};
-    if (row.department !== match.department) diffs.department = row.department;
-    if (row.position_title !== match.title)   diffs.title      = row.position_title;
-    if (wantedMgr && wantedMgr !== match.manager) diffs.manager = wantedMgr;
-    if (isValidPhoneNumber(row.phone)) {
-      const stdPhone = standardizePhoneNumber(row.phone);
-      if (stdPhone !== match.mobile) diffs.mobile = stdPhone;
-    }
-
-    if (Object.keys(diffs).length) {
-      results.push({ employeeID: empId, displayName: match.displayName, diffs });
-      if (!testOnly) {
-        const mods = Object.entries(diffs).map(([attr,val]) => ({ operation:'replace', modification:{ [attr]: val } }));
-        await ldapModify(match.dn, mods);
-        if (diffs.department) {
-          const newParent = `OU=${diffs.department},${ad.baseDN}`;
-          await ldapMoveDn(match.dn, newParent);
+      // 2) Fuzzy fallback
+      if (!adUser) {
+        const fuzzy = fuzzyMatchAdUser(adUsers, empName);
+        if (fuzzy) {
+          adUser = fuzzy;
+          if (!testOnly) {
+            await ldapModify(fuzzy.dn, [
+              { operation:'replace', modification:{ employeeID: empId } },
+              { operation:'replace', modification:{ gender: empGender } }
+            ]);
+          }
         }
       }
+
+      // **Guard against still‐undefined** adUser
+      if (!adUser) {
+        console.warn(`No AD match for ${empName}`);
+        continue;
+      }
+
+      // 3) Compute diffs
+      const diffs = computeDiffs(row, adUser);
+
+      // Manager diff (outside computeDiffs for async lookup)
+      if (row.supervisor_id && isValidEmployeeId(row.supervisor_id)) {
+        const mgrDN = await ldapGetDn(row.supervisor_id);
+        if (mgrDN && mgrDN !== adUser.manager) {
+          diffs.manager = mgrDN;
+        }
+      }
+
+      // 4) If no diffs, skip
+      if (Object.keys(diffs).length === 0) continue;
+
+      // 5) Record result
+      // syncResults.push({
+      //   employeeID: empId,
+      //   displayName: adUser.displayName,
+      //   diffs,
+      //   action: testOnly ? 'Test' : 'Updated'
+      // });
+
+      //5) Record result, include current values
+      syncResults.push({
+        employeeID: empId,
+        displayName: adUser.displayName || "",
+        current: {
+          department: adUser.department || "",
+          title:      adUser.title || "",
+          manager:    adUser.manager || "",
+          mobile:     adUser.mobile || ""
+        },
+        diffs,
+        action: testOnly ? 'Test' : 'Updated'
+      });
+
+      // 6) Apply to AD if not testOnly
+      if (!testOnly) {
+        await applyDiffs(adUser, diffs, adBaseDN);
+      }
+
+    } catch (err) {
+      console.error(`Error processing ${row.employee_id}:`, err);
     }
   }
 
-  console.log(`[HRIS] Sync complete. ${results.length} changes.`);
-  return { test: testOnly, results };
+  return { test: testOnly, results: syncResults };
+}
+
+
+/**
+ * Optional: export HRIS vs AD comparison to CSV
+ */
+export async function exportComparisonCsv(outputPath) {
+  const cfg = loadSettings();
+  const [dbUsers, adUsers] = await Promise.all([
+    gatherEmployeeData(),
+    findUsersInAD(cfg.activeDirectorySettings.baseDN)
+  ]);
+
+  // merge on employeeID
+  const merged = dbUsers.map(d => {
+    const ad = adUsers.find(u => u.employeeID === d.employee_id) || {};
+    return {
+      employee_id:   d.employee_id,
+      employee_name: d.employee_name,
+      department_db: d.department,
+      department_ad: ad.department,
+      title_db:      d.position_title,
+      title_ad:      ad.title,
+      phone_db:      d.phone,
+      mobile_ad:     ad.mobile
+    };
+  });
+
+  // write CSV
+  const header = Object.keys(merged[0]).join(',');
+  const rows   = merged.map(r => Object.values(r).map(v => `"${v||''}"`).join(','));
+  fs.writeFileSync(outputPath, [header, ...rows].join('\n'));
 }
