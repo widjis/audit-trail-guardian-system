@@ -213,14 +213,14 @@ export default function HrisSync() {
                             <tr key={idx}>
                               <td className="border px-2 py-1">{row.employeeID}</td>
                               <td className="border px-2 py-1">{row.displayName}</td>
-                              <td className="border px-2 py-1">{row.departmentCurrent}</td>
-                              <td className="border px-2 py-1">{row.departmentNew}</td>
-                              <td className="border px-2 py-1">{row.titleCurrent}</td>
-                              <td className="border px-2 py-1">{row.titleNew}</td>
-                              <td className="border px-2 py-1">{row.managerCurrent}</td>
-                              <td className="border px-2 py-1">{row.managerNew}</td>
-                              <td className="border px-2 py-1">{row.mobileCurrent}</td>
-                              <td className="border px-2 py-1">{row.mobileNew}</td>
+                              <td className="border px-2 py-1">{row.current.department}</td>
+                              <td className="border px-2 py-1">{row.diffs.department}</td>
+                              <td className="border px-2 py-1">{row.current.title}</td>
+                              <td className="border px-2 py-1">{row.diffs.title}</td>
+                              <td className="border px-2 py-1">{row.current.manager}</td>
+                              <td className="border px-2 py-1">{row.diffs.manager}</td>
+                              <td className="border px-2 py-1">{row.current.mobile}</td>
+                              <td className="border px-2 py-1">{row.diffs.mobile}</td>
                               <td className="border px-2 py-1">{row.action}</td>
                             </tr>
                           ))}
