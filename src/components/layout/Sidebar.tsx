@@ -1,8 +1,18 @@
-
 import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/services/auth-service";
-import { UserCircle, LayoutDashboard, Upload, Users, LogOut, Settings, RefreshCw, Server } from "lucide-react";
+import {
+  UserCircle,
+  LayoutDashboard,
+  Upload,
+  Users,
+  LogOut,
+  Settings,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 export function Sidebar() {
   const location = useLocation();
@@ -10,57 +20,121 @@ export function Sidebar() {
   const user = getCurrentUser();
   const isAdmin = user?.role === "admin";
 
-  // Define navigation items
-  const commonNavItems = [
-    { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
-    { label: "New Hires", path: "/hires", icon: <Users className="mr-2 h-4 w-4" /> },
-    { label: "Import Data", path: "/import", icon: <Upload className="mr-2 h-4 w-4" /> },
+  // Collapse state
+  const [collapsed, setCollapsed] = useState(false);
+  const toggleSidebar = () => setCollapsed((v) => !v);
+
+  // Navigation items
+  interface NavItem {
+    label: string;
+    path: string;
+    icon: React.ReactNode;
+  }
+  const commonNavItems: NavItem[] = [
+    {
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: "New Hires",
+      path: "/hires",
+      icon: <Users className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: "Import Data",
+      path: "/import",
+      icon: <Upload className="mr-2 h-4 w-4" />,
+    },
   ];
-  
-  // Admin-only navigation items
-  const adminNavItems = [
-    { label: "HRIS Sync", path: "/hris-sync", icon: <RefreshCw className="mr-2 h-4 w-4" /> },
-    { label: "Settings", path: "/settings", icon: <Settings className="mr-2 h-4 w-4" /> }
+  const adminNavItems: NavItem[] = [
+    {
+      label: "HRIS Sync",
+      path: "/hris-sync",
+      icon: <RefreshCw className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: "Settings",
+      path: "/settings",
+      icon: <Settings className="mr-2 h-4 w-4" />,
+    },
   ];
-  
-  // Combine navigation items based on user role
-  const navItems = isAdmin 
+  const navItems = isAdmin
     ? [...commonNavItems, ...adminNavItems]
     : commonNavItems;
 
+  // Active route detection
+  const isActive = (path: string) => location.pathname.startsWith(path);
+
   return (
-    <div className="h-full min-h-screen flex flex-col bg-audit-blue text-white min-w-64 w-auto max-w-80 py-4">
-      <div className="px-4 mb-6">
-        <h1 className="text-2xl font-bold">MTI Onboarding Workflow</h1>
-        <p className="text-sm opacity-75">New Hire Management</p>
+    <div
+      className={`
+        h-full min-h-screen flex flex-col bg-audit-blue text-white
+        transition-all duration-200
+        ${collapsed ? "w-16" : "w-64"}
+      `}
+    >
+      {/* Header + Toggle */}
+      <div className="flex items-center justify-between px-3 py-4">
+        {!collapsed && (
+          <div>
+            <h1 className="text-2xl font-bold">MTI Onboarding</h1>
+            <p className="text-sm opacity-75">New Hire Management</p>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="p-2"
+        >
+          {collapsed ? <ChevronRight /> : <ChevronLeft />}
+        </Button>
       </div>
 
-      <div className="flex-1">
+      {/* Nav Links */}
+      <div className="flex-1 overflow-hidden">
         <nav className="space-y-1 px-2">
           {navItems.map((item) => (
             <Link to={item.path} key={item.path}>
-              <Button 
-                variant={location.pathname.startsWith(item.path) ? "secondary" : "ghost"} 
-                className={`w-full justify-start ${location.pathname.startsWith(item.path) ? 'bg-audit-lightBlue text-white' : 'text-white hover:bg-audit-lightBlue hover:text-white'}`}
+              <Button
+                variant={isActive(item.path) ? "secondary" : "ghost"}
+                className={`
+                  w-full justify-start
+                  ${isActive(item.path)
+                    ? "bg-audit-lightBlue text-white"
+                    : "text-white hover:bg-audit-lightBlue hover:text-white"}
+                `}
+                aria-current={isActive(item.path) ? "page" : undefined}
               >
                 {item.icon}
-                {item.label}
+                {!collapsed && item.label}
               </Button>
             </Link>
           ))}
         </nav>
       </div>
 
-      <div className="border-t border-audit-lightBlue pt-4 px-4">
+      {/* Footer */}
+      <div
+        className={`
+          border-t border-audit-lightBlue pt-4 px-4
+          transition-opacity duration-200
+          ${collapsed ? "opacity-0 pointer-events-none" : "opacity-100"}
+        `}
+      >
         <div className="flex items-center mb-4 px-2">
           <UserCircle className="h-6 w-6 min-w-6 mr-2" />
           <div className="overflow-hidden">
-            <p className="font-medium truncate">{user?.username || "User"}</p>
+            <p className="font-medium truncate">
+              {user?.username || "User"}
+            </p>
             <p className="text-xs opacity-75">{user?.role || "Role"}</p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="w-full justify-start text-white hover:bg-audit-lightBlue hover:text-white"
           onClick={logout}
         >

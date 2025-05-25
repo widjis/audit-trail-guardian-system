@@ -289,8 +289,8 @@ export function HiresTable() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col h-screen">
+      <div className="flex-shrink-0 flex justify-between items-center p-4 bg-white border-b">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -334,8 +334,8 @@ export function HiresTable() {
             : "No records available. Import or add new hires."}
         </div>
       ) : (
-        <div className="border rounded-md overflow-hidden">
-          <ScrollArea className="w-full h-[calc(100vh-250px)]" showHorizontalScrollbar>
+        <div className="border rounded-md overflow-hidden flex-1 flex flex-col min-h-0">
+          <ScrollArea className="w-full flex-1 min-h-0" showHorizontalScrollbar>
             <div className="min-w-[1200px] relative">
               <Table>
                 <TableHeader sticky>

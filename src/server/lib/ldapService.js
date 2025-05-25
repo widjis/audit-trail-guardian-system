@@ -3,12 +3,13 @@
 import fs from 'fs';
 import path from 'path';
 import ldap from 'ldapjs';
+
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
+const { Change, Attribute } = ldap;
 /**
  * Load settings.json from server/data
  */
@@ -70,7 +71,7 @@ export async function search(baseDN, filter, attributes) {
       filter,
       scope: 'sub',
       paged: { pageSize: 200, pagePause: false },   // auto-page through everything
-      attributes: attributes.length > 0 ? attributes : ['*','dn']
+      attributes: attributes.length > 0 ? attributes : ['*','+']
     };
   
     console.info(`LDAP search: baseDN="${baseDN}", filter="${filter}", attributes=${JSON.stringify(opts.attributes)}`);
@@ -133,10 +134,49 @@ export async function getDnFromEmployeeId(employeeID) {
  */
 export async function modify(dn, changes) {
   const client = await getClient();
+
   return new Promise((resolve, reject) => {
-    client.modify(dn, changes, err => {
+    // 1) catch any client-level errors so they don’t crash your process
+    client.on('error', err => {
+      console.error('🔴 LDAP client error during modify:', err);
+      // if it’s just a socket-reset after unbind, swallow it
+      if (err.code === 'ECONNRESET') {
+        return;
+      }
       client.unbind();
-      err ? reject(err) : resolve();
+      reject(err);
+    });
+
+    // 2) build your Change objects as before
+    const ldapChanges = changes.flatMap(c =>
+      Object.entries(c.modification).map(([attr, val]) => {
+        const vals = Array.isArray(val) ? val : [val];
+        return new ldap.Change({
+          operation:    c.operation,
+          modification: new ldap.Attribute({ type: attr, vals })
+        });
+      })
+    );
+
+    console.log('> LDAP.modify()', dn, ldapChanges);
+
+    // 3) invoke modify
+    client.modify(dn, ldapChanges, err => {
+      // unbind only once modify finishes
+      client.unbind(unbindErr => {
+        if (err) {
+          console.error('🔴 LDAP.modify error:', err);
+          return reject(err);
+        }
+        if (unbindErr) {
+          console.error('🔴 LDAP.unbind error:', unbindErr);
+          // swallow ECONNRESET from unbind
+          if (unbindErr.code !== 'ECONNRESET') {
+            return reject(unbindErr);
+          }
+        }
+        resolve();
+      });
     });
   });
 }

@@ -50,7 +50,7 @@ function standardizePhoneNumber(num) {
  * @param {string} targetName
  * @param {number} threshold – max Fuse.js score (lower = better)
  */
-function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.3) {
+function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.1) {
   const fuse = new Fuse(adUsers, {
     keys: ['name'],
     threshold,
@@ -95,13 +95,30 @@ function computeDiffs(dbRow, adUser) {
 
 /** Apply the computed diffs to AD (modify + optional move) */
 async function applyDiffs(adUser, diffs, adBaseDN) {
-  const mods = Object.entries(diffs).map(
-    ([attr, val]) => ({ operation: 'replace', modification: { [attr]: val } })
-  );
+  // 1) Build only the valid change entries
+  const mods = Object.entries(diffs)
+    // drop any empty diffs
+    .filter(([attr, val]) => attr && val != null)
+    // wrap each val in an array
+    .map(([attr, val]) => ({
+      operation:    'replace',
+      modification: { [attr]: Array.isArray(val) ? val : [val] }
+    }));
+
+  // nothing changed? skip
+  if (mods.length === 0) {
+    console.debug(`No valid LDAP mods for ${adUser.dn}`);
+    return;
+  }
+
+  // 2) Apply the modifications
+  console.log(`Applying LDAP mods to ${adUser.dn}:`, mods);
   await ldapModify(adUser.dn, mods);
 
+  // 3) If department moved, also move the OU
   if (diffs.department) {
     const newOU = `OU=${diffs.department},${adBaseDN}`;
+    console.log(`Moving ${adUser.dn} → ${newOU}`);
     await ldapMoveDn(adUser.dn, newOU);
   }
 }
@@ -142,7 +159,7 @@ export async function findUsersInAD(baseDN) {
 
   // refined fetch
   const filter = '(&(objectClass=user)(objectCategory=user))';
-  const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','dn'];
+  const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','distinguishedName'];
   const entries = await ldapSearch(baseDN, filter, attrs);
 
   // map into consistent shape
@@ -155,7 +172,7 @@ export async function findUsersInAD(baseDN) {
     title:          e.title,
     manager:        e.manager,
     mobile:         e.mobile,
-    dn:             e.dn
+    dn:             e.distinguishedName
   }));
 }
 
@@ -252,82 +269,108 @@ export async function syncToActiveDirectory(testOnly = true) {
 export async function syncSelectedUsersToAD(employeeIDs) {
   const { activeDirectorySettings: ad } = loadSettings();
   const adBaseDN = ad.baseDN;
-  
-  // Get data from both sources
+
+  // Fetch all DB rows and AD users
   const [dbUsers, adUsers] = await Promise.all([
     gatherEmployeeData(),
     findUsersInAD(adBaseDN)
   ]);
-  
-  // Filter dbUsers to only include selected employeeIDs
-  const selectedDbUsers = dbUsers.filter(user => 
-    employeeIDs.includes(user.employee_id)
+
+  // Only process those selected
+  const selectedDbUsers = dbUsers.filter(row =>
+    employeeIDs.includes(row.employee_id)
   );
-  
+
   const syncResults = [];
-  
+
   for (const row of selectedDbUsers) {
     try {
-      const empId = row.employee_id;
-      const empName = row.employee_name?.trim();
+      const empId     = row.employee_id;
+      const empName   = row.employee_name?.trim();
       const empGender = row.gender;
-      
+
       if (!empName) continue;
-      
-      // Find matching AD user
+
+      // 1) Exact match on employeeID
       let adUser = adUsers.find(u => u.employeeID === empId);
-      
+
+      // 2) Fuzzy fallback: reassign employeeID & gender if needed
       if (!adUser) {
-        // Fuzzy fallback
         const fuzzy = fuzzyMatchAdUser(adUsers, empName);
         if (fuzzy) {
           adUser = fuzzy;
-          await ldapModify(fuzzy.dn, [
-            { operation:'replace', modification:{ employeeID: empId } },
-            { operation:'replace', modification:{ gender: empGender } }
+          // record the ID reassignment in results
+          syncResults.push({
+            employeeID:  empId,
+            displayName: adUser.displayName || '',
+            current: {
+              department: adUser.department || '',
+              title:      adUser.title      || '',
+              manager:    adUser.manager    || '',
+              mobile:     adUser.mobile     || ''
+            },
+            diffs: {
+              employeeID: empId,
+              gender:     empGender
+            },
+            action: 'ID Reassigned'
+          });
+          // perform the change
+          await ldapModify(adUser.dn, [
+            { operation: 'replace', modification: { employeeID: [empId] } },
+            { operation: 'replace', modification: { gender:     [empGender] } }
           ]);
         }
       }
-      
+
+      // 3) If still no match, skip
       if (!adUser) {
         console.warn(`No AD match for ${empName}`);
         continue;
       }
-      
-      // Compute diffs
+
+      // 4) Guard: ensure we have a DN before applying any diffs
+      if (!adUser.dn) {
+        console.warn(`Skipping ${empId}: missing DN on adUser`, adUser);
+        continue;
+      }
+
+      // 5) Compute attribute diffs (department/title/mobile)
       const diffs = computeDiffs(row, adUser);
-      
-      // Manager diff
+
+      // 6) Manager diff (async lookup)
       if (row.supervisor_id && isValidEmployeeId(row.supervisor_id)) {
         const mgrDN = await ldapGetDn(row.supervisor_id);
         if (mgrDN && mgrDN !== adUser.manager) {
           diffs.manager = mgrDN;
         }
       }
-      
+
+      // 7) If no diffs at all, skip
       if (Object.keys(diffs).length === 0) continue;
-      
-      // Record result with current values
+
+      // 8) Record the change
       syncResults.push({
-        employeeID: empId,
-        displayName: adUser.displayName || "",
+        employeeID:  empId,
+        displayName: adUser.displayName || '',
         current: {
-          department: adUser.department || "",
-          title: adUser.title || "",
-          manager: adUser.manager || "",
-          mobile: adUser.mobile || ""
+          department: adUser.department || '',
+          title:      adUser.title      || '',
+          manager:    adUser.manager    || '',
+          mobile:     adUser.mobile     || ''
         },
         diffs,
-        action: 'Updated'
+        action: 'Attribute Update'
       });
-      
-      // Apply changes to AD
+
+      // 9) Apply the diffs to AD
       await applyDiffs(adUser, diffs, adBaseDN);
+
     } catch (err) {
       console.error(`Error processing ${row.employee_id}:`, err);
     }
   }
-  
+
   return { test: false, results: syncResults };
 }
 
