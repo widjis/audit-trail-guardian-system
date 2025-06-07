@@ -63,7 +63,7 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   ict_support_pic: "",
 };
 
-const [showEmptyMailingListDialog, setShowEmptyMailingListDialog] = useState(false);
+
 
 export function HireForm({ currentUser }: HireFormProps) {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +76,7 @@ export function HireForm({ currentUser }: HireFormProps) {
   const [isPasswordManuallyEdited, setIsPasswordManuallyEdited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showADDetails, setShowADDetails] = useState(false);
+  const [showEmptyMailingListDialog, setShowEmptyMailingListDialog] = useState(false);
   const [adAccountDetails, setADAccountDetails] = useState<ADAccountDetails>({
     displayName: "",
     firstName: "",
@@ -1118,25 +1119,25 @@ export function HireForm({ currentUser }: HireFormProps) {
           </Button>
         </div>
       </form>
+        {/* Warning dialog for empty mailing list */}
+        <AlertDialog open={showEmptyMailingListDialog} onOpenChange={setShowEmptyMailingListDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>No Mailing List Selected</AlertDialogTitle>
+              <AlertDialogDescription>
+                You haven't selected any mailing lists for this hire. This person won't receive any automated communications.
+                Are you sure you want to proceed without selecting mailing lists?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={proceedWithSubmit}>
+                Proceed Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
+    
   );
-  {/* Warning dialog for empty mailing list */}
-<AlertDialog open={showEmptyMailingListDialog} onOpenChange={setShowEmptyMailingListDialog}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>No Mailing List Selected</AlertDialogTitle>
-      <AlertDialogDescription>
-        You haven't selected any mailing lists for this hire. This person won't receive any automated communications.
-        Are you sure you want to proceed without selecting mailing lists?
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction onClick={proceedWithSubmit}>
-        Proceed Anyway
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-
 }
