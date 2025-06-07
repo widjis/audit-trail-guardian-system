@@ -191,11 +191,16 @@ router.post('/', async (req, res) => {
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
           values.push(value ? 1 : 0);
+        } else if (key === 'mailing_list' && Array.isArray(value)) {
+          // Convert mailing_list array to comma-separated string
+          values.push(value.join(','));
+          logger.api.debug('Converted mailing_list array to string:', value.join(','));
         } else {
           values.push(value);
         }
       }
     }
+
     
     // Construct and execute SQL query
     const query = `
@@ -297,11 +302,16 @@ router.put('/:id', async (req, res) => {
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
           values.push(value ? 1 : 0);
+        } else if (key === 'mailing_list' && Array.isArray(value)) {
+          // Convert mailing_list array to comma-separated string
+          values.push(value.join(','));
+          logger.api.debug('Converted mailing_list array to string for update:', value.join(','));
         } else {
           values.push(value);
         }
       }
     }
+
     
     // Add ID to values array for the WHERE clause
     values.push(id);
@@ -471,11 +481,16 @@ router.post('/bulk-update', async (req, res) => {
         // Handle boolean values for SQL Server
         if (typeof value === 'boolean') {
           values.push(value ? 1 : 0);
+        } else if (key === 'mailing_list' && Array.isArray(value)) {
+          // Convert mailing_list array to comma-separated string
+          values.push(value.join(','));
+          logger.api.debug('Converted mailing_list array to string for bulk update:', value.join(','));
         } else {
           values.push(value);
         }
       }
     }
+
     
     // Use parameterized queries to prevent SQL injection
     const placeholders = ids.map(() => '?').join(',');

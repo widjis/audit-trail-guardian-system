@@ -18,6 +18,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MultiSelectMailingList } from "./MultiSelectMailingList";
 import { ADUserLookup } from "./ADUserLookup";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
+
 
 // Type definition for Active Directory account details
 interface ADAccountDetails {
@@ -59,6 +62,8 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   note: "",
   ict_support_pic: "",
 };
+
+const [showEmptyMailingListDialog, setShowEmptyMailingListDialog] = useState(false);
 
 export function HireForm({ currentUser }: HireFormProps) {
   const { id } = useParams<{ id: string }>();
@@ -428,6 +433,17 @@ export function HireForm({ currentUser }: HireFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if mailing list is empty and show warning dialog
+    if (!hire.mailing_list || hire.mailing_list.length === 0) {
+      setShowEmptyMailingListDialog(true);
+      return;
+    }
+    
+    await proceedWithSubmit();
+  };
+  
+  const proceedWithSubmit = async () => {
     setIsLoading(true);
     
     logger.ui.info("HireForm", "Form submitted");
@@ -490,6 +506,7 @@ export function HireForm({ currentUser }: HireFormProps) {
       setIsLoading(false);
     }
   };
+  
 
   if (isFetching) {
     return <div className="text-center py-8">Loading...</div>;
@@ -1103,4 +1120,23 @@ export function HireForm({ currentUser }: HireFormProps) {
       </form>
     </div>
   );
+  {/* Warning dialog for empty mailing list */}
+<AlertDialog open={showEmptyMailingListDialog} onOpenChange={setShowEmptyMailingListDialog}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>No Mailing List Selected</AlertDialogTitle>
+      <AlertDialogDescription>
+        You haven't selected any mailing lists for this hire. This person won't receive any automated communications.
+        Are you sure you want to proceed without selecting mailing lists?
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction onClick={proceedWithSubmit}>
+        Proceed Anyway
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
 }
