@@ -18,8 +18,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MultiSelectMailingList } from "./MultiSelectMailingList";
 import { ADUserLookup } from "./ADUserLookup";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { AlertTriangle } from "lucide-react";
 
 // Type definition for Active Directory account details
 interface ADAccountDetails {
@@ -430,22 +428,6 @@ export function HireForm({ currentUser }: HireFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check if mailing list is empty and show warning
-    const mailingListArray = Array.isArray(hire.mailing_list) ? hire.mailing_list : hire.mailing_list.split(',').filter(Boolean).map(item => item.trim());
-    const isMailingListEmpty = mailingListArray.length === 0;
-    
-    if (isMailingListEmpty) {
-      // Show warning dialog - we'll use a state to control this
-      setShowMailingListWarning(true);
-      return;
-    }
-    
-    // Continue with normal submission
-    await submitForm();
-  };
-
-  const submitForm = async () => {
     setIsLoading(true);
     
     logger.ui.info("HireForm", "Form submitted");
@@ -508,9 +490,6 @@ export function HireForm({ currentUser }: HireFormProps) {
       setIsLoading(false);
     }
   };
-
-  // Add state for mailing list warning dialog
-  const [showMailingListWarning, setShowMailingListWarning] = useState(false);
 
   if (isFetching) {
     return <div className="text-center py-8">Loading...</div>;
@@ -1122,34 +1101,6 @@ export function HireForm({ currentUser }: HireFormProps) {
           </Button>
         </div>
       </form>
-
-      {/* Mailing List Warning Dialog */}
-      <AlertDialog open={showMailingListWarning} onOpenChange={setShowMailingListWarning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Empty Mailing List Warning
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              No mailing lists have been selected for this new hire. This means they won't be added to any distribution lists automatically.
-              <br /><br />
-              Are you sure you want to continue without selecting any mailing lists?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowMailingListWarning(false)}>
-              Go Back to Select Lists
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              setShowMailingListWarning(false);
-              submitForm();
-            }}>
-              Continue Without Mailing Lists
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
