@@ -1,3 +1,4 @@
+
 import express from 'express';
 import { nanoid } from 'nanoid';
 import fs from 'fs/promises';
@@ -5,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import logger from '../utils/logger.js';
-import { pool, USE_DATABASE } from '../database/db.js';
+import { checkDatabaseConnection, executeQuery } from '../utils/dbConnection.js';
 
 const router = express.Router();
 
@@ -57,18 +58,20 @@ router.get('/', async (req, res) => {
   try {
     logger.info('GET /hires - Fetching all hires');
     
-    if (USE_DATABASE) {
-      const result = await pool.query('SELECT * FROM hires ORDER BY created_at DESC');
-      logger.info(`Fetched ${result.recordset.length} hires from database`);
+    const hasDb = await checkDatabaseConnection();
+    
+    if (hasDb) {
+      const hires = await executeQuery('SELECT * FROM hires ORDER BY created_at DESC');
+      logger.info(`Fetched ${hires.length} hires from database`);
       
       // Transform boolean fields from 0/1 to true/false
-      const hires = result.recordset.map(hire => ({
+      const transformedHires = hires.map(hire => ({
         ...hire,
         license_assigned: hire.license_assigned === 1,
         status_srf: hire.status_srf === 1
       }));
       
-      res.json(hires);
+      res.json(transformedHires);
     } else {
       // Read from JSON file
       const data = await fs.readFile(HIRES_FILE, 'utf8');
@@ -88,21 +91,21 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     logger.info(`GET /hires/${id} - Fetching hire`);
     
-    if (USE_DATABASE) {
-      const result = await pool.query('SELECT * FROM hires WHERE id = @id', {
-        id
-      });
+    const hasDb = await checkDatabaseConnection();
+    
+    if (hasDb) {
+      const hires = await executeQuery('SELECT * FROM hires WHERE id = ?', [id]);
       
-      if (result.recordset.length === 0) {
+      if (hires.length === 0) {
         logger.warn(`Hire with ID ${id} not found`);
         return res.status(404).json({ error: 'Hire not found' });
       }
       
       // Transform boolean fields from 0/1 to true/false
       const hire = {
-        ...result.recordset[0],
-        license_assigned: result.recordset[0].license_assigned === 1,
-        status_srf: result.recordset[0].status_srf === 1
+        ...hires[0],
+        license_assigned: hires[0].license_assigned === 1,
+        status_srf: hires[0].status_srf === 1
       };
       
       res.json(hire);
@@ -147,21 +150,28 @@ router.post('/', async (req, res) => {
 
     logger.info('Transformed hire data for database:', hire);
 
-    if (USE_DATABASE) {
+    const hasDb = await checkDatabaseConnection();
+    
+    if (hasDb) {
       // Insert into database
-      await pool.query(`
+      await executeQuery(`
         INSERT INTO hires (
           id, name, title, department, email, direct_report, phone_number,
           mailing_list, remarks, account_creation_status, license_assigned,
           status_srf, username, password, on_site_date, microsoft_365_license,
           laptop_ready, note, ict_support_pic, created_at, updated_at
         ) VALUES (
-          @id, @name, @title, @department, @email, @direct_report, @phone_number,
-          @mailing_list, @remarks, @account_creation_status, @license_assigned,
-          @status_srf, @username, @password, @on_site_date, @microsoft_365_license,
-          @laptop_ready, @note, @ict_support_pic, @created_at, @updated_at
+          ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?
         )
-      `, hire);
+      `, [
+        hire.id, hire.name, hire.title, hire.department, hire.email, hire.direct_report, hire.phone_number,
+        hire.mailing_list, hire.remarks, hire.account_creation_status, hire.license_assigned,
+        hire.status_srf, hire.username, hire.password, hire.on_site_date, hire.microsoft_365_license,
+        hire.laptop_ready, hire.note, hire.ict_support_pic, hire.created_at, hire.updated_at
+      ]);
       
       logger.info(`Hire created with ID: ${id}`);
       res.status(201).json(hire);
@@ -198,49 +208,43 @@ router.put('/:id', async (req, res) => {
 
     logger.info('Transformed update data for database:', updatedHire);
 
-    if (USE_DATABASE) {
+    const hasDb = await checkDatabaseConnection();
+    
+    if (hasDb) {
       // Check if hire exists
-      const checkResult = await pool.query('SELECT * FROM hires WHERE id = @id', { id });
+      const checkResult = await executeQuery('SELECT * FROM hires WHERE id = ?', [id]);
       
-      if (checkResult.recordset.length === 0) {
+      if (checkResult.length === 0) {
         logger.warn(`Hire with ID ${id} not found for update`);
         return res.status(404).json({ error: 'Hire not found' });
       }
       
       // Update in database
-      await pool.query(`
+      await executeQuery(`
         UPDATE hires
         SET
-          name = @name,
-          title = @title,
-          department = @department,
-          email = @email,
-          direct_report = @direct_report,
-          phone_number = @phone_number,
-          mailing_list = @mailing_list,
-          remarks = @remarks,
-          account_creation_status = @account_creation_status,
-          license_assigned = @license_assigned,
-          status_srf = @status_srf,
-          username = @username,
-          password = @password,
-          on_site_date = @on_site_date,
-          microsoft_365_license = @microsoft_365_license,
-          laptop_ready = @laptop_ready,
-          note = @note,
-          ict_support_pic = @ict_support_pic,
-          updated_at = @updated_at
-        WHERE id = @id
-      `, { ...updatedHire, id });
+          name = ?, title = ?, department = ?, email = ?, direct_report = ?, phone_number = ?,
+          mailing_list = ?, remarks = ?, account_creation_status = ?, license_assigned = ?,
+          status_srf = ?, username = ?, password = ?, on_site_date = ?, microsoft_365_license = ?,
+          laptop_ready = ?, note = ?, ict_support_pic = ?, updated_at = ?
+        WHERE id = ?
+      `, [
+        updatedHire.name, updatedHire.title, updatedHire.department, updatedHire.email, 
+        updatedHire.direct_report, updatedHire.phone_number, updatedHire.mailing_list, 
+        updatedHire.remarks, updatedHire.account_creation_status, updatedHire.license_assigned,
+        updatedHire.status_srf, updatedHire.username, updatedHire.password, 
+        updatedHire.on_site_date, updatedHire.microsoft_365_license, updatedHire.laptop_ready, 
+        updatedHire.note, updatedHire.ict_support_pic, updatedHire.updated_at, id
+      ]);
       
       // Get the updated hire
-      const result = await pool.query('SELECT * FROM hires WHERE id = @id', { id });
+      const result = await executeQuery('SELECT * FROM hires WHERE id = ?', [id]);
       
       // Transform boolean fields from 0/1 to true/false
       const hire = {
-        ...result.recordset[0],
-        license_assigned: result.recordset[0].license_assigned === 1,
-        status_srf: result.recordset[0].status_srf === 1
+        ...result[0],
+        license_assigned: result[0].license_assigned === 1,
+        status_srf: result[0].status_srf === 1
       };
       
       logger.info(`Hire updated with ID: ${id}`);
@@ -274,17 +278,19 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     logger.info(`DELETE /hires/${id} - Deleting hire`);
     
-    if (USE_DATABASE) {
+    const hasDb = await checkDatabaseConnection();
+    
+    if (hasDb) {
       // Check if hire exists
-      const checkResult = await pool.query('SELECT * FROM hires WHERE id = @id', { id });
+      const checkResult = await executeQuery('SELECT * FROM hires WHERE id = ?', [id]);
       
-      if (checkResult.recordset.length === 0) {
+      if (checkResult.length === 0) {
         logger.warn(`Hire with ID ${id} not found for deletion`);
         return res.status(404).json({ error: 'Hire not found' });
       }
       
       // Delete from database
-      await pool.query('DELETE FROM hires WHERE id = @id', { id });
+      await executeQuery('DELETE FROM hires WHERE id = ?', [id]);
       
       logger.info(`Hire deleted with ID: ${id}`);
       res.json({ message: 'Hire deleted successfully' });
