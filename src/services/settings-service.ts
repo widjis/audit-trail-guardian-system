@@ -42,6 +42,7 @@ interface HrisDatabaseConfig {
 
 interface SettingsData {
   accountStatuses?: string[];
+  positionGrades?: string[];
   mailingLists?: MailingList[];
   departments?: Department[];
   mailingListDisplayAsDropdown?: boolean;
