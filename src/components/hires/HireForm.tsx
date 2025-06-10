@@ -43,6 +43,7 @@ interface HireFormProps {
 const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   name: "",
   title: "",
+  position_grade: "", // Added new field
   department: "",
   email: "",
   direct_report: "",
@@ -440,6 +441,16 @@ export function HireForm({ currentUser }: HireFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields including position_grade
+    if (!hire.position_grade) {
+      toast({
+        title: "Validation Error",
+        description: "Position Grade is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Check if mailing list is empty and show warning dialog
     if (!hire.mailing_list || hire.mailing_list.length === 0) {
       setShowEmptyMailingListDialog(true);
@@ -530,9 +541,10 @@ export function HireForm({ currentUser }: HireFormProps) {
     );
   }
 
-  // Get departments and statuses from settings
+  // Get departments, statuses, and position grades from settings
   const departments = settingsData?.departments || [];
   const accountStatuses = settingsData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
+  const positionGrades = settingsData?.positionGrades || ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
 
   // Check if any license type has the name "None" to avoid duplicate keys
@@ -567,7 +579,7 @@ export function HireForm({ currentUser }: HireFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
-                  Full Name
+                  Full Name *
                 </label>
                 <Input
                   id="name"
@@ -579,7 +591,7 @@ export function HireForm({ currentUser }: HireFormProps) {
               </div>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
-                  Email
+                  Email *
                 </label>
                 <Input
                   id="email"
@@ -595,7 +607,7 @@ export function HireForm({ currentUser }: HireFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label htmlFor="title" className="text-sm font-medium">
-                  Job Title
+                  Job Title *
                 </label>
                 <Input
                   id="title"
@@ -606,8 +618,28 @@ export function HireForm({ currentUser }: HireFormProps) {
                 />
               </div>
               <div className="space-y-2">
+                <label htmlFor="position_grade" className="text-sm font-medium">
+                  Position Grade *
+                </label>
+                <Select
+                  value={hire.position_grade}
+                  onValueChange={(value) => handleSelectChange("position_grade", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select position grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positionGrades.map(grade => (
+                      <SelectItem key={grade} value={grade}>
+                        {grade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <label htmlFor="department" className="text-sm font-medium">
-                  Department
+                  Department *
                 </label>
                 <Select
                   value={hire.department}
@@ -625,17 +657,18 @@ export function HireForm({ currentUser }: HireFormProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <label htmlFor="phone_number" className="text-sm font-medium">
-                  Phone Number
-                </label>
-                <Input
-                  id="phone_number"
-                  name="phone_number"
-                  value={hire.phone_number}
-                  onChange={handleInputChange}
-                />
-              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="phone_number" className="text-sm font-medium">
+                Phone Number
+              </label>
+              <Input
+                id="phone_number"
+                name="phone_number"
+                value={hire.phone_number}
+                onChange={handleInputChange}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -660,7 +693,7 @@ export function HireForm({ currentUser }: HireFormProps) {
               </div>
               <div className="space-y-2">
                 <label htmlFor="on_site_date" className="text-sm font-medium">
-                  On-site Date
+                  On-site Date *
                 </label>
                 <Input
                   id="on_site_date"

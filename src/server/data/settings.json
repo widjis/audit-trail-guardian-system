@@ -1,9 +1,17 @@
+
 {
   "accountStatuses": [
     "Pending",
     "Active",
     "Inactive",
     "Suspended"
+  ],
+  "positionGrades": [
+    "General Management",
+    "Superintendent",
+    "Supervisor", 
+    "Staff",
+    "Non-Staff"
   ],
   "mailingLists": [
     {

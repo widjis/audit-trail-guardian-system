@@ -54,18 +54,19 @@ router.get('/template', (req, res) => {
   try {
     logger.api.info('GET /hires/template - Generating CSV template');
     
-    // Define the CSV headers based on required fields
+    // Define the CSV headers based on required fields including position_grade
     const headers = [
       'name',
       'title',
+      'position_grade',  // Added new field
       'department',
       'email',
       'direct_report',
       'phone_number',
       'mailing_list',
       'account_creation_status',
-      'username',         // Added username field
-      'password',         // Added password field
+      'username',
+      'password',
       'on_site_date',
       'ict_support_pic',
       'remarks',
@@ -83,14 +84,15 @@ router.get('/template', (req, res) => {
     const exampleData = [
       'John Doe',
       'Software Engineer',
+      'Staff',              // Example position grade
       'IT',
       'john.doe@example.com',
       'Jane Smith',
       '555-1234',
       'engineering,all-staff', 
       'Pending',
-      'john.doe',          // Example username
-      'temporary123',      // Example password
+      'john.doe',
+      'temporary123',
       '2025-06-01',
       'Tech Support A',
       'New graduate hire',
@@ -164,6 +166,11 @@ router.post('/', async (req, res) => {
   if (!hireData.name) {
     logger.api.warn('Validation error: Name is required');
     return res.status(400).json({ error: 'Name is required' });
+  }
+  
+  if (!hireData.position_grade) {
+    logger.api.warn('Validation error: Position Grade is required');
+    return res.status(400).json({ error: 'Position Grade is required' });
   }
   
   try {

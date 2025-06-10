@@ -1,3 +1,4 @@
+
 export interface AuditLog {
   id: string;
   hire_id: string;
@@ -18,6 +19,7 @@ export interface NewHire {
   name: string;
   title: string;
   job_title?: string;    // Added for compatibility with CreateADAccountDialog
+  position_grade: string; // Added new mandatory field
   department: string;
   email: string;
   direct_report: string;
