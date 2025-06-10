@@ -105,29 +105,30 @@ BEGIN
 END
 ELSE
 BEGIN
-    -- Check if position_grade column exists, if not add it
-    IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('hires') AND name='position_grade')
-    BEGIN
-        -- First, add the column without NOT NULL constraint
-        ALTER TABLE hires ADD position_grade NVARCHAR(100);
-        
-        -- Set default value for existing records
-        UPDATE hires SET position_grade = 'Staff' WHERE position_grade IS NULL;
-        
-        -- Now make the column NOT NULL
-        ALTER TABLE hires ALTER COLUMN position_grade NVARCHAR(100) NOT NULL;
-        
-        -- Add constraint to ensure only valid position grades are accepted
-        ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
-        
-        PRINT 'Added position_grade column to hires table';
-    END
-    ELSE
-    BEGIN
-        PRINT 'Position_grade column already exists in hires table';
-    END
-    
     PRINT 'Hires table already exists';
+END
+
+-- Check if position_grade column exists, if not add it
+IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('hires') AND name='position_grade')
+BEGIN
+    -- First, add the column without NOT NULL constraint
+    ALTER TABLE hires ADD position_grade NVARCHAR(100);
+    
+    -- Set default value for existing records using dynamic SQL to avoid early validation
+    DECLARE @sql NVARCHAR(MAX) = 'UPDATE hires SET position_grade = ''Staff'' WHERE position_grade IS NULL';
+    EXEC sp_executesql @sql;
+    
+    -- Now make the column NOT NULL
+    ALTER TABLE hires ALTER COLUMN position_grade NVARCHAR(100) NOT NULL;
+    
+    -- Add constraint to ensure only valid position grades are accepted
+    ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
+    
+    PRINT 'Added position_grade column to hires table';
+END
+ELSE
+BEGIN
+    PRINT 'Position_grade column already exists in hires table';
 END
 
 -- Check if the audit_logs table already exists
