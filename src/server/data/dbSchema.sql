@@ -108,12 +108,13 @@ BEGIN
     -- Check if position_grade column exists, if not add it
     IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('hires') AND name='position_grade')
     BEGIN
+        -- First, add the column without NOT NULL constraint
         ALTER TABLE hires ADD position_grade NVARCHAR(100);
         
-        -- Set default value for existing records (you can adjust this default as needed)
+        -- Set default value for existing records
         UPDATE hires SET position_grade = 'Staff' WHERE position_grade IS NULL;
         
-        -- Make the column NOT NULL after setting default values
+        -- Now make the column NOT NULL
         ALTER TABLE hires ALTER COLUMN position_grade NVARCHAR(100) NOT NULL;
         
         -- Add constraint to ensure only valid position grades are accepted
