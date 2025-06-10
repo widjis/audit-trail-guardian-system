@@ -2,6 +2,7 @@
 // Using ES module import instead of CommonJS require
 import app from './index.js';
 import { initDbConnection } from './utils/dbConnection.js';
+import { initializeSchema } from './utils/schemaInit.js';
 import logger from './utils/logger.js';
 import fs from 'fs';
 import path from 'path';
@@ -85,6 +86,15 @@ async function startServer() {
   try {
     // Initialize database connection
     await initDbConnection();
+    
+    // Initialize database schema
+    logger.api.info('Initializing database schema...');
+    const schemaInitSuccess = await initializeSchema();
+    if (schemaInitSuccess) {
+      logger.api.info('Database schema initialization completed successfully');
+    } else {
+      logger.api.warn('Database schema initialization failed, but continuing startup');
+    }
     
     // Start the Express server
     app.listen(PORT, () => {
