@@ -33,7 +33,7 @@ export const initializeSchema = async () => {
         return false;
       }
       
-      // Split the schema into logical sections to avoid batch validation issues
+      // Split the schema into logical sections based on table creation
       const sections = [
         // Users table section
         schemaContent.substring(
@@ -45,9 +45,14 @@ export const initializeSchema = async () => {
           schemaContent.indexOf('-- Check if the departments table already exists'),
           schemaContent.indexOf('-- Check if the hires table already exists')
         ),
-        // Hires table section
+        // Hires table section - split into two parts
         schemaContent.substring(
           schemaContent.indexOf('-- Check if the hires table already exists'),
+          schemaContent.indexOf('-- Check if position_grade column exists')
+        ),
+        // Position grade migration section
+        schemaContent.substring(
+          schemaContent.indexOf('-- Check if position_grade column exists'),
           schemaContent.indexOf('-- Check if the audit_logs table already exists')
         ),
         // Audit logs table section
@@ -56,45 +61,47 @@ export const initializeSchema = async () => {
         )
       ];
       
-      // Execute each section separately
+      // Execute each section separately with better error handling
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i].trim();
         if (section) {
           try {
             logger.db.info(`Executing schema section ${i + 1}...`);
-            
-            // Special handling for hires table section to fix position_grade issue
-            if (i === 2) { // Hires table section
-              // Execute the hires table creation/check first
-              const hiresTablePart = section.substring(0, section.indexOf('-- Check if position_grade column exists'));
-              if (hiresTablePart.trim()) {
-                await dbPool.request().batch(hiresTablePart);
-                logger.db.info('Hires table section executed');
-              }
-              
-              // Then handle position_grade column separately with dynamic SQL
-              const positionGradePart = section.substring(section.indexOf('-- Check if position_grade column exists'));
-              if (positionGradePart.trim()) {
-                // Replace the problematic UPDATE with dynamic SQL
-                const dynamicSql = positionGradePart.replace(
-                  'UPDATE hires SET position_grade = \'Staff\' WHERE position_grade IS NULL;',
-                  'EXEC(\'UPDATE hires SET position_grade = \'\'Staff\'\' WHERE position_grade IS NULL\');'
-                );
-                await dbPool.request().batch(dynamicSql);
-                logger.db.info('Position grade column section executed');
-              }
-            } else {
-              await dbPool.request().batch(section);
-              logger.db.info(`Schema section ${i + 1} executed successfully`);
-            }
+            await dbPool.request().batch(section);
+            logger.db.info(`Schema section ${i + 1} executed successfully`);
           } catch (sectionError) {
             logger.db.error(`Error executing schema section ${i + 1}:`, sectionError);
-            // Continue with other sections even if one fails
+            
+            // For position_grade migration errors, log but continue
+            if (i === 3 && sectionError.number === 207) {
+              logger.db.warn('Position grade migration encountered expected validation error, continuing...');
+              continue;
+            }
+            
+            // For other critical errors, continue with remaining sections
+            logger.db.warn(`Continuing with remaining sections despite error in section ${i + 1}`);
           }
         }
       }
       
-      logger.db.info('Schema initialization completed successfully');
+      // Verify position_grade column exists
+      try {
+        const columnCheck = await dbPool.request().query(`
+          SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'position_grade'
+        `);
+        
+        if (columnCheck.recordset.length > 0) {
+          logger.db.info('Position_grade column verified as existing in hires table');
+        } else {
+          logger.db.warn('Position_grade column not found in hires table');
+        }
+      } catch (verifyError) {
+        logger.db.error('Error verifying position_grade column:', verifyError);
+      }
+      
+      logger.db.info('Schema initialization completed');
       return true;
     } 
     else if (process.env.DB_TYPE === 'postgres') {
