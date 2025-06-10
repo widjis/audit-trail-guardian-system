@@ -19,6 +19,7 @@ import { SortButton } from "./SortButton";
 import { ExcelReportDialog } from "./ExcelReportDialog";
 import { calculateProgressPercentage } from "@/utils/progressCalculator";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { useResponsive } from "@/hooks/use-responsive";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -46,6 +47,7 @@ export function HiresTable() {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isMobile, isTablet, isDesktop } = useResponsive();
 
   useEffect(() => {
     fetchHires();
@@ -319,21 +321,25 @@ export function HiresTable() {
                 variant="secondary" 
                 onClick={() => setShowBulkUpdateDialog(true)}
                 disabled={isBulkUpdating}
+                size={isMobile ? "sm" : "default"}
               >
                 <ListPlus className="h-4 w-4 mr-1" />
-                Bulk Update ({selectedHires.length})
+                {isMobile ? "Update" : `Bulk Update (${selectedHires.length})`}
               </Button>
               <Button 
                 variant="destructive" 
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={isBulkDeleting}
+                size={isMobile ? "sm" : "default"}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Delete Selected ({selectedHires.length})
+                {isMobile ? "Delete" : `Delete Selected (${selectedHires.length})`}
               </Button>
             </>
           )}
-          <Button onClick={() => navigate("/hires/new")}>Add New Hire</Button>
+          <Button onClick={() => navigate("/hires/new")} size={isMobile ? "sm" : "default"}>
+            {isMobile ? "Add" : "Add New Hire"}
+          </Button>
         </div>
       </div>
 
@@ -348,7 +354,7 @@ export function HiresTable() {
       ) : (
         <div className="border rounded-md overflow-hidden flex-1 flex flex-col min-h-0">
           <ScrollArea className="w-full flex-1 min-h-0" showHorizontalScrollbar>
-            <div className="min-w-[1200px] relative">
+            <div className={`${isMobile ? 'min-w-[600px]' : isTablet ? 'min-w-[900px]' : 'min-w-[1200px]'} relative`}>
               <Table>
                 <TableHeader sticky>
                   <TableRow>
@@ -380,126 +386,144 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[150px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        Title
-                        <SortButton 
-                          direction={getSortDirectionForField("title")}
-                          onClick={() => handleSort("title")}
-                        />
-                        <FilterPopover 
-                          isActive={isFilterActive("title")}
-                          onClear={() => clearFilter("title")}
-                        >
-                          <Label className="text-xs">Filter by title</Label>
-                          <Input
-                            placeholder="Type to filter..."
-                            value={filters.title}
-                            onChange={(e) => setFilters(prev => ({ ...prev, title: e.target.value }))}
-                            className="h-8 mt-1"
+                    {/* Title - Desktop only */}
+                    {isDesktop && (
+                      <TableHead className="min-w-[150px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          Title
+                          <SortButton 
+                            direction={getSortDirectionForField("title")}
+                            onClick={() => handleSort("title")}
                           />
-                        </FilterPopover>
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[150px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        Department
-                        <SortButton 
-                          direction={getSortDirectionForField("department")}
-                          onClick={() => handleSort("department")}
-                        />
-                        <FilterPopover 
-                          isActive={isFilterActive("department")}
-                          onClear={() => clearFilter("department")}
-                        >
-                          <Label className="text-xs">Filter by department</Label>
-                          <Input
-                            placeholder="Type to filter..."
-                            value={filters.department}
-                            onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
-                            className="h-8 mt-1"
-                          />
-                        </FilterPopover>
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[200px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        Email
-                        <SortButton 
-                          direction={getSortDirectionForField("email")}
-                          onClick={() => handleSort("email")}
-                        />
-                        <FilterPopover 
-                          isActive={isFilterActive("email")}
-                          onClear={() => clearFilter("email")}
-                        >
-                          <Label className="text-xs">Filter by email</Label>
-                          <Input
-                            placeholder="Type to filter..."
-                            value={filters.email}
-                            onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
-                            className="h-8 mt-1"
-                          />
-                        </FilterPopover>
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[120px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        Onsite Date
-                        <SortButton 
-                          direction={getSortDirectionForField("on_site_date")}
-                          onClick={() => handleSort("on_site_date")}
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[120px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        <Laptop className="h-3 w-3 mr-1" /> 
-                        License
-                        <SortButton 
-                          direction={getSortDirectionForField("microsoft_365_license")}
-                          onClick={() => handleSort("microsoft_365_license")}
-                        />
-                        <FilterPopover 
-                          isActive={isFilterActive("license")}
-                          onClear={() => clearFilter("license")}
-                        >
-                          <Label className="text-xs mb-2">Select license type</Label>
-                          <RadioGroup 
-                            value={filters.license} 
-                            onValueChange={(value) => setFilters(prev => ({ ...prev, license: value }))}
+                          <FilterPopover 
+                            isActive={isFilterActive("title")}
+                            onClear={() => clearFilter("title")}
                           >
-                            {licenseTypes.map((license) => (
-                              <div key={license} className="flex items-center space-x-2">
-                                <RadioGroupItem value={license} id={`license-${license.toLowerCase()}`} />
-                                <Label htmlFor={`license-${license.toLowerCase()}`} className="text-sm">{license}</Label>
-                              </div>
-                            ))}
-                          </RadioGroup>
-                        </FilterPopover>
-                      </div>
-                    </TableHead>
-                    <TableHead className="min-w-[120px] bg-background">
-                      <div className="flex items-center space-x-1">
-                        ICT Support PIC
-                        <SortButton 
-                          direction={getSortDirectionForField("ict_support_pic")}
-                          onClick={() => handleSort("ict_support_pic")}
-                        />
-                        <FilterPopover 
-                          isActive={isFilterActive("ictSupportPic")}
-                          onClear={() => clearFilter("ictSupportPic")}
-                        >
-                          <Label className="text-xs">Filter by ICT Support</Label>
-                          <Input
-                            placeholder="Type to filter..."
-                            value={filters.ictSupportPic}
-                            onChange={(e) => setFilters(prev => ({ ...prev, ictSupportPic: e.target.value }))}
-                            className="h-8 mt-1"
+                            <Label className="text-xs">Filter by title</Label>
+                            <Input
+                              placeholder="Type to filter..."
+                              value={filters.title}
+                              onChange={(e) => setFilters(prev => ({ ...prev, title: e.target.value }))}
+                              className="h-8 mt-1"
+                            />
+                          </FilterPopover>
+                        </div>
+                      </TableHead>
+                    )}
+                    {/* Department - Tablet+ */}
+                    {!isMobile && (
+                      <TableHead className="min-w-[150px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          Department
+                          <SortButton 
+                            direction={getSortDirectionForField("department")}
+                            onClick={() => handleSort("department")}
                           />
-                        </FilterPopover>
-                      </div>
-                    </TableHead>
+                          <FilterPopover 
+                            isActive={isFilterActive("department")}
+                            onClear={() => clearFilter("department")}
+                          >
+                            <Label className="text-xs">Filter by department</Label>
+                            <Input
+                              placeholder="Type to filter..."
+                              value={filters.department}
+                              onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                              className="h-8 mt-1"
+                            />
+                          </FilterPopover>
+                        </div>
+                      </TableHead>
+                    )}
+                    {/* Email - Tablet+ */}
+                    {!isMobile && (
+                      <TableHead className="min-w-[200px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          Email
+                          <SortButton 
+                            direction={getSortDirectionForField("email")}
+                            onClick={() => handleSort("email")}
+                          />
+                          <FilterPopover 
+                            isActive={isFilterActive("email")}
+                            onClear={() => clearFilter("email")}
+                          >
+                            <Label className="text-xs">Filter by email</Label>
+                            <Input
+                              placeholder="Type to filter..."
+                              value={filters.email}
+                              onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
+                              className="h-8 mt-1"
+                            />
+                          </FilterPopover>
+                        </div>
+                      </TableHead>
+                    )}
+                    {/* Onsite Date - Desktop only */}
+                    {isDesktop && (
+                      <TableHead className="min-w-[120px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          Onsite Date
+                          <SortButton 
+                            direction={getSortDirectionForField("on_site_date")}
+                            onClick={() => handleSort("on_site_date")}
+                          />
+                        </div>
+                      </TableHead>
+                    )}
+                    {/* License - Desktop only */}
+                    {isDesktop && (
+                      <TableHead className="min-w-[120px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          <Laptop className="h-3 w-3 mr-1" /> 
+                          License
+                          <SortButton 
+                            direction={getSortDirectionForField("microsoft_365_license")}
+                            onClick={() => handleSort("microsoft_365_license")}
+                          />
+                          <FilterPopover 
+                            isActive={isFilterActive("license")}
+                            onClear={() => clearFilter("license")}
+                          >
+                            <Label className="text-xs mb-2">Select license type</Label>
+                            <RadioGroup 
+                              value={filters.license} 
+                              onValueChange={(value) => setFilters(prev => ({ ...prev, license: value }))}
+                            >
+                              {licenseTypes.map((license) => (
+                                <div key={license} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={license} id={`license-${license.toLowerCase()}`} />
+                                  <Label htmlFor={`license-${license.toLowerCase()}`} className="text-sm">{license}</Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          </FilterPopover>
+                        </div>
+                      </TableHead>
+                    )}
+                    {/* ICT Support PIC - Desktop only */}
+                    {isDesktop && (
+                      <TableHead className="min-w-[120px] bg-background">
+                        <div className="flex items-center space-x-1">
+                          ICT Support PIC
+                          <SortButton 
+                            direction={getSortDirectionForField("ict_support_pic")}
+                            onClick={() => handleSort("ict_support_pic")}
+                          />
+                          <FilterPopover 
+                            isActive={isFilterActive("ictSupportPic")}
+                            onClear={() => clearFilter("ictSupportPic")}
+                          >
+                            <Label className="text-xs">Filter by ICT Support</Label>
+                            <Input
+                              placeholder="Type to filter..."
+                              value={filters.ictSupportPic}
+                              onChange={(e) => setFilters(prev => ({ ...prev, ictSupportPic: e.target.value }))}
+                              className="h-8 mt-1"
+                            />
+                          </FilterPopover>
+                        </div>
+                      </TableHead>
+                    )}
                     <TableHead className="min-w-[150px] bg-background">
                       <div className="flex items-center space-x-1">
                         Progress
@@ -553,36 +577,55 @@ export function HiresTable() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          {hire.name}
+                          <div>
+                            {hire.name}
+                            {/* Show additional info on mobile */}
+                            {isMobile && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {hire.department} • {hire.email}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell>{hire.title}</TableCell>
-                        <TableCell>{hire.department}</TableCell>
-                        <TableCell>{hire.email}</TableCell>
-                        <TableCell>{hire.on_site_date ? new Date(hire.on_site_date).toLocaleDateString() : 'N/A'}</TableCell>
+                        {/* Title - Desktop only */}
+                        {isDesktop && <TableCell>{hire.title}</TableCell>}
+                        {/* Department - Tablet+ */}
+                        {!isMobile && <TableCell>{hire.department}</TableCell>}
+                        {/* Email - Tablet+ */}
+                        {!isMobile && <TableCell>{hire.email}</TableCell>}
+                        {/* Onsite Date - Desktop only */}
+                        {isDesktop && <TableCell>{hire.on_site_date ? new Date(hire.on_site_date).toLocaleDateString() : 'N/A'}</TableCell>}
+                        {/* License - Desktop only */}
+                        {isDesktop && (
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
+                                "bg-green-100 text-green-800" : 
+                                "bg-gray-100 text-gray-800"
+                            }`}>
+                              {hire.microsoft_365_license || "None"}
+                            </span>
+                          </TableCell>
+                        )}
+                        {/* ICT Support PIC - Desktop only */}
+                        {isDesktop && <TableCell>{hire.ict_support_pic || "Unassigned"}</TableCell>}
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
-                              "bg-green-100 text-green-800" : 
-                              "bg-gray-100 text-gray-800"
-                          }`}>
-                            {hire.microsoft_365_license || "None"}
-                          </span>
-                        </TableCell>
-                        <TableCell>{hire.ict_support_pic || "Unassigned"}</TableCell>
-                        <TableCell>
-                          <ProgressBar percentage={progressPercentage} />
+                          <ProgressBar 
+                            percentage={progressPercentage} 
+                            showText={!isMobile}
+                          />
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size={isMobile ? "sm" : "icon"}
                             onClick={() => navigate(`/hires/${hire.id}`)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size={isMobile ? "sm" : "icon"}
                             onClick={() => handleDelete(hire.id)}
                           >
                             <Trash2 className="h-4 w-4" />
