@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface CreateADAccountDialogProps {
   hire: NewHire;
@@ -19,6 +19,7 @@ interface CreateADAccountDialogProps {
 
 export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAccountDialogProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [manualPassword, setManualPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -92,6 +93,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     try {
       const userData = generateADUserData();
       console.log("Creating AD account with password length:", userData.password?.length || 0);
+      console.log("Current hire status before AD creation:", hire.account_creation_status);
 
       // Check if password is provided or needs to be manually entered
       if (!userData.password) {
@@ -134,16 +136,23 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
       setResult(result);
       
       if (result.success) {
+        console.log("AD account created successfully, invalidating query cache and calling onSuccess callback");
+        
+        // Invalidate the query cache to refresh the hire data across all components
+        queryClient.invalidateQueries({ queryKey: ['hire', hire.id] });
+        
         toast({
           title: "Success",
-          description: "Active Directory account created successfully",
+          description: "Active Directory account created successfully and status updated to Active",
         });
         
-        // If onSuccess callback is provided, call it
+        // If onSuccess callback is provided, call it to refresh the hire data
         if (onSuccess) {
+          console.log("Calling onSuccess callback to refresh hire data");
           onSuccess();
         }
       } else {
+        console.error("AD account creation failed:", result.error || result.message);
         toast({
           title: "Error",
           description: result.message || result.error || "Failed to create Active Directory account",

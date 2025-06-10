@@ -10,7 +10,7 @@ import { hiresApi } from "@/services/api";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, Eye, EyeOff, Copy, ChevronDown, ChevronUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import logger from "@/utils/logger";
 import { licenseService } from "@/services/license-service";
@@ -19,8 +19,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { MultiSelectMailingList } from "./MultiSelectMailingList";
 import { ADUserLookup } from "./ADUserLookup";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-
-
 
 // Type definition for Active Directory account details
 interface ADAccountDetails {
@@ -70,7 +68,6 @@ export function HireForm({ currentUser }: HireFormProps) {
   const isNewHire = id === "new";
   const [hire, setHire] = useState<Omit<NewHire, "id" | "created_at" | "updated_at">>(emptyHire);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
   const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false);
   const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
   const [isPasswordManuallyEdited, setIsPasswordManuallyEdited] = useState(false);
@@ -88,13 +85,26 @@ export function HireForm({ currentUser }: HireFormProps) {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   logger.ui.debug("HireForm", "Component rendered with id:", id, "isNewHire:", isNewHire);
   
-  // Fetch settings to get departments and account statuses
-  const { data: settingsData } = useQuery({
-    queryKey: ['settings'],
-    queryFn: settingsService.getSettings,
+  // Query to get hire details with proper caching - using the same key as HireDetail
+  const { 
+    data: hireData,
+    isLoading: isFetching,
+    error: fetchError
+  } = useQuery({
+    queryKey: ['hire', id],
+    queryFn: async () => {
+      if (!id || id === "new") return null;
+      logger.ui.info("HireForm", "Fetching hire details with React Query for ID:", id);
+      const data = await hiresApi.getOne(id);
+      return data;
+    },
+    enabled: !!id && id !== "new",
+    staleTime: 10000, // 10 seconds before refetching
+    gcTime: 300000, // Keep in cache for 5 minutes
   });
 
   // Move the license types query inside the component
@@ -110,6 +120,7 @@ export function HireForm({ currentUser }: HireFormProps) {
       fetchHire(id);
     } else {
       logger.ui.info("HireForm", "Creating new hire, using empty form");
+      setHire(emptyHire);
       setIsEmailManuallyEdited(false);
       setIsUsernameManuallyEdited(false);
       setIsPasswordManuallyEdited(false);
@@ -482,6 +493,10 @@ export function HireForm({ currentUser }: HireFormProps) {
         logger.ui.debug("HireForm", "Update data:", JSON.stringify(hireToSubmit));
         const result = await hiresApi.update(id, hireToSubmit);
         logger.ui.debug("HireForm", "Update hire result:", result);
+        
+        // Invalidate the query cache to refresh the data across all components
+        queryClient.invalidateQueries({ queryKey: ['hire', id] });
+        
         toast({
           title: "Success",
           description: "Hire details updated successfully",
@@ -513,16 +528,24 @@ export function HireForm({ currentUser }: HireFormProps) {
     return <div className="text-center py-8">Loading...</div>;
   }
 
+  if (fetchError) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        Error loading hire details: {fetchError instanceof Error ? fetchError.message : 'Unknown error'}
+      </div>
+    );
+  }
+
   // Get departments and statuses from settings
-  const departments = settingsData?.departments || [];
-  const accountStatuses = settingsData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
+  const departments = hireData?.departments || [];
+  const accountStatuses = hireData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
 
   // Check if any license type has the name "None" to avoid duplicate keys
   const hasNoneLicenseType = (licenseTypes || []).some(lt => lt.name === "None");
 
   // Check if AD is enabled to decide whether to show the AD user lookup
-  const isADEnabled = settingsData?.activeDirectorySettings?.enabled || false;
+  const isADEnabled = hireData?.activeDirectorySettings?.enabled || false;
 
   // Add the missing handleMailingListChange function
   const handleMailingListChange = (value: string[]) => {
@@ -993,11 +1016,11 @@ export function HireForm({ currentUser }: HireFormProps) {
                 <label htmlFor="mailing_list" className="text-sm font-medium">
                   Mailing Lists
                 </label>
-                {settingsData?.mailingListDisplayAsDropdown ? (
+                {hireData?.mailingListDisplayAsDropdown ? (
                   <MultiSelectMailingList
                     value={Array.isArray(hire.mailing_list) ? hire.mailing_list : hire.mailing_list.split(',').filter(Boolean).map(item => item.trim())}
                     onChange={handleMailingListChange}
-                    lists={settingsData?.mailingLists || []}
+                    lists={hireData?.mailingLists || []}
                     placeholder="Select mailing lists..."
                   />
                 ) : (
