@@ -1190,8 +1190,5 @@ export function HireForm({ currentUser }: HireFormProps) {
           </AlertDialogContent>
         </AlertDialog>
     </div>
-    
   );
 }
-
-</initial_code>
