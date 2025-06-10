@@ -61,8 +61,6 @@ const emptyHire: Omit<NewHire, "id" | "created_at" | "updated_at"> = {
   ict_support_pic: "",
 };
 
-
-
 export function HireForm({ currentUser }: HireFormProps) {
   const { id } = useParams<{ id: string }>();
   const isNewHire = id === "new";
@@ -107,18 +105,52 @@ export function HireForm({ currentUser }: HireFormProps) {
     gcTime: 300000, // Keep in cache for 5 minutes
   });
 
+  // Query to get settings data (departments, account statuses, etc.)
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsService.getSettings,
+  });
+
   // Move the license types query inside the component
   const { data: licenseTypes } = useQuery({
     queryKey: ['licenseTypes'],
     queryFn: licenseService.getLicenseTypes,
   });
 
+  // Effect to update hire state when hireData changes
+  useEffect(() => {
+    if (hireData && !isNewHire) {
+      logger.ui.debug("HireForm", "Updating hire state with fetched data:", hireData);
+      
+      // Filter out id, created_at, and updated_at
+      const { id, created_at, updated_at, ...hireFormData } = hireData;
+      
+      // Format on_site_date if it exists
+      if (hireFormData.on_site_date) {
+        // Convert the date to YYYY-MM-DD format
+        const date = new Date(hireFormData.on_site_date);
+        hireFormData.on_site_date = date.toISOString().split('T')[0];
+      }
+      
+      setHire(hireFormData);
+      
+      // Update AD account details
+      updateADAccountDetails(hireFormData.name, hireFormData.department);
+      
+      // Set the current user's username as ICT Support PIC if it's empty
+      if (!hireFormData.ict_support_pic && currentUser?.username) {
+        setHire(prev => ({
+          ...prev,
+          ict_support_pic: currentUser.username
+        }));
+        console.log("Set missing ICT Support PIC to:", currentUser.username);
+      }
+    }
+  }, [hireData, isNewHire, currentUser]);
+
   useEffect(() => {
     logger.ui.debug("HireForm", "useEffect triggered for id:", id);
-    if (!isNewHire && id) {
-      logger.ui.info("HireForm", "Fetching existing hire with id:", id);
-      fetchHire(id);
-    } else {
+    if (isNewHire) {
       logger.ui.info("HireForm", "Creating new hire, using empty form");
       setHire(emptyHire);
       setIsEmailManuallyEdited(false);
@@ -145,44 +177,6 @@ export function HireForm({ currentUser }: HireFormProps) {
     }
   }, [isNewHire, currentUser]);
 
-  const fetchHire = async (hireId: string) => {
-    setIsFetching(true);
-    try {
-      logger.ui.info("HireForm", "Calling API to fetch hire with ID:", hireId);
-      const data = await hiresApi.getOne(hireId);
-      logger.ui.debug("HireForm", "Fetched hire data:", data);
-      // Filter out id, created_at, and updated_at
-      const { id, created_at, updated_at, ...hireData } = data;
-      
-      // Format on_site_date if it exists
-      if (hireData.on_site_date) {
-        // Convert the date to YYYY-MM-DD format
-        const date = new Date(hireData.on_site_date);
-        hireData.on_site_date = date.toISOString().split('T')[0];
-      }
-      
-      setHire(hireData);
-      
-      // Update AD account details
-      updateADAccountDetails(hireData.name, hireData.department);
-      
-      // Set the current user's username as ICT Support PIC if it's empty
-      if (!hireData.ict_support_pic && currentUser?.username) {
-        hireData.ict_support_pic = currentUser.username;
-        console.log("Set missing ICT Support PIC to:", currentUser.username);
-      }
-    } catch (error) {
-      console.error("Error fetching hire:", error);
-      toast({
-        title: "Error",
-        description: `Failed to fetch hire: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsFetching(false);
-    }
-  };
-  
   // Function to update AD account details
   const updateADAccountDetails = (name: string, department: string) => {
     if (!name) return;
@@ -537,15 +531,15 @@ export function HireForm({ currentUser }: HireFormProps) {
   }
 
   // Get departments and statuses from settings
-  const departments = hireData?.departments || [];
-  const accountStatuses = hireData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
+  const departments = settingsData?.departments || [];
+  const accountStatuses = settingsData?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
 
   // Check if any license type has the name "None" to avoid duplicate keys
   const hasNoneLicenseType = (licenseTypes || []).some(lt => lt.name === "None");
 
   // Check if AD is enabled to decide whether to show the AD user lookup
-  const isADEnabled = hireData?.activeDirectorySettings?.enabled || false;
+  const isADEnabled = settingsData?.activeDirectorySettings?.enabled || false;
 
   // Add the missing handleMailingListChange function
   const handleMailingListChange = (value: string[]) => {
@@ -1016,11 +1010,11 @@ export function HireForm({ currentUser }: HireFormProps) {
                 <label htmlFor="mailing_list" className="text-sm font-medium">
                   Mailing Lists
                 </label>
-                {hireData?.mailingListDisplayAsDropdown ? (
+                {settingsData?.mailingListDisplayAsDropdown ? (
                   <MultiSelectMailingList
                     value={Array.isArray(hire.mailing_list) ? hire.mailing_list : hire.mailing_list.split(',').filter(Boolean).map(item => item.trim())}
                     onChange={handleMailingListChange}
-                    lists={hireData?.mailingLists || []}
+                    lists={settingsData?.mailingLists || []}
                     placeholder="Select mailing lists..."
                   />
                 ) : (
