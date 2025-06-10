@@ -79,6 +79,7 @@ BEGIN
         id NVARCHAR(255) PRIMARY KEY,
         name NVARCHAR(255) NOT NULL,
         title NVARCHAR(255) NOT NULL,
+        position_grade NVARCHAR(100) NOT NULL,
         department NVARCHAR(255) NOT NULL,
         email NVARCHAR(255),
         direct_report NVARCHAR(255),
@@ -96,13 +97,35 @@ BEGIN
         note NVARCHAR(MAX),
         ict_support_pic NVARCHAR(255),
         created_at DATETIME DEFAULT GETDATE(),
-        updated_at DATETIME DEFAULT GETDATE()
+        updated_at DATETIME DEFAULT GETDATE(),
+        CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'))
     );
     
-    PRINT 'Hires table created successfully';
+    PRINT 'Hires table created successfully with position_grade field';
 END
 ELSE
 BEGIN
+    -- Check if position_grade column exists, if not add it
+    IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('hires') AND name='position_grade')
+    BEGIN
+        ALTER TABLE hires ADD position_grade NVARCHAR(100);
+        
+        -- Set default value for existing records (you can adjust this default as needed)
+        UPDATE hires SET position_grade = 'Staff' WHERE position_grade IS NULL;
+        
+        -- Make the column NOT NULL after setting default values
+        ALTER TABLE hires ALTER COLUMN position_grade NVARCHAR(100) NOT NULL;
+        
+        -- Add constraint to ensure only valid position grades are accepted
+        ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
+        
+        PRINT 'Added position_grade column to hires table';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Position_grade column already exists in hires table';
+    END
+    
     PRINT 'Hires table already exists';
 END
 
