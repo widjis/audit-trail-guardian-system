@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { licenseService } from "@/services/license-service";
 import { SortButton } from "./SortButton";
 import { ExcelReportDialog } from "./ExcelReportDialog";
+import { calculateProgressPercentage } from "@/utils/progressCalculator";
+import { ProgressBar } from "@/components/ui/progress-bar";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -38,7 +40,7 @@ export function HiresTable() {
     title: "",
     department: "",
     email: "",
-    status: "",
+    progress: "", // Changed from status to progress
     license: "", 
     ictSupportPic: "", // Added ICT Support PIC filter
   });
@@ -227,8 +229,14 @@ export function HiresTable() {
       hire.department.toLowerCase().includes(filters.department.toLowerCase());
     const matchesEmail = filters.email === "" || 
       hire.email.toLowerCase().includes(filters.email.toLowerCase());
-    const matchesStatus = filters.status === "" || 
-      hire.account_creation_status === filters.status;
+    
+    // Progress filter - check percentage ranges
+    const hireProgress = calculateProgressPercentage(hire);
+    const matchesProgress = filters.progress === "" || 
+      (filters.progress === "0-25" && hireProgress >= 0 && hireProgress <= 25) ||
+      (filters.progress === "26-50" && hireProgress >= 26 && hireProgress <= 50) ||
+      (filters.progress === "51-75" && hireProgress >= 51 && hireProgress <= 75) ||
+      (filters.progress === "76-100" && hireProgress >= 76 && hireProgress <= 100);
     
     // License filter
     const licenseLower = filters.license.toLowerCase();
@@ -244,7 +252,7 @@ export function HiresTable() {
       hireIctSupportPic.includes(ictSupportPicLower);
     
     return matchesSearch && matchesName && matchesTitle && 
-           matchesDepartment && matchesEmail && matchesStatus && 
+           matchesDepartment && matchesEmail && matchesProgress && 
            matchesLicense && matchesIctSupportPic;
   });
 
@@ -252,12 +260,16 @@ export function HiresTable() {
   const sortedHires = [...filteredHires].sort((a, b) => {
     if (!sortField || !sortDirection) return 0;
     
-    // Handle different data types for sorting
     let valueA = a[sortField];
     let valueB = b[sortField];
     
+    // Special handling for progress percentage
+    if (sortField === "progress_percentage") {
+      valueA = calculateProgressPercentage(a);
+      valueB = calculateProgressPercentage(b);
+    }
     // Special handling for dates
-    if (sortField === "on_site_date" || sortField === "created_at" || sortField === "updated_at") {
+    else if (sortField === "on_site_date" || sortField === "created_at" || sortField === "updated_at") {
       valueA = new Date(valueA || 0).getTime();
       valueB = new Date(valueB || 0).getTime();
     } 
@@ -488,37 +500,37 @@ export function HiresTable() {
                         </FilterPopover>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[120px] bg-background">
+                    <TableHead className="min-w-[150px] bg-background">
                       <div className="flex items-center space-x-1">
-                        Status
+                        Progress
                         <SortButton 
-                          direction={getSortDirectionForField("account_creation_status")}
-                          onClick={() => handleSort("account_creation_status")}
+                          direction={getSortDirectionForField("progress_percentage")}
+                          onClick={() => handleSort("progress_percentage")}
                         />
                         <FilterPopover 
-                          isActive={isFilterActive("status")}
-                          onClear={() => clearFilter("status")}
+                          isActive={isFilterActive("progress")}
+                          onClear={() => clearFilter("progress")}
                         >
-                          <Label className="text-xs mb-2">Select status</Label>
+                          <Label className="text-xs mb-2">Select progress range</Label>
                           <RadioGroup 
-                            value={filters.status} 
-                            onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                            value={filters.progress} 
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, progress: value }))}
                           >
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="Active" id="active" />
-                              <Label htmlFor="active" className="text-sm">Active</Label>
+                              <RadioGroupItem value="0-25" id="progress-0-25" />
+                              <Label htmlFor="progress-0-25" className="text-sm">0-25%</Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="Pending" id="pending" />
-                              <Label htmlFor="pending" className="text-sm">Pending</Label>
+                              <RadioGroupItem value="26-50" id="progress-26-50" />
+                              <Label htmlFor="progress-26-50" className="text-sm">26-50%</Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="Inactive" id="inactive" />
-                              <Label htmlFor="inactive" className="text-sm">Inactive</Label>
+                              <RadioGroupItem value="51-75" id="progress-51-75" />
+                              <Label htmlFor="progress-51-75" className="text-sm">51-75%</Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="Suspended" id="suspended" />
-                              <Label htmlFor="suspended" className="text-sm">Suspended</Label>
+                              <RadioGroupItem value="76-100" id="progress-76-100" />
+                              <Label htmlFor="progress-76-100" className="text-sm">76-100%</Label>
                             </div>
                           </RadioGroup>
                         </FilterPopover>
@@ -528,63 +540,57 @@ export function HiresTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedHires.map((hire) => (
-                    <TableRow key={hire.id}>
-                      <TableCell>
-                        <Checkbox 
-                          checked={isSelected(hire.id)}
-                          onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
-                          aria-label={`Select ${hire.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {hire.name}
-                      </TableCell>
-                      <TableCell>{hire.title}</TableCell>
-                      <TableCell>{hire.department}</TableCell>
-                      <TableCell>{hire.email}</TableCell>
-                      <TableCell>{hire.on_site_date ? new Date(hire.on_site_date).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
-                            "bg-green-100 text-green-800" : 
-                            "bg-gray-100 text-gray-800"
-                        }`}>
-                          {hire.microsoft_365_license || "None"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{hire.ict_support_pic || "Unassigned"}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          hire.account_creation_status === "Active" ? 
-                            "bg-green-100 text-green-800" : 
-                            hire.account_creation_status === "Pending" ?
-                              "bg-yellow-100 text-yellow-800" :
-                              hire.account_creation_status === "Inactive" ?
-                                "bg-gray-100 text-gray-800" :
-                                "bg-red-100 text-red-800"
-                        }`}>
-                          {hire.account_creation_status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => navigate(`/hires/${hire.id}`)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDelete(hire.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {sortedHires.map((hire) => {
+                    const progressPercentage = calculateProgressPercentage(hire);
+                    
+                    return (
+                      <TableRow key={hire.id}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={isSelected(hire.id)}
+                            onCheckedChange={(checked) => handleSelectOne(hire.id, checked === true)}
+                            aria-label={`Select ${hire.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {hire.name}
+                        </TableCell>
+                        <TableCell>{hire.title}</TableCell>
+                        <TableCell>{hire.department}</TableCell>
+                        <TableCell>{hire.email}</TableCell>
+                        <TableCell>{hire.on_site_date ? new Date(hire.on_site_date).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            hire.microsoft_365_license && hire.microsoft_365_license !== "None" ? 
+                              "bg-green-100 text-green-800" : 
+                              "bg-gray-100 text-gray-800"
+                          }`}>
+                            {hire.microsoft_365_license || "None"}
+                          </span>
+                        </TableCell>
+                        <TableCell>{hire.ict_support_pic || "Unassigned"}</TableCell>
+                        <TableCell>
+                          <ProgressBar percentage={progressPercentage} />
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => navigate(`/hires/${hire.id}`)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDelete(hire.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
