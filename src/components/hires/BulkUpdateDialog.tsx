@@ -48,6 +48,7 @@ export function BulkUpdateDialog({
   
   const accountStatuses = settings?.accountStatuses || ["Pending", "Active", "Inactive", "Suspended"];
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
+  const positionGrades = ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"];
   
   const handleSubmit = async () => {
     if (!updateFields.field) return;
@@ -80,6 +81,9 @@ export function BulkUpdateDialog({
           break;
         case "microsoft_365_license":
           updateData = { microsoft_365_license: updateFields.value };
+          break;
+        case "position_grade":
+          updateData = { position_grade: updateFields.value };
           break;
       }
       
@@ -136,6 +140,25 @@ export function BulkUpdateDialog({
               {laptopStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
                   {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      
+      case "position_grade":
+        return (
+          <Select 
+            value={updateFields.value} 
+            onValueChange={(value) => setUpdateFields({ ...updateFields, value })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select position grade" />
+            </SelectTrigger>
+            <SelectContent>
+              {positionGrades.map((grade) => (
+                <SelectItem key={grade} value={grade}>
+                  {grade}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -210,6 +233,7 @@ export function BulkUpdateDialog({
                 <SelectItem value="license_assigned">License Assigned</SelectItem>
                 <SelectItem value="status_srf">SRF Status</SelectItem>
                 <SelectItem value="microsoft_365_license">Microsoft 365 License</SelectItem>
+                <SelectItem value="position_grade">Position Grade</SelectItem>
                 <SelectItem value="excel_report">Excel Report</SelectItem>
               </SelectContent>
             </Select>
