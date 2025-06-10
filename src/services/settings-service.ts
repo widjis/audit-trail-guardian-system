@@ -5,7 +5,17 @@ import apiClient from "./api-client";
 interface MailingList {
   id: string;
   name: string;
-  isDefault: boolean;
+  email: string;
+  code?: string;
+  departmentCode?: string;
+  positionGrade?: string;
+  isDefault?: boolean;
+}
+
+interface MailingListStructure {
+  mandatory: MailingList[];
+  optional: MailingList[];
+  roleBased: MailingList[];
 }
 
 interface Department {
@@ -43,7 +53,7 @@ interface HrisDatabaseConfig {
 interface SettingsData {
   accountStatuses?: string[];
   positionGrades?: string[];
-  mailingLists?: MailingList[];
+  mailingLists?: MailingListStructure | MailingList[]; // Support both old and new format
   departments?: Department[];
   mailingListDisplayAsDropdown?: boolean;
   whatsappSettings?: WhatsAppSettings;
@@ -70,8 +80,8 @@ export const settingsService = {
     return response.data;
   },
 
-  // Update mailing lists
-  updateMailingLists: async (mailingLists: MailingList[], displayAsDropdown: boolean) => {
+  // Update mailing lists - now supports the new structure
+  updateMailingLists: async (mailingLists: MailingListStructure, displayAsDropdown: boolean) => {
     const response = await apiClient.put<{ success: boolean }>(
       `${SETTINGS_ENDPOINT}/mailing-lists`, 
       { mailingLists, displayAsDropdown }
@@ -140,5 +150,18 @@ export const settingsService = {
       config
     );
     return response.data;
+  },
+
+  // Helper function to get all mailing lists in a flat array for backwards compatibility
+  getAllMailingLists: (mailingLists: MailingListStructure | MailingList[]): MailingList[] => {
+    if (Array.isArray(mailingLists)) {
+      return mailingLists; // Old format
+    }
+    // New format - combine all categories
+    return [
+      ...mailingLists.mandatory,
+      ...mailingLists.optional,
+      ...mailingLists.roleBased
+    ];
   }
 };

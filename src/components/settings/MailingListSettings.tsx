@@ -1,22 +1,44 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Save, Edit, Trash, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { settingsService } from "@/services/settings-service";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
+interface MailingList {
+  id: string;
+  name: string;
+  email: string;
+  code?: string;
+  departmentCode?: string;
+  positionGrade?: string;
+  isDefault?: boolean;
+}
+
+interface MailingListStructure {
+  mandatory: MailingList[];
+  optional: MailingList[];
+  roleBased: MailingList[];
+}
+
 export function MailingListSettings() {
-  const [mailingLists, setMailingLists] = useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
+  const [mailingLists, setMailingLists] = useState<MailingListStructure>({
+    mandatory: [],
+    optional: [],
+    roleBased: []
+  });
   const [newListName, setNewListName] = useState("");
+  const [newListEmail, setNewListEmail] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [useAsDropdown, setUseAsDropdown] = useState(true);
+  const [editEmail, setEditEmail] = useState("");
   
   // Fetch settings from the server
   const { data, isLoading, error } = useQuery({
@@ -26,18 +48,24 @@ export function MailingListSettings() {
   
   // Update settings when data is loaded
   useEffect(() => {
-    if (data) {
-      if (data.mailingLists) {
+    if (data?.mailingLists) {
+      if (Array.isArray(data.mailingLists)) {
+        // Handle old format - convert to new structure
+        setMailingLists({
+          mandatory: [],
+          optional: data.mailingLists,
+          roleBased: []
+        });
+      } else {
+        // New structured format
         setMailingLists(data.mailingLists);
       }
-      // Always set to true - dropdown is now permanently enabled
-      setUseAsDropdown(true);
     }
   }, [data]);
   
   // Save mailing lists mutation
   const saveMailingListsMutation = useMutation({
-    mutationFn: (params: { lists: typeof mailingLists, dropdown: boolean }) => 
+    mutationFn: (params: { lists: MailingListStructure, dropdown: boolean }) => 
       settingsService.updateMailingLists(params.lists, params.dropdown),
     onSuccess: () => {
       toast.success("Mailing list settings saved successfully");
@@ -48,61 +76,163 @@ export function MailingListSettings() {
     }
   });
 
-  const handleAddList = () => {
-    if (!newListName.trim()) return;
-    
-    if (mailingLists.some(list => list.name.toLowerCase() === newListName.trim().toLowerCase())) {
-      toast.error("This mailing list already exists");
+  const handleAddList = (category: 'mandatory' | 'optional' | 'roleBased') => {
+    if (!newListName.trim() || !newListEmail.trim()) {
+      toast.error("Please provide both name and email");
       return;
     }
     
-    const newId = String(Math.max(...mailingLists.map(list => Number(list.id)), 0) + 1);
-    setMailingLists([...mailingLists, { 
+    // Check if email already exists in any category
+    const allLists = [...mailingLists.mandatory, ...mailingLists.optional, ...mailingLists.roleBased];
+    if (allLists.some(list => list.email.toLowerCase() === newListEmail.trim().toLowerCase())) {
+      toast.error("This email address already exists");
+      return;
+    }
+    
+    const newId = String(Date.now());
+    const newList: MailingList = { 
       id: newId, 
       name: newListName.trim(), 
-      isDefault: false 
-    }]);
+      email: newListEmail.trim()
+    };
+    
+    setMailingLists(prev => ({
+      ...prev,
+      [category]: [...prev[category], newList]
+    }));
+    
     setNewListName("");
+    setNewListEmail("");
     toast.success("New mailing list added");
   };
 
-  const handleRemoveList = (id: string) => {
-    setMailingLists(mailingLists.filter(list => list.id !== id));
+  const handleRemoveList = (id: string, category: 'mandatory' | 'optional' | 'roleBased') => {
+    setMailingLists(prev => ({
+      ...prev,
+      [category]: prev[category].filter(list => list.id !== id)
+    }));
     toast.success("Mailing list removed");
   };
 
-  const handleStartEdit = (list: { id: string, name: string }) => {
+  const handleStartEdit = (list: MailingList) => {
     setEditingId(list.id);
     setEditName(list.name);
+    setEditEmail(list.email);
   };
 
-  const handleSaveEdit = (id: string) => {
-    if (!editName.trim()) {
-      toast.error("Mailing list name cannot be empty");
+  const handleSaveEdit = (id: string, category: 'mandatory' | 'optional' | 'roleBased') => {
+    if (!editName.trim() || !editEmail.trim()) {
+      toast.error("Name and email cannot be empty");
       return;
     }
     
-    setMailingLists(mailingLists.map(list => 
-      list.id === id ? { ...list, name: editName.trim() } : list
-    ));
+    setMailingLists(prev => ({
+      ...prev,
+      [category]: prev[category].map(list => 
+        list.id === id ? { ...list, name: editName.trim(), email: editEmail.trim() } : list
+      )
+    }));
+    
     setEditingId(null);
     toast.success("Mailing list updated");
   };
 
-  const handleSetDefault = (id: string) => {
-    setMailingLists(mailingLists.map(list => 
-      ({ ...list, isDefault: list.id === id })
-    ));
-    toast.success("Default mailing list updated");
-  };
-
   const handleSaveSettings = () => {
-    // Always save with dropdown set to true
     saveMailingListsMutation.mutate({ 
       lists: mailingLists, 
       dropdown: true 
     });
   };
+
+  const renderTable = (lists: MailingList[], category: 'mandatory' | 'optional' | 'roleBased', title: string) => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">{title}</h3>
+      
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead className="w-[150px]">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lists.map(list => (
+            <TableRow key={list.id}>
+              <TableCell>
+                {editingId === list.id ? (
+                  <Input 
+                    value={editName} 
+                    onChange={e => setEditName(e.target.value)} 
+                    className="max-w-xs" 
+                  />
+                ) : (
+                  list.name
+                )}
+              </TableCell>
+              <TableCell>
+                {editingId === list.id ? (
+                  <Input 
+                    value={editEmail} 
+                    onChange={e => setEditEmail(e.target.value)} 
+                    className="max-w-xs" 
+                  />
+                ) : (
+                  <span className="text-muted-foreground">{list.email}</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {editingId === list.id ? (
+                  <Button size="sm" onClick={() => handleSaveEdit(list.id, category)}>Save</Button>
+                ) : (
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleStartEdit(list)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    {category !== 'mandatory' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleRemoveList(list.id, category)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      
+      {category !== 'mandatory' && (
+        <div className="flex gap-2">
+          <Input 
+            placeholder="Mailing list name..." 
+            value={newListName} 
+            onChange={(e) => setNewListName(e.target.value)}
+            className="max-w-xs"
+          />
+          <Input 
+            placeholder="Email address..." 
+            value={newListEmail} 
+            onChange={(e) => setNewListEmail(e.target.value)}
+            className="max-w-xs"
+          />
+          <Button onClick={() => handleAddList(category)} disabled={!newListName.trim() || !newListEmail.trim()}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -130,92 +260,38 @@ export function MailingListSettings() {
       <CardHeader>
         <CardTitle>Mailing List Settings</CardTitle>
         <CardDescription>
-          Manage mailing lists for new hires. Multiple mailing lists can be selected for each hire.
+          Manage mailing lists for new hires. Mandatory lists are auto-assigned based on department, role-based lists are auto-assigned based on position grade.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Remove the dropdown toggle option as it's now permanently enabled */}
-        
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Available Mailing Lists</h3>
+        <Tabs defaultValue="mandatory" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="mandatory">Mandatory ({mailingLists.mandatory.length})</TabsTrigger>
+            <TabsTrigger value="roleBased">Role-based ({mailingLists.roleBased.length})</TabsTrigger>
+            <TabsTrigger value="optional">Optional ({mailingLists.optional.length})</TabsTrigger>
+          </TabsList>
           
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[150px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mailingLists.map(list => (
-                <TableRow key={list.id}>
-                  <TableCell>
-                    {editingId === list.id ? (
-                      <Input 
-                        value={editName} 
-                        onChange={e => setEditName(e.target.value)} 
-                        className="max-w-xs" 
-                      />
-                    ) : (
-                      list.name
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {list.isDefault && <Badge>Default</Badge>}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === list.id ? (
-                      <Button size="sm" onClick={() => handleSaveEdit(list.id)}>Save</Button>
-                    ) : (
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleStartEdit(list)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {!list.isDefault && (
-                          <>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleSetDefault(list.id)}
-                            >
-                              Set Default
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="text-red-500 hover:text-red-700"
-                              onClick={() => handleRemoveList(list.id)}
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <TabsContent value="mandatory">
+            {renderTable(mailingLists.mandatory, 'mandatory', 'Mandatory Mailing Lists (Department-based)')}
+            <div className="text-sm text-muted-foreground mt-2">
+              <Badge variant="outline">Note</Badge> Mandatory lists are automatically assigned based on the employee's department and cannot be deleted.
+            </div>
+          </TabsContent>
           
-          <div className="flex gap-2">
-            <Input 
-              placeholder="Add new mailing list..." 
-              value={newListName} 
-              onChange={(e) => setNewListName(e.target.value)}
-              className="max-w-xs"
-            />
-            <Button onClick={handleAddList} disabled={!newListName.trim()}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
-          </div>
-        </div>
+          <TabsContent value="roleBased">
+            {renderTable(mailingLists.roleBased, 'roleBased', 'Role-based Mailing Lists')}
+            <div className="text-sm text-muted-foreground mt-2">
+              <Badge variant="outline">Note</Badge> Role-based lists are automatically assigned based on the employee's position grade.
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="optional">
+            {renderTable(mailingLists.optional, 'optional', 'Optional Mailing Lists')}
+            <div className="text-sm text-muted-foreground mt-2">
+              <Badge variant="outline">Note</Badge> Optional lists can be manually selected for each employee.
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
       <CardFooter>
         <Button 

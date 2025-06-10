@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -28,12 +27,14 @@ const getSettings = () => {
     }
     return {
       accountStatuses: ["Pending", "Active", "Inactive", "Suspended"],
-      mailingLists: [
-        { id: "1", name: "General Updates", isDefault: true },
-        { id: "2", name: "Technical Team", isDefault: false },
-        { id: "3", name: "Marketing", isDefault: false },
-        { id: "4", name: "Management", isDefault: false }
-      ],
+      mailingLists: {
+        mandatory: [],
+        optional: [
+          { id: "1", name: "General Updates", email: "general@example.com", isDefault: true },
+          { id: "2", name: "Technical Team", email: "tech@example.com", isDefault: false }
+        ],
+        roleBased: []
+      },
       mailingListDisplayAsDropdown: true
     };
   } catch (err) {
@@ -96,23 +97,45 @@ router.put('/account-statuses', (req, res) => {
   }
 });
 
-// Update mailing lists
+// Update mailing lists - now supports new structure
 router.put('/mailing-lists', (req, res) => {
   try {
     const { mailingLists, displayAsDropdown } = req.body;
     
-    if (!Array.isArray(mailingLists)) {
-      return res.status(400).json({ error: 'Invalid format. Expected an array of mailing lists.' });
+    // Support both old array format and new structured format
+    if (Array.isArray(mailingLists)) {
+      // Old format - convert to new structure
+      const settings = getSettings();
+      settings.mailingLists = {
+        mandatory: [],
+        optional: mailingLists,
+        roleBased: []
+      };
+      
+      if (displayAsDropdown !== undefined) {
+        settings.mailingListDisplayAsDropdown = displayAsDropdown;
+      }
+      
+      saveSettings(settings);
+    } else if (mailingLists && typeof mailingLists === 'object') {
+      // New structured format
+      const { mandatory, optional, roleBased } = mailingLists;
+      
+      if (!Array.isArray(mandatory) || !Array.isArray(optional) || !Array.isArray(roleBased)) {
+        return res.status(400).json({ error: 'Invalid format. Expected structured mailing lists with mandatory, optional, and roleBased arrays.' });
+      }
+      
+      const settings = getSettings();
+      settings.mailingLists = { mandatory, optional, roleBased };
+      
+      if (displayAsDropdown !== undefined) {
+        settings.mailingListDisplayAsDropdown = displayAsDropdown;
+      }
+      
+      saveSettings(settings);
+    } else {
+      return res.status(400).json({ error: 'Invalid format. Expected mailing lists data.' });
     }
-    
-    const settings = getSettings();
-    settings.mailingLists = mailingLists;
-    
-    if (displayAsDropdown !== undefined) {
-      settings.mailingListDisplayAsDropdown = displayAsDropdown;
-    }
-    
-    saveSettings(settings);
     
     res.json({ success: true, message: 'Mailing lists updated successfully' });
   } catch (err) {
