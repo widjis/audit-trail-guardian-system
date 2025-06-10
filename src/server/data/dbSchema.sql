@@ -1,4 +1,5 @@
 
+
 -- MS SQL Server Users Schema
 
 -- Check if the users table already exists
@@ -111,39 +112,25 @@ END
 -- Check if position_grade column exists, if not add it
 IF NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('hires') AND name='position_grade')
 BEGIN
-    -- Add the column without NOT NULL constraint first
-    ALTER TABLE hires ADD position_grade NVARCHAR(100);
+    -- Add the column with a default value
+    ALTER TABLE hires ADD position_grade NVARCHAR(100) DEFAULT 'Staff';
     PRINT 'Added position_grade column to hires table';
     
-    -- Set default value for existing records
-    UPDATE hires SET position_grade = 'Staff' WHERE position_grade IS NULL;
+    -- Set default value for all existing records (no WHERE clause needed)
+    UPDATE hires SET position_grade = 'Staff';
     PRINT 'Set default position_grade values for existing records';
     
     -- Now make the column NOT NULL
     ALTER TABLE hires ALTER COLUMN position_grade NVARCHAR(100) NOT NULL;
     PRINT 'Made position_grade column NOT NULL';
     
-    -- Add constraint only if it doesn't exist
-    IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CHK_POSITION_GRADE')
-    BEGIN
-        ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
-        PRINT 'Added position_grade constraint';
-    END
-    ELSE
-    BEGIN
-        PRINT 'Position_grade constraint already exists';
-    END
+    -- Add constraint
+    ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
+    PRINT 'Added position_grade constraint';
 END
 ELSE
 BEGIN
     PRINT 'Position_grade column already exists in hires table';
-    
-    -- Ensure constraint exists even if column already exists
-    IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CHK_POSITION_GRADE')
-    BEGIN
-        ALTER TABLE hires ADD CONSTRAINT CHK_POSITION_GRADE CHECK (position_grade IN ('General Management', 'Superintendent', 'Supervisor', 'Staff', 'Non-Staff'));
-        PRINT 'Added missing position_grade constraint';
-    END
 END
 
 -- Check if the audit_logs table already exists
@@ -167,3 +154,4 @@ ELSE
 BEGIN
     PRINT 'Audit logs table already exists';
 END
+

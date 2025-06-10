@@ -1,4 +1,5 @@
 
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,7 +46,7 @@ export const initializeSchema = async () => {
           schemaContent.indexOf('-- Check if the departments table already exists'),
           schemaContent.indexOf('-- Check if the hires table already exists')
         ),
-        // Hires table section - split into two parts
+        // Hires table section
         schemaContent.substring(
           schemaContent.indexOf('-- Check if the hires table already exists'),
           schemaContent.indexOf('-- Check if position_grade column exists')
@@ -72,13 +73,7 @@ export const initializeSchema = async () => {
           } catch (sectionError) {
             logger.db.error(`Error executing schema section ${i + 1}:`, sectionError);
             
-            // For position_grade migration errors, log but continue
-            if (i === 3 && sectionError.number === 207) {
-              logger.db.warn('Position grade migration encountered expected validation error, continuing...');
-              continue;
-            }
-            
-            // For other critical errors, continue with remaining sections
+            // Continue with remaining sections even if one fails
             logger.db.warn(`Continuing with remaining sections despite error in section ${i + 1}`);
           }
         }
@@ -123,3 +118,4 @@ export const initializeSchema = async () => {
     return false;
   }
 };
+
