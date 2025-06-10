@@ -1049,6 +1049,8 @@ export function HireForm({ currentUser }: HireFormProps) {
                     onChange={handleMailingListChange}
                     lists={settingsData?.mailingLists || []}
                     placeholder="Select mailing lists..."
+                    department={hire.department}
+                    positionGrade={hire.position_grade}
                   />
                 ) : (
                   <Input
@@ -1191,3 +1193,5 @@ export function HireForm({ currentUser }: HireFormProps) {
     
   );
 }
+
+</initial_code>
