@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -599,67 +598,98 @@ const createLdapUser = async (settings, userData) => {
   });
 };
 
-// FIXED: Helper function to add user to a group with improved error handling and proper baseDN usage
+// FIXED: Helper function to add user to a group with fallback search strategy
 const addUserToGroup = (client, userDN, groupName, settings) => {
   return new Promise((resolve, reject) => {
-    logger.api.debug(`Searching for group: ${groupName} in baseDN: ${settings.baseDN}`);
+    logger.api.debug(`Searching for group: ${groupName} with fallback strategy`);
     
-    // FIXED: Use proper baseDN from settings instead of empty string
-    const searchBase = settings.baseDN;
+    // Extract root DN from base DN (get just the DC components)
+    const extractRootDN = (baseDN) => {
+      const dcParts = baseDN.match(/DC=[^,]+/gi);
+      return dcParts ? dcParts.join(',') : baseDN;
+    };
     
-    // First search for the group
-    client.search(searchBase, {
-      filter: `(&(objectClass=group)(cn=${groupName}))`,
-      scope: 'sub'
-    }, (err, res) => {
-      if (err) {
-        logger.api.error(`Error searching for group ${groupName} in ${searchBase}:`, err);
-        return reject(err);
+    const rootDN = extractRootDN(settings.baseDN);
+    
+    // Define search locations in order of preference
+    const searchBases = [
+      settings.baseDN, // Current organizational unit
+      rootDN, // Domain root
+      `CN=Users,${rootDN}`, // Users container
+      `CN=Builtin,${rootDN}` // Built-in container
+    ];
+    
+    logger.api.debug(`Will search in the following locations: ${searchBases.join(' -> ')}`);
+    
+    // Function to search in a specific base
+    const searchInBase = (searchBase, baseIndex = 0) => {
+      if (baseIndex >= searchBases.length) {
+        logger.api.warn(`Group ${groupName} not found in any search location`);
+        return reject(new Error(`Group ${groupName} not found in any location`));
       }
       
-      let groupDN = null;
+      const currentBase = searchBases[baseIndex];
+      logger.api.debug(`Searching for group ${groupName} in: ${currentBase}`);
       
-      res.on('searchEntry', (entry) => {
-        groupDN = entry.dn.toString();
-        logger.api.debug(`Found group DN: ${groupDN}`);
-      });
-      
-      res.on('error', (err) => {
-        logger.api.error(`Search error for group ${groupName}:`, err);
-        reject(err);
-      });
-      
-      res.on('end', () => {
-        if (!groupDN) {
-          logger.api.warn(`Group ${groupName} not found in ${searchBase}`);
-          return reject(new Error(`Group ${groupName} not found`));
+      client.search(currentBase, {
+        filter: `(&(objectClass=group)(cn=${groupName}))`,
+        scope: 'sub'
+      }, (err, res) => {
+        if (err) {
+          logger.api.warn(`Error searching for group ${groupName} in ${currentBase}:`, err);
+          // Try next search base
+          return searchInBase(searchBase, baseIndex + 1);
         }
         
-        // Modify group to add member
-        const change = new ldap.Change({
-          operation: 'add',
-          modification: {
-            type: 'member',
-            values: [userDN]
-          }
+        let groupDN = null;
+        
+        res.on('searchEntry', (entry) => {
+          groupDN = entry.dn.toString();
+          logger.api.info(`Found group ${groupName} at: ${groupDN}`);
         });
         
-        logger.api.debug(`Adding user ${userDN} to group ${groupDN}`);
-        client.modify(groupDN, change, (err) => {
-          if (err) {
-            // If the error is that the user is already a member, that's ok
-            if (err.name === 'EntryAlreadyExistsError') {
-              logger.api.info(`User ${userDN} is already a member of ${groupName}`);
-              return resolve();
-            }
-            logger.api.error(`Error adding user to group ${groupName}:`, err);
-            return reject(err);
+        res.on('error', (err) => {
+          logger.api.warn(`Search error for group ${groupName} in ${currentBase}:`, err);
+          // Try next search base
+          searchInBase(searchBase, baseIndex + 1);
+        });
+        
+        res.on('end', () => {
+          if (!groupDN) {
+            logger.api.debug(`Group ${groupName} not found in ${currentBase}, trying next location`);
+            // Try next search base
+            return searchInBase(searchBase, baseIndex + 1);
           }
-          logger.api.info(`Successfully added user to group ${groupName}`);
-          resolve();
+          
+          // Group found, now add user to it
+          const change = new ldap.Change({
+            operation: 'add',
+            modification: {
+              type: 'member',
+              values: [userDN]
+            }
+          });
+          
+          logger.api.debug(`Adding user ${userDN} to group ${groupDN}`);
+          client.modify(groupDN, change, (err) => {
+            if (err) {
+              // If the error is that the user is already a member, that's ok
+              if (err.name === 'EntryAlreadyExistsError') {
+                logger.api.info(`User ${userDN} is already a member of ${groupName}`);
+                return resolve();
+              }
+              logger.api.error(`Error adding user to group ${groupName}:`, err);
+              return reject(err);
+            }
+            logger.api.info(`Successfully added user to group ${groupName} (found in ${currentBase})`);
+            resolve();
+          });
         });
       });
-    });
+    };
+    
+    // Start the search process
+    searchInBase(searchBases);
   });
 };
 
