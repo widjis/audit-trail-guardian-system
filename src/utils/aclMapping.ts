@@ -13,6 +13,9 @@ export function getACLForDepartment(department: string | null | undefined): stri
     return "ACL MTI OHSE";
   }
   
+  if (department === "Supply Chain Management" || department === "Finance") {
+    return "ACL MTI Commercial";
+  }
   // Standard department mapping - remove ' Plant' suffix if present
   return `ACL MTI ${department.replace(' Plant', '')}`;
 }
