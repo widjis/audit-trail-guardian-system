@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export function Sidebar() {
   const { logout, getCurrentUser } = useAuth();
   const user = getCurrentUser();
   const isAdmin = user?.role === "admin";
+  const isAdminOrSupport = ["admin", "support"].includes(user?.role || "");
 
   // Collapse state
   const [collapsed, setCollapsed] = useState(false);
@@ -47,21 +49,30 @@ export function Sidebar() {
       icon: <Upload className="mr-2 h-4 w-4" />,
     },
   ];
-  const adminNavItems: NavItem[] = [
+  
+  const adminOrSupportNavItems: NavItem[] = [
     {
       label: "HRIS Sync",
       path: "/hris-sync",
       icon: <RefreshCw className="mr-2 h-4 w-4" />,
     },
+  ];
+  
+  const adminOnlyNavItems: NavItem[] = [
     {
       label: "Settings",
       path: "/settings",
       icon: <Settings className="mr-2 h-4 w-4" />,
     },
   ];
-  const navItems = isAdmin
-    ? [...commonNavItems, ...adminNavItems]
-    : commonNavItems;
+
+  let navItems = [...commonNavItems];
+  if (isAdminOrSupport) {
+    navItems = [...navItems, ...adminOrSupportNavItems];
+  }
+  if (isAdmin) {
+    navItems = [...navItems, ...adminOnlyNavItems];
+  }
 
   // Active route detection
   const isActive = (path: string) => location.pathname.startsWith(path);

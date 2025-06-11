@@ -30,6 +30,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Protected route that checks for admin or support role
+const AdminOrSupportRoute = ({ children }: { children: React.ReactNode }) => {
+  const { getCurrentUser } = useAuth();
+  const user = getCurrentUser();
+  
+  if (!["admin", "support"].includes(user?.role || "")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -45,9 +57,9 @@ const App = () => (
           <Route path="/hires/:id" element={<HireDetail />} />
           <Route path="/import" element={<Import />} />
           <Route path="/hris-sync" element={
-            <AdminRoute>
+            <AdminOrSupportRoute>
               <HrisSync />
-            </AdminRoute>
+            </AdminOrSupportRoute>
           } />
           <Route path="/settings" element={
             <AdminRoute>
