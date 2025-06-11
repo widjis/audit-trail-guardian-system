@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -76,9 +77,9 @@ export function BulkUpdateDialog({
             title: hire.title || '',
             department: hire.department || '',
             ou: 'CN=Users,DC=mbma,DC=com', // Default OU - you may want to make this configurable
-            acl: hire.acl || 'Default-Group', // Default ACL group
+            acl: 'Default-Group', // Default ACL group
             company: 'MBMA',
-            office: hire.office || ''
+            office: '' // Default empty office value
           });
           successCount++;
         } catch (error) {
