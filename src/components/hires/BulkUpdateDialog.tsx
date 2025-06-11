@@ -9,7 +9,9 @@ import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import { licenseService } from "@/services/license-service";
+import { activeDirectoryService } from "@/services/active-directory-service";
 import { NewHire } from "@/types/types";
+import { useToast } from "@/components/ui/use-toast";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
@@ -33,6 +35,7 @@ export function BulkUpdateDialog({
     field: "",
     value: "",
   });
+  const { toast } = useToast();
   
   // For account status options
   const { data: settings } = useQuery({
@@ -50,6 +53,65 @@ export function BulkUpdateDialog({
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
   const positionGrades = ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"];
   
+  const handleBulkADCreation = async () => {
+    if (!selectedHires || selectedHires.length === 0) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      // Process each selected hire for AD account creation
+      for (const hire of selectedHires) {
+        try {
+          await activeDirectoryService.createAccount({
+            name: hire.name,
+            email: hire.email,
+            username: hire.username || hire.email.split('@')[0],
+            department: hire.department,
+            title: hire.title,
+            hireId: hire.id
+          });
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          errors.push(`${hire.name}: ${errorMessage}`);
+          console.error(`Error creating AD account for ${hire.name}:`, error);
+        }
+      }
+      
+      // Show results
+      if (successCount > 0) {
+        toast({
+          title: "Bulk AD Account Creation",
+          description: `Successfully created ${successCount} AD accounts${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        });
+      }
+      
+      if (errorCount > 0) {
+        toast({
+          title: "AD Account Creation Errors",
+          description: `${errorCount} accounts failed to create. Check console for details.`,
+          variant: "destructive",
+        });
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error("Error in bulk AD creation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process bulk AD account creation",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
   const handleSubmit = async () => {
     if (!updateFields.field) return;
     
@@ -57,6 +119,12 @@ export function BulkUpdateDialog({
     if (updateFields.field === "excel_report" && onExcelReport) {
       onExcelReport();
       onClose();
+      return;
+    }
+    
+    // If AD Account Creation is selected, handle it separately
+    if (updateFields.field === "ad_account_creation") {
+      await handleBulkADCreation();
       return;
     }
     
@@ -104,6 +172,16 @@ export function BulkUpdateDialog({
         <p className="text-sm text-muted-foreground">
           This will generate an Excel report for license requests that you can download.
         </p>
+      );
+    }
+    
+    // If AD Account Creation is selected, show info about the operation
+    if (updateFields.field === "ad_account_creation") {
+      return (
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>This will create Active Directory accounts for all selected hires.</p>
+          <p className="text-xs">Note: This operation may take some time depending on the number of selected hires.</p>
+        </div>
       );
     }
     
@@ -234,6 +312,7 @@ export function BulkUpdateDialog({
                 <SelectItem value="status_srf">SRF Status</SelectItem>
                 <SelectItem value="microsoft_365_license">Microsoft 365 License</SelectItem>
                 <SelectItem value="position_grade">Position Grade</SelectItem>
+                <SelectItem value="ad_account_creation">Create AD Accounts</SelectItem>
                 <SelectItem value="excel_report">Excel Report</SelectItem>
               </SelectContent>
             </Select>
@@ -241,7 +320,9 @@ export function BulkUpdateDialog({
           
           {updateFields.field && (
             <div className="grid gap-2">
-              <Label htmlFor="value">New Value</Label>
+              <Label htmlFor="value">
+                {updateFields.field === "ad_account_creation" ? "Operation Details" : "New Value"}
+              </Label>
               {renderValueInput()}
             </div>
           )}
@@ -253,17 +334,19 @@ export function BulkUpdateDialog({
             onClick={handleSubmit} 
             disabled={
               (!updateFields.field) || 
-              (updateFields.field !== "excel_report" && !updateFields.value) || 
+              (updateFields.field !== "excel_report" && updateFields.field !== "ad_account_creation" && !updateFields.value) || 
               isSubmitting
             }
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating...
+                {updateFields.field === "ad_account_creation" ? "Creating AD Accounts..." : "Updating..."}
               </>
             ) : updateFields.field === "excel_report" ? (
               'Generate Report'
+            ) : updateFields.field === "ad_account_creation" ? (
+              'Create AD Accounts'
             ) : (
               'Update Selected'
             )}
