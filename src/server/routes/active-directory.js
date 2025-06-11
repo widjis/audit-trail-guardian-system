@@ -275,7 +275,8 @@ const checkUserExists = async (settings, username) => {
           
           res.on('searchEntry', (entry) => {
             userFound = true;
-            userDN = entry.object.distinguishedName || entry.dn.toString();
+            // Use entry.dn.toString() directly instead of entry.object.distinguishedName
+            userDN = entry.dn.toString();
             logger.api.info(`User ${username} already exists with DN: ${userDN}`);
           });
           
