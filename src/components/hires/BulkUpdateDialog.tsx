@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { licenseService } from "@/services/license-service";
 import { activeDirectoryService } from "@/services/active-directory-service";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import { getDepartmentACL } from "@/utils/departmentACLMapping";
+import { getACLForDepartment } from "@/utils/aclMapping";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
@@ -66,8 +67,8 @@ export function BulkUpdateDialog({
       // Process each selected hire for AD account creation
       for (const hire of selectedHires) {
         try {
-          // Get the appropriate ACL group based on the hire's department
-          const aclGroup = getDepartmentACL(hire.department);
+          // Use the shared ACL determination logic
+          const aclGroup = getACLForDepartment(hire.department);
           
           console.log(`Creating AD account for ${hire.name} with department: ${hire.department}, ACL: ${aclGroup}`);
           
@@ -82,7 +83,7 @@ export function BulkUpdateDialog({
             title: hire.title || '',
             department: hire.department || '',
             ou: 'CN=Users,DC=mbma,DC=com', // Default OU - you may want to make this configurable
-            acl: aclGroup, // Use department-based ACL mapping
+            acl: aclGroup, // Use the correct ACL mapping
             company: 'MBMA',
             office: '' // Default empty office value
           });

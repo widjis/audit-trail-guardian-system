@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
+import { getACLForDepartment } from "@/utils/aclMapping";
 
 interface CreateADAccountDialogProps {
   hire: NewHire;
@@ -51,15 +52,8 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
       ou = `OU=CCP,OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`;
     }
     
-    // Determine ACL for the user
-    let acl = '';
-    if (department === "Occupational Health and Safety" || department === "Environment") {
-      acl = "ACL MTI OHSE";
-    } else if (department) {
-      acl = `ACL MTI ${department.replace(' Plant', '')}`;
-    } else {
-      acl = "ACL MTI Users";
-    }
+    // Use the shared ACL determination logic
+    const acl = getACLForDepartment(department);
     
     return {
       username: username.substring(0, 20), // Ensure username is 20 chars max
