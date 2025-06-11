@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -66,13 +65,20 @@ export function BulkUpdateDialog({
       // Process each selected hire for AD account creation
       for (const hire of selectedHires) {
         try {
-          await activeDirectoryService.createAccount({
-            name: hire.name,
-            email: hire.email,
+          // Use the correct createUser method with proper parameters
+          await activeDirectoryService.createUser(hire.id, {
             username: hire.username || hire.email.split('@')[0],
-            department: hire.department,
-            title: hire.title,
-            hireId: hire.id
+            displayName: hire.name,
+            firstName: hire.name.split(' ')[0] || hire.name,
+            lastName: hire.name.split(' ').slice(1).join(' ') || hire.name,
+            password: 'TempPass123!', // You may want to generate or get this from settings
+            email: hire.email,
+            title: hire.title || '',
+            department: hire.department || '',
+            ou: 'CN=Users,DC=mbma,DC=com', // Default OU - you may want to make this configurable
+            acl: hire.acl || 'Default-Group', // Default ACL group
+            company: 'MBMA',
+            office: hire.office || ''
           });
           successCount++;
         } catch (error) {
