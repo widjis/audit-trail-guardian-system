@@ -235,6 +235,76 @@ function encodeUnicodePwd(password) {
   }
 }
 
+// Add function to check if user exists in AD
+const checkUserExists = async (settings, username) => {
+  return new Promise((resolve, reject) => {
+    const client = createLdapClient(settings);
+    
+    try {
+      // Format the bind credentials based on settings
+      const bindDN = formatBindCredential(settings, settings.username);
+      logger.api.debug(`Checking if user ${username} exists in AD`);
+      
+      // Bind with service account
+      client.bind(bindDN, settings.password, (err) => {
+        if (err) {
+          logger.api.error('Error binding to AD for user existence check:', err);
+          client.destroy();
+          return reject(err);
+        }
+        
+        // Search for the user by sAMAccountName
+        const searchFilter = `(&(objectClass=user)(sAMAccountName=${username}))`;
+        const searchOptions = {
+          filter: searchFilter,
+          scope: 'sub',
+          attributes: ['sAMAccountName', 'distinguishedName', 'displayName']
+        };
+        
+        logger.api.debug(`Searching for user with filter: ${searchFilter}`);
+        
+        client.search(settings.baseDN, searchOptions, (err, res) => {
+          if (err) {
+            logger.api.error('Error searching for existing user:', err);
+            client.destroy();
+            return reject(err);
+          }
+          
+          let userFound = false;
+          let userDN = null;
+          
+          res.on('searchEntry', (entry) => {
+            userFound = true;
+            userDN = entry.object.distinguishedName || entry.dn.toString();
+            logger.api.info(`User ${username} already exists with DN: ${userDN}`);
+          });
+          
+          res.on('error', (err) => {
+            logger.api.error('Search error during user existence check:', err);
+            client.destroy();
+            reject(err);
+          });
+          
+          res.on('end', () => {
+            client.unbind();
+            resolve({ exists: userFound, dn: userDN });
+          });
+        });
+      });
+    } catch (err) {
+      logger.api.error('Error in user existence check process:', err);
+      
+      try {
+        client.unbind();
+      } catch (unbindErr) {
+        logger.api.debug('Error unbinding client:', unbindErr);
+      }
+      
+      reject(err);
+    }
+  });
+};
+
 // Get AD settings
 router.get('/', (req, res) => {
   try {
@@ -367,31 +437,38 @@ router.post('/create-user/:id', async (req, res) => {
       });
     }
     
-    // Create user in AD using ldapjs
+    // Create user in AD using ldapjs (now handles existing users)
     const result = await createLdapUser(settings.activeDirectorySettings, userData);
     
-    // If successful, update the hire record to mark the account as created
+    // If successful (either created or updated existing), update the hire record
     if (result.success) {
       try {
-        // FIXED: Changed "account_status" to "account_creation_status" to match database schema
+        // Update account status to Active
         await executeQuery('UPDATE hires SET account_creation_status = ? WHERE id = ?', ['Active', id]);
         logger.db.info(`Updated account_creation_status to 'Active' for hire ID ${id}`);
         
-        // Add an audit log entry for the AD account creation with correct schema
+        // Add appropriate audit log entry based on whether user was created or updated
         const timestamp = new Date().toISOString();
+        const actionType = result.userCreated ? 'AD_ACCOUNT_CREATED' : 'AD_GROUPS_UPDATED';
+        const message = result.userCreated 
+          ? `Active Directory account created for user ${userData.username}`
+          : `Active Directory groups updated for existing user ${userData.username}`;
+        
         const audit = {
           id: Math.random().toString(36).slice(2),
-          new_hire_id: id, // FIXED: Changed from hire_id to new_hire_id
-          action_type: 'AD_ACCOUNT_CREATED', // FIXED: Changed from action to action_type
-          status: 'Success', // ADDED: Required status field
-          message: `Active Directory account created for user ${userData.username}`, // ADDED: Required message field
+          new_hire_id: id,
+          action_type: actionType,
+          status: 'Success',
+          message: message,
           details: JSON.stringify({
             username: userData.username,
             displayName: userData.displayName,
-            ou: userData.ou
+            ou: userData.ou,
+            userAlreadyExisted: !result.userCreated,
+            groupsAdded: result.details?.groups || []
           }),
-          performed_by: req.user?.username || 'system', // FIXED: Changed from created_by to performed_by
-          timestamp: timestamp // FIXED: Changed from created_at to timestamp
+          performed_by: req.user?.username || 'system',
+          timestamp: timestamp
         };
         
         // Insert the audit log into the database with correct column names
@@ -400,7 +477,7 @@ router.post('/create-user/:id', async (req, res) => {
             'INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, details, performed_by, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [audit.id, audit.new_hire_id, audit.action_type, audit.status, audit.message, audit.details, audit.performed_by, audit.timestamp]
           );
-          logger.db.info(`Created audit log entry for AD account creation for hire ID ${id}`);
+          logger.db.info(`Created audit log entry for AD operation for hire ID ${id}`);
         } catch (auditError) {
           // Log the specific SQL error details for audit log insertion
           logger.db.error(`Audit log creation error for hire ID ${id}:`, auditError);
@@ -408,7 +485,7 @@ router.post('/create-user/:id', async (req, res) => {
             logger.db.error('SQL error details:', auditError.originalError.info);
           }
           // Continue execution even if audit log fails - we still want to return success
-          logger.db.warn('AD account created but audit log creation failed');
+          logger.db.warn('AD operation completed but audit log creation failed');
         }
       } catch (dbError) {
         // Log detailed information about the database error
@@ -422,7 +499,7 @@ router.post('/create-user/:id', async (req, res) => {
         // Still return success, but with a warning
         return res.json({
           ...result,
-          warning: "AD account created but database update failed. Please check database schema."
+          warning: "AD operation completed but database update failed. Please check database schema."
         });
       }
     }
@@ -441,7 +518,7 @@ router.post('/create-user/:id', async (req, res) => {
   }
 });
 
-// Create user in AD - enhanced with better error handling and logging
+// Create user in AD - enhanced to handle existing users
 const createLdapUser = async (settings, userData) => {
   return new Promise(async (resolve, reject) => {
     const client = createLdapClient(settings);
@@ -467,95 +544,114 @@ const createLdapUser = async (settings, userData) => {
         });
       });
       
-      logger.api.debug('Successfully bound to AD, creating user');
+      logger.api.debug('Successfully bound to AD, checking if user exists');
       
-      // Create user DN
-      const userDN = `CN=${userData.displayName},${userData.ou}`;
-      logger.api.debug(`User DN will be: ${userDN}`);
+      // Check if user already exists
+      const userCheck = await checkUserExists(settings, userData.username);
+      let userDN;
+      let userCreated = false;
       
-      // Encode password for AD - with enhanced error handling
-      let unicodePwd;
-      try {
-        unicodePwd = encodeUnicodePwd(userData.password);
-        logger.api.debug(`Successfully encoded password for user ${userData.username}`);
-      } catch (pwdError) {
-        logger.api.error('Failed to encode password:', pwdError);
-        throw new Error(`Password encoding failed: ${pwdError.message}`);
-      }
-      
-      // Create user entry object with careful attribute typing
-      const entry = {
-        objectClass: ['top', 'person', 'organizationalPerson', 'user'],
-        cn: userData.displayName,
-        sn: userData.lastName || userData.displayName.split(' ').pop() || userData.displayName,
-        givenName: userData.firstName || userData.displayName.split(' ')[0] || userData.displayName,
-        displayName: userData.displayName,
-        sAMAccountName: userData.username,
-        userAccountControl: '512', // Enable account
-      };
-      
-      // Only add non-empty attributes to avoid syntax errors
-      if (userData.email && userData.email.includes('@')) {
-        entry.mail = userData.email;
-        entry.userPrincipalName = userData.email;
-      }
-      
-      if (userData.title) entry.title = userData.title;
-      if (userData.department) entry.department = userData.department;
-      if (userData.company) entry.company = userData.company;
-      if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
-      
-      // Add password as a separate property to ensure correct typing
-      entry.unicodePwd = unicodePwd;
-      
-      // Log the entry object for debugging (without the password)
-      const debugEntry = { ...entry };
-      delete debugEntry.unicodePwd;
-      logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
-      
-      // Create the user with enhanced error logging
-      await new Promise((resolveAdd, rejectAdd) => {
-        client.add(userDN, entry, (err) => {
-          if (err) {
-            logger.api.error(`Error creating user: ${err.message}`);
-            if (err.code) {
-              logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
-            }
-            // Enhanced logging for attribute syntax errors
-            if (err.name === 'InvalidAttributeSyntaxError') {
-              logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
-              logger.api.error('- unicodePwd (password encoding)');
-              logger.api.error('- userPrincipalName and mail (must be valid email formats)');
-              logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
-              
-              // Log each attribute separately to help identify the problematic one
-              logger.api.debug('Checking individual attributes for syntax issues:');
-              for (const [key, value] of Object.entries(debugEntry)) {
-                logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+      if (userCheck.exists) {
+        logger.api.info(`User ${userData.username} already exists, skipping creation`);
+        userDN = userCheck.dn;
+        userCreated = false;
+      } else {
+        logger.api.debug('User does not exist, creating new user');
+        
+        // Create user DN
+        userDN = `CN=${userData.displayName},${userData.ou}`;
+        logger.api.debug(`User DN will be: ${userDN}`);
+        
+        // Encode password for AD - with enhanced error handling
+        let unicodePwd;
+        try {
+          unicodePwd = encodeUnicodePwd(userData.password);
+          logger.api.debug(`Successfully encoded password for user ${userData.username}`);
+        } catch (pwdError) {
+          logger.api.error('Failed to encode password:', pwdError);
+          throw new Error(`Password encoding failed: ${pwdError.message}`);
+        }
+        
+        // Create user entry object with careful attribute typing
+        const entry = {
+          objectClass: ['top', 'person', 'organizationalPerson', 'user'],
+          cn: userData.displayName,
+          sn: userData.lastName || userData.displayName.split(' ').pop() || userData.displayName,
+          givenName: userData.firstName || userData.displayName.split(' ')[0] || userData.displayName,
+          displayName: userData.displayName,
+          sAMAccountName: userData.username,
+          userAccountControl: '512', // Enable account
+        };
+        
+        // Only add non-empty attributes to avoid syntax errors
+        if (userData.email && userData.email.includes('@')) {
+          entry.mail = userData.email;
+          entry.userPrincipalName = userData.email;
+        }
+        
+        if (userData.title) entry.title = userData.title;
+        if (userData.department) entry.department = userData.department;
+        if (userData.company) entry.company = userData.company;
+        if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
+        
+        // Add password as a separate property to ensure correct typing
+        entry.unicodePwd = unicodePwd;
+        
+        // Log the entry object for debugging (without the password)
+        const debugEntry = { ...entry };
+        delete debugEntry.unicodePwd;
+        logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
+        
+        // Create the user with enhanced error logging
+        await new Promise((resolveAdd, rejectAdd) => {
+          client.add(userDN, entry, (err) => {
+            if (err) {
+              logger.api.error(`Error creating user: ${err.message}`);
+              if (err.code) {
+                logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
               }
+              // Enhanced logging for attribute syntax errors
+              if (err.name === 'InvalidAttributeSyntaxError') {
+                logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
+                logger.api.error('- unicodePwd (password encoding)');
+                logger.api.error('- userPrincipalName and mail (must be valid email formats)');
+                logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
+                
+                // Log each attribute separately to help identify the problematic one
+                logger.api.debug('Checking individual attributes for syntax issues:');
+                for (const [key, value] of Object.entries(debugEntry)) {
+                  logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+                }
+              }
+              return rejectAdd(err);
             }
-            return rejectAdd(err);
-          }
-          logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
-          resolveAdd();
+            logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
+            resolveAdd();
+          });
         });
-      });
+        
+        userCreated = true;
+      }
       
-      // Add to security groups if specified - FIXED: pass settings to addUserToGroup
+      // Always attempt to add to security groups (regardless of whether user was created or already existed)
+      const groupResults = [];
+      
       if (userData.acl) {
         try {
           await addUserToGroup(client, userDN, userData.acl, settings);
           logger.api.debug(`Added user to ${userData.acl} group`);
+          groupResults.push(userData.acl);
         } catch (groupErr) {
           logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
           // Continue even if group add fails
         }
       }
       
-      // Always add to VPN-USERS group - FIXED: pass settings to addUserToGroup
+      // Always add to VPN-USERS group
       try {
         await addUserToGroup(client, userDN, 'VPN-USERS', settings);
         logger.api.debug(`Added user to VPN-USERS group`);
+        groupResults.push('VPN-USERS');
       } catch (vpnErr) {
         logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
         // Continue even if group add fails
@@ -569,15 +665,20 @@ const createLdapUser = async (settings, userData) => {
         });
       });
       
-      // Return success
+      // Return success with information about what was done
+      const successMessage = userCreated 
+        ? "Active Directory account created successfully"
+        : "User already exists in Active Directory, groups updated successfully";
+        
       resolve({
         success: true,
-        message: "Active Directory account created successfully",
+        message: successMessage,
+        userCreated: userCreated,
         details: {
           samAccountName: userData.username,
           displayName: userData.displayName,
           distinguishedName: userDN,
-          groups: [userData.acl, 'VPN-USERS'].filter(Boolean),
+          groups: groupResults,
         }
       });
       
@@ -594,7 +695,7 @@ const createLdapUser = async (settings, userData) => {
       // Return failure with details
       reject({
         success: false,
-        error: `Failed to create AD user: ${err.message}`
+        error: `Failed to process AD user: ${err.message}`
       });
     }
   });
