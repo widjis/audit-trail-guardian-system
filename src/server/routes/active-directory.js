@@ -377,26 +377,28 @@ router.post('/create-user/:id', async (req, res) => {
         await executeQuery('UPDATE hires SET account_creation_status = ? WHERE id = ?', ['Active', id]);
         logger.db.info(`Updated account_creation_status to 'Active' for hire ID ${id}`);
         
-        // Add an audit log entry for the AD account creation
+        // Add an audit log entry for the AD account creation with correct schema
         const timestamp = new Date().toISOString();
         const audit = {
           id: Math.random().toString(36).slice(2),
-          hire_id: id,
-          action: 'AD_ACCOUNT_CREATED',
+          new_hire_id: id, // FIXED: Changed from hire_id to new_hire_id
+          action_type: 'AD_ACCOUNT_CREATED', // FIXED: Changed from action to action_type
+          status: 'Success', // ADDED: Required status field
+          message: `Active Directory account created for user ${userData.username}`, // ADDED: Required message field
           details: JSON.stringify({
             username: userData.username,
             displayName: userData.displayName,
             ou: userData.ou
           }),
-          created_by: req.user?.username || 'system',
-          created_at: timestamp
+          performed_by: req.user?.username || 'system', // FIXED: Changed from created_by to performed_by
+          timestamp: timestamp // FIXED: Changed from created_at to timestamp
         };
         
-        // Insert the audit log into the database
+        // Insert the audit log into the database with correct column names
         try {
           await executeQuery(
-            'INSERT INTO audit_logs (id, hire_id, action, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [audit.id, audit.hire_id, audit.action, audit.details, audit.created_by, audit.created_at]
+            'INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, details, performed_by, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [audit.id, audit.new_hire_id, audit.action_type, audit.status, audit.message, audit.details, audit.performed_by, audit.timestamp]
           );
           logger.db.info(`Created audit log entry for AD account creation for hire ID ${id}`);
         } catch (auditError) {
