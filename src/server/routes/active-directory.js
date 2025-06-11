@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -539,10 +540,10 @@ const createLdapUser = async (settings, userData) => {
         });
       });
       
-      // Add to security groups if specified
+      // Add to security groups if specified - FIXED: pass settings to addUserToGroup
       if (userData.acl) {
         try {
-          await addUserToGroup(client, userDN, userData.acl);
+          await addUserToGroup(client, userDN, userData.acl, settings);
           logger.api.debug(`Added user to ${userData.acl} group`);
         } catch (groupErr) {
           logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
@@ -550,9 +551,9 @@ const createLdapUser = async (settings, userData) => {
         }
       }
       
-      // Always add to VPN-USERS group
+      // Always add to VPN-USERS group - FIXED: pass settings to addUserToGroup
       try {
-        await addUserToGroup(client, userDN, 'VPN-USERS');
+        await addUserToGroup(client, userDN, 'VPN-USERS', settings);
         logger.api.debug(`Added user to VPN-USERS group`);
       } catch (vpnErr) {
         logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
@@ -598,18 +599,21 @@ const createLdapUser = async (settings, userData) => {
   });
 };
 
-// Helper function to add user to a group with improved error handling
-const addUserToGroup = (client, userDN, groupName) => {
+// FIXED: Helper function to add user to a group with improved error handling and proper baseDN usage
+const addUserToGroup = (client, userDN, groupName, settings) => {
   return new Promise((resolve, reject) => {
-    logger.api.debug(`Searching for group: ${groupName}`);
+    logger.api.debug(`Searching for group: ${groupName} in baseDN: ${settings.baseDN}`);
+    
+    // FIXED: Use proper baseDN from settings instead of empty string
+    const searchBase = settings.baseDN;
     
     // First search for the group
-    client.search('', {
+    client.search(searchBase, {
       filter: `(&(objectClass=group)(cn=${groupName}))`,
       scope: 'sub'
     }, (err, res) => {
       if (err) {
-        logger.api.error(`Error searching for group ${groupName}:`, err);
+        logger.api.error(`Error searching for group ${groupName} in ${searchBase}:`, err);
         return reject(err);
       }
       
@@ -627,7 +631,7 @@ const addUserToGroup = (client, userDN, groupName) => {
       
       res.on('end', () => {
         if (!groupDN) {
-          logger.api.warn(`Group ${groupName} not found`);
+          logger.api.warn(`Group ${groupName} not found in ${searchBase}`);
           return reject(new Error(`Group ${groupName} not found`));
         }
         
