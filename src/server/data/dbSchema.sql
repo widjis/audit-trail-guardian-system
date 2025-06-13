@@ -1,3 +1,4 @@
+
 -- Create the users table
 CREATE TABLE users (
   id VARCHAR(255) PRIMARY KEY,
@@ -62,5 +63,5 @@ CREATE TABLE ms365_license_types (
 );
 
 -- Add distribution list sync columns to hires table
-ALTER TABLE hires ADD COLUMN distribution_list_sync_status VARCHAR(50) DEFAULT NULL;
-ALTER TABLE hires ADD COLUMN distribution_list_sync_date DATETIME DEFAULT NULL;
+ALTER TABLE hires ADD distribution_list_sync_status VARCHAR(50) DEFAULT NULL;
+ALTER TABLE hires ADD distribution_list_sync_date DATETIME DEFAULT NULL;
