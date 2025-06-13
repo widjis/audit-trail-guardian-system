@@ -1,10 +1,11 @@
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
-import { protect } from './middleware/authMiddleware.js';
+import { extractUser } from './middleware/authMiddleware.js';
 import { getCurrentUser } from './middleware/userMiddleware.js';
 import { executeQuery } from './utils/dbConnection.js';
 
@@ -39,7 +40,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // }));
 
 // Custom middleware to attach user object to request
-app.use(protect);
+app.use(extractUser);
 app.use(getCurrentUser);
 
 // Import routes
@@ -87,3 +88,5 @@ app.use(errorHandler);
 app.listen(port, () => {
   console.log(`Server running on port: ${port}`);
 });
+
+export default app;
