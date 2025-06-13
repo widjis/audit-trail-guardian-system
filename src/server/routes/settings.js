@@ -473,4 +473,43 @@ router.post('/hris-database/test-connection', async (req, res) => {
   }
 });
 
+// Add routes for Exchange Online settings
+router.get('/exchange-online', (req, res) => {
+  try {
+    const settings = getSettings();
+    const exchangeSettings = settings.exchangeOnlineSettings || {
+      enabled: false,
+      appId: '',
+      tenantId: '',
+      certificateThumbprint: ''
+    };
+    
+    res.json(exchangeSettings);
+  } catch (error) {
+    console.error('Error fetching Exchange Online settings:', error);
+    res.status(500).json({ error: 'Failed to fetch Exchange Online settings' });
+  }
+});
+
+router.put('/exchange-online', (req, res) => {
+  try {
+    const { enabled, appId, tenantId, certificateThumbprint } = req.body;
+    
+    const settings = getSettings();
+    settings.exchangeOnlineSettings = {
+      enabled,
+      appId,
+      tenantId,
+      certificateThumbprint
+    };
+    
+    saveSettings(settings);
+    
+    res.json(settings.exchangeOnlineSettings);
+  } catch (error) {
+    console.error('Error updating Exchange Online settings:', error);
+    res.status(500).json({ error: 'Failed to update Exchange Online settings' });
+  }
+});
+
 export default router;

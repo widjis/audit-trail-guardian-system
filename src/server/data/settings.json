@@ -1,4 +1,3 @@
-
 {
   "accountStatuses": [
     "Pending",
@@ -328,5 +327,11 @@
     "username": "IT.MTI",
     "password": "morowali",
     "enabled": true
+  },
+  "exchangeOnlineSettings": {
+    "enabled": false,
+    "appId": "",
+    "tenantId": "",
+    "certificateThumbprint": ""
   }
 }

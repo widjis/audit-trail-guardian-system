@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +8,8 @@ import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSett
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
 import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
-import { Database, MessageSquare, Users, Server, BadgeCheck } from "lucide-react";
+import { ExchangeOnlineSettings } from "@/components/settings/ExchangeOnlineSettings";
+import { Database, MessageSquare, Users, Server, BadgeCheck, Mail } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Settings() {
@@ -54,6 +54,10 @@ export default function Settings() {
                 <Server className="h-4 w-4" />
                 <span>Active Directory</span>
               </TabsTrigger>
+              <TabsTrigger value="exchange-online" className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                <span>Exchange Online</span>
+              </TabsTrigger>
               <TabsTrigger value="database" className="flex items-center gap-1">
                 <Database className="h-4 w-4" />
                 <span>Databases</span>
@@ -83,6 +87,10 @@ export default function Settings() {
           
           <TabsContent value="active-directory" className="space-y-4">
             <ActiveDirectorySettings />
+          </TabsContent>
+          
+          <TabsContent value="exchange-online" className="space-y-4">
+            <ExchangeOnlineSettings />
           </TabsContent>
           
           <TabsContent value="database" className="space-y-4">

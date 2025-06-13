@@ -1,4 +1,3 @@
-
 import apiClient from "./api-client";
 
 // Settings types
@@ -131,6 +130,21 @@ export const settingsService = {
   updateActiveDirectorySettings: async (settings: ActiveDirectorySettings) => {
     const response = await apiClient.put<ActiveDirectorySettings>(
       `${SETTINGS_ENDPOINT}/active-directory`,
+      settings
+    );
+    return response.data;
+  },
+
+  // Get Exchange Online settings
+  getExchangeOnlineSettings: async () => {
+    const response = await apiClient.get<ExchangeOnlineSettings>(`${SETTINGS_ENDPOINT}/exchange-online`);
+    return response.data;
+  },
+
+  // Update Exchange Online settings
+  updateExchangeOnlineSettings: async (settings: ExchangeOnlineSettings) => {
+    const response = await apiClient.put<ExchangeOnlineSettings>(
+      `${SETTINGS_ENDPOINT}/exchange-online`,
       settings
     );
     return response.data;
