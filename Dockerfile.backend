@@ -1,15 +1,50 @@
-# Stage: install dependencies
-FROM node:18-alpine AS deps
+# ── Stage 1: build & install deps + PowerShell ───────────────────────
+FROM node:18-slim AS build
 WORKDIR /app
+
+# 1) Install OS prerequisites + PowerShell
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      wget \
+      apt-transport-https \
+      gnupg \
+      ca-certificates \
+      libunwind8 \
+      libssl1.1 \
+      libicu70 \
+ && rm -rf /var/lib/apt/lists/* \
+ \
+ # Import Microsoft repo and install PowerShell
+ && wget -q https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb \
+ && dpkg -i packages-microsoft-prod.deb \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends powershell \
+ && rm packages-microsoft-prod.deb \
+ && rm -rf /var/lib/apt/lists/*
+
+# 2) Copy and install Node dependencies
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
-# Stage: runtime
-FROM node:18-alpine
+# ── Stage 2: runtime ────────────────────────────────────────────────
+FROM node:18-slim AS runtime
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+
+# 3) Copy PowerShell from build stage
+COPY --from=build /usr/bin/pwsh /usr/bin/pwsh
+COPY --from=build /opt/microsoft/powershell /opt/microsoft/powershell
+
+# 4) Copy Node modules and app code
+COPY --from=build /app/node_modules ./node_modules
 COPY . .
-# expose the port your Express server listens on
+
+# 5) (Optional) If you need to install the ExchangeOnlineManagement module at runtime:
+#    pwsh -Command "Install-Module -Name ExchangeOnlineManagement -Force -Scope AllUsers"
+#    But we’ll install it at build time below:
+
+RUN pwsh -Command \
+    "Install-Module -Name ExchangeOnlineManagement -Force -Scope AllUsers; \
+     Exit $LASTEXITCODE"
+
 EXPOSE 3001
-# start the backend
 CMD ["node", "src/server/start.js"]
