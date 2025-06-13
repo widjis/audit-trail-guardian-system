@@ -41,6 +41,13 @@ interface ActiveDirectorySettings {
   authFormat: string;
 }
 
+interface ExchangeOnlineSettings {
+  enabled: boolean;
+  appId: string;
+  tenantId: string;
+  certificateThumbprint: string;
+}
+
 interface HrisDatabaseConfig {
   server: string;
   port: string;
@@ -58,6 +65,7 @@ interface SettingsData {
   mailingListDisplayAsDropdown?: boolean;
   whatsappSettings?: WhatsAppSettings;
   activeDirectorySettings?: ActiveDirectorySettings;
+  exchangeOnlineSettings?: ExchangeOnlineSettings;
   hrisDbConfig?: HrisDatabaseConfig;
 }
 
