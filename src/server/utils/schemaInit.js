@@ -1,5 +1,4 @@
 
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -34,69 +33,40 @@ export const initializeSchema = async () => {
         return false;
       }
       
-      // Split the schema into logical sections based on table creation
-      const sections = [
-        // Users table section
-        schemaContent.substring(
-          schemaContent.indexOf('-- Check if the users table already exists'),
-          schemaContent.indexOf('-- Check if the departments table already exists')
-        ),
-        // Departments table section
-        schemaContent.substring(
-          schemaContent.indexOf('-- Check if the departments table already exists'),
-          schemaContent.indexOf('-- Check if the hires table already exists')
-        ),
-        // Hires table section
-        schemaContent.substring(
-          schemaContent.indexOf('-- Check if the hires table already exists'),
-          schemaContent.indexOf('-- Check if position_grade column exists')
-        ),
-        // Position grade migration section
-        schemaContent.substring(
-          schemaContent.indexOf('-- Check if position_grade column exists'),
-          schemaContent.indexOf('-- Check if the audit_logs table already exists')
-        ),
-        // Audit logs table section
-        schemaContent.substring(
-          schemaContent.indexOf('-- Check if the audit_logs table already exists')
-        )
-      ];
-      
-      // Execute each section separately with better error handling
-      for (let i = 0; i < sections.length; i++) {
-        const section = sections[i].trim();
-        if (section) {
-          try {
-            logger.db.info(`Executing schema section ${i + 1}...`);
-            await dbPool.request().batch(section);
-            logger.db.info(`Schema section ${i + 1} executed successfully`);
-          } catch (sectionError) {
-            logger.db.error(`Error executing schema section ${i + 1}:`, sectionError);
-            
-            // Continue with remaining sections even if one fails
-            logger.db.warn(`Continuing with remaining sections despite error in section ${i + 1}`);
-          }
-        }
-      }
-      
-      // Verify position_grade column exists
       try {
-        const columnCheck = await dbPool.request().query(`
-          SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE 
-          FROM INFORMATION_SCHEMA.COLUMNS 
-          WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'position_grade'
+        logger.db.info('Executing database schema...');
+        await dbPool.request().batch(schemaContent);
+        logger.db.info('Database schema executed successfully');
+        
+        // Verify that the hires table exists and has the required columns
+        const tableCheck = await dbPool.request().query(`
+          SELECT TABLE_NAME 
+          FROM INFORMATION_SCHEMA.TABLES 
+          WHERE TABLE_NAME IN ('users', 'hires', 'audit_logs', 'departments', 'ms365_license_types')
         `);
         
-        if (columnCheck.recordset.length > 0) {
-          logger.db.info('Position_grade column verified as existing in hires table');
+        logger.db.info(`Found ${tableCheck.recordset.length} tables in database`);
+        
+        // Verify distribution list sync columns exist
+        const columnCheck = await dbPool.request().query(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_NAME = 'hires' 
+          AND COLUMN_NAME IN ('distribution_list_sync_status', 'distribution_list_sync_date')
+        `);
+        
+        if (columnCheck.recordset.length === 2) {
+          logger.db.info('Distribution list sync columns verified as existing in hires table');
         } else {
-          logger.db.warn('Position_grade column not found in hires table');
+          logger.db.warn('Some distribution list sync columns may be missing from hires table');
         }
-      } catch (verifyError) {
-        logger.db.error('Error verifying position_grade column:', verifyError);
+        
+      } catch (schemaError) {
+        logger.db.error('Error executing database schema:', schemaError);
+        return false;
       }
       
-      logger.db.info('Schema initialization completed');
+      logger.db.info('Schema initialization completed successfully');
       return true;
     } 
     else if (process.env.DB_TYPE === 'postgres') {
@@ -118,4 +88,3 @@ export const initializeSchema = async () => {
     return false;
   }
 };
-
