@@ -1,4 +1,3 @@
-
 export interface AuditLog {
   id: string;
   hire_id: string;
@@ -87,4 +86,22 @@ export interface UserAccount {
   approved?: boolean;    // Added for AccountManagementSettings.tsx
   created_at?: string;
   updated_at?: string;
+}
+
+// Add missing type for Exchange Online settings
+export interface ExchangeOnlineSettings {
+  enabled: boolean;
+  appId: string;
+  tenantId: string;
+  certificateThumbprint: string;
+}
+
+// Add to existing Settings interface if it exists, or create it
+export interface Settings {
+  activeDirectorySettings?: {
+    enabled: boolean;
+    [key: string]: any;
+  };
+  exchangeOnlineSettings?: ExchangeOnlineSettings;
+  [key: string]: any;
 }

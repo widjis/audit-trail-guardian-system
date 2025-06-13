@@ -9,10 +9,11 @@ import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
 import { Button } from "@/components/ui/button";
-import { Send, UserPlus, RefreshCw } from "lucide-react";
+import { Send, UserPlus, RefreshCw, Mail } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { SendWhatsAppDialog } from "@/components/hires/SendWhatsAppDialog";
 import { CreateADAccountDialog } from "@/components/hires/CreateADAccountDialog";
+import { SyncDistributionListDialog } from "@/components/hires/SyncDistributionListDialog";
 import { useQuery } from "@tanstack/react-query";
 import { settingsService } from "@/services/settings-service";
 import { useAuth } from "@/services/api";
@@ -21,6 +22,7 @@ export default function HireDetail() {
   const { id } = useParams<{ id: string }>();
   const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
   const [isADDialogOpen, setIsADDialogOpen] = useState(false);
+  const [isSyncDLDialogOpen, setIsSyncDLDialogOpen] = useState(false);
   const { toast } = useToast();
   const { getCurrentUser } = useAuth();
   const currentUser = getCurrentUser();
@@ -51,6 +53,9 @@ export default function HireDetail() {
   
   // Check if AD integration is enabled
   const isADEnabled = settings?.activeDirectorySettings?.enabled || false;
+  
+  // Check if Exchange Online integration is enabled
+  const isExchangeEnabled = settings?.exchangeOnlineSettings?.enabled || false;
 
   const handleSendWhatsApp = () => {
     setIsWhatsAppDialogOpen(true);
@@ -58,6 +63,10 @@ export default function HireDetail() {
 
   const handleCreateADAccount = () => {
     setIsADDialogOpen(true);
+  };
+  
+  const handleSyncDistributionLists = () => {
+    setIsSyncDLDialogOpen(true);
   };
   
   const handleRefresh = () => {
@@ -95,6 +104,16 @@ export default function HireDetail() {
                 >
                   <UserPlus className="h-4 w-4" />
                   Create AD Account
+                </Button>
+              )}
+              {isExchangeEnabled && hire.email && (
+                <Button 
+                  onClick={handleSyncDistributionLists} 
+                  className="flex items-center gap-2"
+                  variant="outline"
+                >
+                  <Mail className="h-4 w-4" />
+                  Sync to O365
                 </Button>
               )}
               <Button 
@@ -137,6 +156,21 @@ export default function HireDetail() {
                 toast({
                   title: "Success",
                   description: "AD Account created and hire information updated",
+                });
+              }}
+            />
+          </Dialog>
+
+          <Dialog open={isSyncDLDialogOpen} onOpenChange={setIsSyncDLDialogOpen}>
+            <SyncDistributionListDialog 
+              hire={hire} 
+              onClose={() => setIsSyncDLDialogOpen(false)}
+              onSuccess={() => {
+                // Refresh hire data after syncing distribution lists
+                refetch();
+                toast({
+                  title: "Success",
+                  description: "Distribution lists synced successfully",
                 });
               }}
             />
