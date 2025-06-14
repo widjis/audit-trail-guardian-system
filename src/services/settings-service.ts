@@ -42,9 +42,9 @@ interface ActiveDirectorySettings {
 
 interface ExchangeOnlineSettings {
   enabled: boolean;
-  appId: string;
-  tenantId: string;
-  certificateThumbprint: string;
+  username: string;
+  passwordConfigured: boolean;
+  lastConnectionTest?: string;
 }
 
 interface HrisDatabaseConfig {
@@ -135,13 +135,13 @@ export const settingsService = {
     return response.data;
   },
 
-  // Get Exchange Online settings
+  // Get Exchange Online settings - updated for basic auth
   getExchangeOnlineSettings: async () => {
     const response = await apiClient.get<ExchangeOnlineSettings>(`${SETTINGS_ENDPOINT}/exchange-online`);
     return response.data;
   },
 
-  // Update Exchange Online settings
+  // Update Exchange Online settings - updated for basic auth
   updateExchangeOnlineSettings: async (settings: ExchangeOnlineSettings) => {
     const response = await apiClient.put<ExchangeOnlineSettings>(
       `${SETTINGS_ENDPOINT}/exchange-online`,

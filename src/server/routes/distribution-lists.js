@@ -1,4 +1,3 @@
-
 import express from 'express';
 import exchangeService from '../services/exchangeService.js';
 import { executeQuery } from '../utils/dbConnection.js';
@@ -23,25 +22,102 @@ const getExchangeSettings = () => {
   }
 };
 
-// Helper function to ensure Exchange Online connection
+// Helper function to get username from environment
+const getExchangeUsername = () => {
+  return process.env.EXO_USER || null;
+};
+
+// Helper function to ensure Exchange Online connection with basic auth
 const ensureExchangeConnection = async () => {
   const settings = getExchangeSettings();
   if (!settings || !settings.enabled) {
     throw new Error('Exchange Online integration is not enabled');
   }
 
-  if (!settings.appId || !settings.tenantId || !settings.certificateThumbprint) {
-    throw new Error('Exchange Online settings are incomplete');
+  const username = getExchangeUsername();
+  if (!username) {
+    throw new Error('EXO_USER environment variable not set');
+  }
+
+  if (!settings.passwordConfigured) {
+    throw new Error('Exchange Online password not configured');
   }
 
   if (!exchangeService.isConnected) {
-    await exchangeService.connectToExchangeOnline(
-      settings.appId,
-      settings.tenantId,
-      settings.certificateThumbprint
-    );
+    await exchangeService.connectToExchangeOnline(username);
   }
 };
+
+// Setup Exchange credentials (create secure password file)
+router.post('/setup-credentials', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    // Create secure password file
+    const result = await exchangeService.createSecurePassword(password);
+    
+    if (result.success) {
+      // Test the connection to make sure everything works
+      const testResult = await exchangeService.testConnection(username, password);
+      
+      if (testResult.success) {
+        res.json({ 
+          success: true, 
+          message: 'Credentials configured and tested successfully' 
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: `Credentials saved but connection test failed: ${testResult.message}` 
+        });
+      }
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to save credentials securely' 
+      });
+    }
+
+  } catch (error) {
+    console.error('Error setting up Exchange credentials:', error);
+    res.status(500).json({ error: 'Failed to setup credentials', message: error.message });
+  }
+});
+
+// Test basic authentication connection
+router.post('/test-basic-connection', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    const actualUsername = username || getExchangeUsername();
+    if (!actualUsername) {
+      return res.status(400).json({ error: 'Username not provided and EXO_USER not set' });
+    }
+
+    // Validate that password file exists and is valid
+    const passwordValidation = await exchangeService.validatePasswordFile();
+    if (!passwordValidation.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password file not found or invalid. Please setup credentials first.' 
+      });
+    }
+
+    // Test connection using existing password file
+    const result = await exchangeService.connectToExchangeOnline(actualUsername);
+    await exchangeService.disconnect();
+    
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error testing basic Exchange Online connection:', error);
+    res.status(500).json({ error: 'Failed to test connection', message: error.message });
+  }
+});
 
 // Sync user to distribution groups based on assigned mailing lists
 router.post('/sync-user', async (req, res) => {
@@ -245,13 +321,11 @@ router.post('/test-connection', async (req, res) => {
       return res.status(400).json({ error: 'App ID, Tenant ID, and Certificate Thumbprint are required' });
     }
 
-    const result = await exchangeService.testConnection(appId, tenantId, certificateThumbprint);
+    console.warn('Certificate-based authentication is deprecated. Consider using basic authentication.');
     
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
+    // This would use the old certificate method - for backward compatibility only
+    const result = { success: false, message: 'Certificate authentication is deprecated. Please use basic authentication.' };
+    res.status(400).json(result);
 
   } catch (error) {
     console.error('Error testing Exchange Online connection:', error);

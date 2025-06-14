@@ -1,4 +1,3 @@
-
 import apiClient from './api-client';
 
 export interface DistributionListSyncResult {
@@ -54,7 +53,24 @@ export const distributionListService = {
     return response.data;
   },
 
+  async setupExchangeCredentials(username: string, password: string) {
+    const response = await apiClient.post('/distribution-lists/setup-credentials', {
+      username,
+      password
+    });
+    return response.data;
+  },
+
+  async testBasicConnection(username: string) {
+    const response = await apiClient.post('/distribution-lists/test-basic-connection', {
+      username
+    });
+    return response.data;
+  },
+
+  // Keep the old method for backward compatibility but mark as deprecated
   async testConnection(appId: string, tenantId: string, certificateThumbprint: string) {
+    console.warn('testConnection with certificate is deprecated. Use testBasicConnection instead.');
     const response = await apiClient.post('/distribution-lists/test-connection', {
       appId,
       tenantId,

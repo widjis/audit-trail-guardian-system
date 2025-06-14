@@ -473,15 +473,14 @@ router.post('/hris-database/test-connection', async (req, res) => {
   }
 });
 
-// Add routes for Exchange Online settings
+// Add routes for Exchange Online settings - updated for basic auth
 router.get('/exchange-online', (req, res) => {
   try {
     const settings = getSettings();
     const exchangeSettings = settings.exchangeOnlineSettings || {
       enabled: false,
-      appId: '',
-      tenantId: '',
-      certificateThumbprint: ''
+      username: process.env.EXO_USER || '',
+      passwordConfigured: false
     };
     
     res.json(exchangeSettings);
@@ -493,14 +492,14 @@ router.get('/exchange-online', (req, res) => {
 
 router.put('/exchange-online', (req, res) => {
   try {
-    const { enabled, appId, tenantId, certificateThumbprint } = req.body;
+    const { enabled, username, passwordConfigured, lastConnectionTest } = req.body;
     
     const settings = getSettings();
     settings.exchangeOnlineSettings = {
       enabled,
-      appId,
-      tenantId,
-      certificateThumbprint
+      username: username || process.env.EXO_USER || '',
+      passwordConfigured: passwordConfigured || false,
+      lastConnectionTest
     };
     
     saveSettings(settings);

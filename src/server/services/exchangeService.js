@@ -1,4 +1,3 @@
-
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -49,20 +48,91 @@ class ExchangeService {
   }
 
   /**
-   * Connect to Exchange Online using app-only authentication
+   * Connect to Exchange Online using basic authentication with SecureString
    */
-  async connectToExchangeOnline(appId, tenantId, certificateThumbprint) {
+  async connectToExchangeOnline(username) {
     try {
-      const command = `Connect-ExchangeOnline -AppId "${appId}" -CertificateThumbprint "${certificateThumbprint}" -Organization "${tenantId}" -ShowProgress:$false`;
+      const command = `
+        # Load .env manually from server directory
+        $envPath = "${path.join(__dirname, '../.env')}"
+        if (Test-Path $envPath) {
+          Get-Content $envPath | ForEach-Object {
+            if ($_ -match '^\\s*#') { return }
+            $parts = $_ -split '=', 2
+            if ($parts.Length -eq 2) {
+              [System.Environment]::SetEnvironmentVariable($parts[0].Trim(), $parts[1].Trim())
+            }
+          }
+        }
+
+        # Read username and password
+        $user = if ("${username}") { "${username}" } else { $env:EXO_USER }
+        $passwordPath = "${path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec')}"
+        
+        if (-not (Test-Path $passwordPath)) {
+          throw "Password file not found at $passwordPath. Please run setup first."
+        }
+        
+        $securePassword = Get-Content $passwordPath | ConvertTo-SecureString
+        $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
+        
+        # Connect to Exchange Online
+        Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
+        Write-Output "Connected successfully to Exchange Online"
+      `;
       
       await this.executePowerShellCommand(command);
       this.isConnected = true;
-      console.log('Successfully connected to Exchange Online');
+      console.log('Successfully connected to Exchange Online with basic authentication');
       return { success: true, message: 'Connected to Exchange Online' };
     } catch (error) {
       console.error('Failed to connect to Exchange Online:', error);
       this.isConnected = false;
       throw new Error(`Exchange Online connection failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create secure password file
+   */
+  async createSecurePassword(password) {
+    try {
+      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
+      const command = `
+        $secureString = ConvertTo-SecureString "${password}" -AsPlainText -Force
+        $encryptedPassword = ConvertFrom-SecureString $secureString
+        Set-Content -Path "${passwordPath}" -Value $encryptedPassword
+        Write-Output "Password saved securely"
+      `;
+      
+      await this.executePowerShellCommand(command);
+      return { success: true, message: 'Password saved securely' };
+    } catch (error) {
+      console.error('Failed to create secure password:', error);
+      throw new Error(`Failed to create secure password: ${error.message}`);
+    }
+  }
+
+  /**
+   * Test password file exists and is valid
+   */
+  async validatePasswordFile() {
+    try {
+      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
+      const command = `
+        $passwordPath = "${passwordPath}"
+        if (Test-Path $passwordPath) {
+          $securePassword = Get-Content $passwordPath | ConvertTo-SecureString -ErrorAction Stop
+          Write-Output "Password file is valid"
+        } else {
+          throw "Password file not found"
+        }
+      `;
+      
+      await this.executePowerShellCommand(command);
+      return { success: true, message: 'Password file is valid' };
+    } catch (error) {
+      return { success: false, message: error.message };
     }
   }
 
@@ -187,11 +257,15 @@ class ExchangeService {
   }
 
   /**
-   * Test connection to Exchange Online
+   * Test connection to Exchange Online with basic auth
    */
-  async testConnection(appId, tenantId, certificateThumbprint) {
+  async testConnection(username, password) {
     try {
-      await this.connectToExchangeOnline(appId, tenantId, certificateThumbprint);
+      // First create the secure password file temporarily for testing
+      await this.createSecurePassword(password);
+      
+      // Test the connection
+      await this.connectToExchangeOnline(username);
       await this.disconnect();
       return { success: true, message: 'Exchange Online connection test successful' };
     } catch (error) {
