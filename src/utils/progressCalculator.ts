@@ -1,12 +1,19 @@
 
 import { NewHire } from "@/types/types";
 
+// Distribution List Progress Logic
+function getDistributionListProgress(status: NewHire['distribution_list_sync_status']): number {
+  if (status === "Synced") return 10;     // full credit
+  if (status === "Partial") return 5;     // half credit
+  return 0; // Failed or null
+}
+
 export function calculateProgressPercentage(hire: NewHire): number {
   let progress = 0;
 
-  // Account Creation Status = Active (25%)
+  // Account Creation Status = Active (20%)
   if (hire.account_creation_status === "Active") {
-    progress += 25;
+    progress += 20;
   }
 
   // Laptop Status (25% total, divided by 4 stages)
@@ -28,9 +35,9 @@ export function calculateProgressPercentage(hire: NewHire): number {
       progress += 0;
   }
 
-  // License Assigned (20%)
+  // License Assigned (15%)
   if (hire.license_assigned) {
-    progress += 20;
+    progress += 15;
   }
 
   // SRF Status (15%)
@@ -38,10 +45,13 @@ export function calculateProgressPercentage(hire: NewHire): number {
     progress += 15;
   }
 
-  // Microsoft 365 License (15%)
+  // Microsoft 365 License (10%)
   if (hire.microsoft_365_license && hire.microsoft_365_license !== "None" && hire.microsoft_365_license !== "") {
-    progress += 15;
+    progress += 10;
   }
+
+  // Distribution List Sync (10%)
+  progress += getDistributionListProgress(hire.distribution_list_sync_status);
 
   return Math.round(progress);
 }

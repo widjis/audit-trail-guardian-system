@@ -1,4 +1,3 @@
-
 import { useParams } from "react-router-dom";
 import { HireForm } from "@/components/hires/HireForm";
 import { AuditLogsList } from "@/components/hires/AuditLogsList";
@@ -57,6 +56,23 @@ export default function HireDetail() {
   // Check if Exchange Online integration is enabled
   const isExchangeEnabled = settings?.exchangeOnlineSettings?.enabled || false;
 
+  // Determine DL Sync Status (NEW)
+  const distributionListSyncStatus = hire?.distribution_list_sync_status ?? null;
+
+  // Show button logic:
+  // - Show "Sync to O365" button if not Synced (status is null, 'Failed' or 'Partial')
+  // - If 'Synced', show a disabled "Synced ✓" button
+  // - If 'Partial', show "Re-sync to O365" button and perhaps a warning
+  const showSyncButton =
+    isExchangeEnabled &&
+    hire?.email &&
+    (distributionListSyncStatus === null ||
+      distributionListSyncStatus === "Failed" ||
+      distributionListSyncStatus === "Partial"
+    );
+
+  const isFullySynced = distributionListSyncStatus === "Synced";
+
   const handleSendWhatsApp = () => {
     setIsWhatsAppDialogOpen(true);
   };
@@ -106,14 +122,26 @@ export default function HireDetail() {
                   Create AD Account
                 </Button>
               )}
-              {isExchangeEnabled && hire.email && (
+              {/* Only show if still need to sync, or needs resync */}
+              {isExchangeEnabled && hire.email && showSyncButton && (
                 <Button 
                   onClick={handleSyncDistributionLists} 
                   className="flex items-center gap-2"
                   variant="outline"
                 >
                   <Mail className="h-4 w-4" />
-                  Sync to O365
+                  {distributionListSyncStatus === "Partial" ? "Re-sync to O365" : "Sync to O365"}
+                </Button>
+              )}
+              {/* Show DISABLED "Synced ✓" button if already fully synced */}
+              {isExchangeEnabled && hire.email && isFullySynced && (
+                <Button 
+                  variant="outline"
+                  className="flex items-center gap-2 text-green-600 border-green-500 cursor-default"
+                  disabled
+                >
+                  <Mail className="h-4 w-4" />
+                  Synced ✓
                 </Button>
               )}
               <Button 

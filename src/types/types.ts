@@ -38,6 +38,10 @@ export interface NewHire {
   created_at?: string;
   updated_at?: string;
   audit_logs?: AuditLog[];
+
+  // Add for DL sync status
+  distribution_list_sync_status?: 'Synced' | 'Partial' | 'Failed' | null;
+  distribution_list_sync_date?: string | null;
 }
 
 // Add missing types for sorting

@@ -1,9 +1,9 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { distributionListService } from "@/services/distribution-list-service";
 import { NewHire } from "@/types/types";
@@ -13,6 +13,12 @@ interface SyncDistributionListDialogProps {
   onClose: () => void;
   onSuccess?: () => void;
 }
+
+const SYNC_STATUS_LABELS: Record<NonNullable<NewHire["distribution_list_sync_status"]>, string> = {
+  Synced: "All distribution lists successfully synced",
+  Partial: "Some lists failed to sync",
+  Failed: "All sync attempts failed",
+};
 
 export function SyncDistributionListDialog({ 
   hire, 
@@ -30,6 +36,12 @@ export function SyncDistributionListDialog({
         ? hire.mailing_list.split(',').map(item => item.trim()).filter(Boolean)
         : []);
 
+  // Status info
+  const status = hire.distribution_list_sync_status ?? null;
+  const lastSync = hire.distribution_list_sync_date 
+    ? new Date(hire.distribution_list_sync_date).toLocaleString() 
+    : null;
+
   const handleSync = async () => {
     if (!hire.id || mailingLists.length === 0) {
       toast({
@@ -39,7 +51,6 @@ export function SyncDistributionListDialog({
       });
       return;
     }
-
     setIsLoading(true);
     try {
       const result = await distributionListService.syncUserToDistributionLists(hire.id, mailingLists);
@@ -85,7 +96,34 @@ export function SyncDistributionListDialog({
             The following mailing lists will be synced to Office 365 distribution groups:
           </p>
         </div>
+        {/* Status Indicator Row */}
+        <div className="flex items-center text-xs mb-2 gap-4">
+          {status && status !== 'Failed' && (
+            <Badge variant={status === "Synced" ? "default" : "outline"} className={status === "Synced" ? "bg-green-500 text-white" : "bg-yellow-500 text-black"}>
+              {status === "Synced" && <CheckCircle className="w-3 h-3 mr-1 inline-block" />}
+              {status === "Partial" && <Clock className="w-3 h-3 mr-1 inline-block" />}
+              {SYNC_STATUS_LABELS[status]}
+            </Badge>
+          )}
+          {status === "Failed" && (
+            <Badge variant="outline" className="bg-red-500 text-white">
+              <XCircle className="w-3 h-3 mr-1 inline-block" />
+              {SYNC_STATUS_LABELS[status]}
+            </Badge>
+          )}
+          {status === null && (
+            <Badge variant="outline" className="text-muted-foreground">
+              Not yet synced
+            </Badge>
+          )}
+          {lastSync && (
+            <span className="text-sm text-muted-foreground ml-2 italic">
+              Last Synced: {lastSync}
+            </span>
+          )}
+        </div>
 
+        {/* Mailing Lists Display */}
         <div className="space-y-2">
           {mailingLists.length > 0 ? (
             mailingLists.map((list, index) => (
@@ -116,6 +154,7 @@ export function SyncDistributionListDialog({
           )}
         </div>
 
+        {/* Sync Results Feedback */}
         {syncResults && (
           <div className="bg-muted p-3 rounded">
             <h4 className="font-medium mb-2">Sync Results</h4>
@@ -138,10 +177,11 @@ export function SyncDistributionListDialog({
         <Button variant="outline" onClick={onClose}>
           Close
         </Button>
-        {!syncResults && mailingLists.length > 0 && (
+        {/* Sync Button Only available if not fully synced */}
+        {!syncResults && (status === null || status === "Failed" || status === "Partial") && mailingLists.length > 0 && (
           <Button onClick={handleSync} disabled={isLoading}>
             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Sync to O365
+            {status === "Partial" ? "Re-sync to O365" : "Sync to O365"}
           </Button>
         )}
       </DialogFooter>
