@@ -48,6 +48,44 @@ const ensureExchangeConnection = async () => {
   }
 };
 
+// Check PowerShell availability
+router.get('/check-powershell', async (req, res) => {
+  try {
+    const psInfo = await exchangeService.checkPowerShellAvailability();
+    
+    if (psInfo.available) {
+      res.json({
+        success: true,
+        available: true,
+        powershellType: psInfo.type,
+        command: psInfo.command,
+        message: `${psInfo.type} is available and ready to use`
+      });
+    } else {
+      res.json({
+        success: false,
+        available: false,
+        powershellType: null,
+        command: null,
+        message: 'PowerShell is not installed or not available in the system PATH. Please install PowerShell Core (pwsh) or ensure Windows PowerShell is available.',
+        installInstructions: {
+          windows: 'Download and install PowerShell Core from https://github.com/PowerShell/PowerShell/releases',
+          linux: 'Install PowerShell using: curl -sSL https://aka.ms/install-powershell.sh | sudo bash',
+          macos: 'Install PowerShell using: brew install --cask powershell'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error checking PowerShell availability:', error);
+    res.status(500).json({
+      success: false,
+      available: false,
+      message: 'Failed to check PowerShell availability',
+      error: error.message
+    });
+  }
+});
+
 // Setup Exchange credentials (create secure password file)
 router.post('/setup-credentials', async (req, res) => {
   try {
@@ -75,7 +113,24 @@ router.post('/setup-credentials', async (req, res) => {
       });
     }
 
+    // Check PowerShell availability first
+    const psInfo = await exchangeService.checkPowerShellAvailability();
+    if (!psInfo.available) {
+      console.error('PowerShell not available');
+      return res.status(400).json({
+        success: false,
+        error: 'PowerShell not available',
+        message: 'PowerShell is not installed or not available in the system PATH. Please install PowerShell Core (pwsh) or ensure Windows PowerShell is available.',
+        installInstructions: {
+          windows: 'Download and install PowerShell Core from https://github.com/PowerShell/PowerShell/releases',
+          linux: 'Install PowerShell using: curl -sSL https://aka.ms/install-powershell.sh | sudo bash',
+          macos: 'Install PowerShell using: brew install --cask powershell'
+        }
+      });
+    }
+
     console.log('Creating secure password file...');
+    console.log('Using PowerShell:', psInfo.type);
     
     // Create secure password file
     const result = await exchangeService.createSecurePassword(password);

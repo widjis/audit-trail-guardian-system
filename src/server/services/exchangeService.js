@@ -12,13 +12,68 @@ class ExchangeService {
   }
 
   /**
+   * Check if PowerShell is available
+   */
+  async checkPowerShellAvailability() {
+    return new Promise((resolve) => {
+      // Try pwsh first (PowerShell Core)
+      const ps = spawn('pwsh', ['--version'], { stdio: 'pipe' });
+      
+      ps.on('close', (code) => {
+        if (code === 0) {
+          resolve({ available: true, command: 'pwsh', type: 'PowerShell Core' });
+        } else {
+          // Try powershell (Windows PowerShell)
+          const ps2 = spawn('powershell', ['$PSVersionTable.PSVersion'], { stdio: 'pipe' });
+          
+          ps2.on('close', (code2) => {
+            if (code2 === 0) {
+              resolve({ available: true, command: 'powershell', type: 'Windows PowerShell' });
+            } else {
+              resolve({ available: false, command: null, type: null });
+            }
+          });
+          
+          ps2.on('error', () => {
+            resolve({ available: false, command: null, type: null });
+          });
+        }
+      });
+      
+      ps.on('error', () => {
+        // Try powershell (Windows PowerShell)
+        const ps2 = spawn('powershell', ['$PSVersionTable.PSVersion'], { stdio: 'pipe' });
+        
+        ps2.on('close', (code2) => {
+          if (code2 === 0) {
+            resolve({ available: true, command: 'powershell', type: 'Windows PowerShell' });
+          } else {
+            resolve({ available: false, command: null, type: null });
+          }
+        });
+        
+        ps2.on('error', () => {
+          resolve({ available: false, command: null, type: null });
+        });
+      });
+    });
+  }
+
+  /**
    * Execute PowerShell command and return result
    */
   async executePowerShellCommand(command) {
+    // Check PowerShell availability first
+    const psInfo = await this.checkPowerShellAvailability();
+    
+    if (!psInfo.available) {
+      throw new Error('PowerShell is not installed or not available in the system PATH. Please install PowerShell Core (pwsh) or ensure Windows PowerShell is available.');
+    }
+
     return new Promise((resolve, reject) => {
-      console.log(`Executing PowerShell command: ${command}`);
+      console.log(`Executing PowerShell command using ${psInfo.type}: ${command}`);
       
-      const ps = spawn('pwsh', ['-Command', command], {
+      const ps = spawn(psInfo.command, ['-Command', command], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -42,9 +97,48 @@ class ExchangeService {
       });
 
       ps.on('error', (error) => {
-        reject(new Error(`Failed to start PowerShell process: ${error.message}`));
+        reject(new Error(`Failed to start PowerShell process: ${error.message}. Please ensure PowerShell is installed and available in the system PATH.`));
       });
     });
+  }
+
+  /**
+   * Create secure password file
+   */
+  async createSecurePassword(password) {
+    try {
+      console.log('Creating secure password file...');
+      
+      if (!password) {
+        throw new Error('Password is required');
+      }
+
+      // Check PowerShell availability first
+      const psInfo = await this.checkPowerShellAvailability();
+      
+      if (!psInfo.available) {
+        throw new Error('PowerShell is not installed or not available. Please install PowerShell Core (pwsh) or ensure Windows PowerShell is available in the system PATH.');
+      }
+
+      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
+      console.log('Password file path:', passwordPath);
+      console.log('Using PowerShell:', psInfo.type);
+      
+      const command = `
+        $secureString = ConvertTo-SecureString "${password.replace(/"/g, '""')}" -AsPlainText -Force
+        $encryptedPassword = ConvertFrom-SecureString $secureString
+        Set-Content -Path "${passwordPath}" -Value $encryptedPassword
+        Write-Output "Password saved securely to ${passwordPath}"
+      `;
+      
+      const result = await this.executePowerShellCommand(command);
+      console.log('PowerShell result:', result);
+      
+      return { success: true, message: 'Password saved securely' };
+    } catch (error) {
+      console.error('Failed to create secure password:', error);
+      throw new Error(`Failed to create secure password: ${error.message}`);
+    }
   }
 
   /**
@@ -89,37 +183,6 @@ class ExchangeService {
       console.error('Failed to connect to Exchange Online:', error);
       this.isConnected = false;
       throw new Error(`Exchange Online connection failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Create secure password file
-   */
-  async createSecurePassword(password) {
-    try {
-      console.log('Creating secure password file...');
-      
-      if (!password) {
-        throw new Error('Password is required');
-      }
-
-      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
-      console.log('Password file path:', passwordPath);
-      
-      const command = `
-        $secureString = ConvertTo-SecureString "${password.replace(/"/g, '""')}" -AsPlainText -Force
-        $encryptedPassword = ConvertFrom-SecureString $secureString
-        Set-Content -Path "${passwordPath}" -Value $encryptedPassword
-        Write-Output "Password saved securely to ${passwordPath}"
-      `;
-      
-      const result = await this.executePowerShellCommand(command);
-      console.log('PowerShell result:', result);
-      
-      return { success: true, message: 'Password saved securely' };
-    } catch (error) {
-      console.error('Failed to create secure password:', error);
-      throw new Error(`Failed to create secure password: ${error.message}`);
     }
   }
 
