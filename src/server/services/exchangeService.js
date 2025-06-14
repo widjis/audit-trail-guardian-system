@@ -214,23 +214,40 @@ class ExchangeService {
    */
   async addUserToDistributionGroup(userEmail, groupEmail) {
     try {
-      if (!this.isConnected) {
-        throw new Error('Not connected to Exchange Online');
-      }
+      // Always run everything in a single script so module/cmdlets are recognized
+      const username = process.env.EXO_USER;
+      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
 
-      const command = `Add-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -ErrorAction Stop`;
+      // PowerShell script to Import-Module, Connect, Add, then Disconnect in one go
+      const command = `
+        Import-Module ExchangeOnlineManagement -ErrorAction Stop
+        
+        $user = "${username}"
+        $passwordPath = "${passwordPath}"
+
+        if (-not (Test-Path $passwordPath)) {
+          throw "Password file not found at $passwordPath. Please run setup first."
+        }
+        $securePassword = Get-Content $passwordPath | ConvertTo-SecureString
+        $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
+
+        Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
+
+        Add-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -ErrorAction Stop
+
+        Disconnect-ExchangeOnline -Confirm:$false
+        Write-Output "User added to distribution group"
+      `;
+
       await this.executePowerShellCommand(command);
-      
       console.log(`Successfully added ${userEmail} to ${groupEmail}`);
       return { success: true, message: `User added to distribution group ${groupEmail}` };
     } catch (error) {
       console.error(`Failed to add user to distribution group:`, error);
-      
-      // Check if user is already a member
+
       if (error.message.includes('already a member') || error.message.includes('recipient already exists')) {
         return { success: true, message: `User is already a member of ${groupEmail}`, alreadyMember: true };
       }
-      
       throw new Error(`Failed to add user to distribution group: ${error.message}`);
     }
   }
@@ -240,13 +257,30 @@ class ExchangeService {
    */
   async removeUserFromDistributionGroup(userEmail, groupEmail) {
     try {
-      if (!this.isConnected) {
-        throw new Error('Not connected to Exchange Online');
-      }
+      // Always run everything in a single script so module/cmdlets are recognized
+      const username = process.env.EXO_USER;
+      const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
+      const command = `
+        Import-Module ExchangeOnlineManagement -ErrorAction Stop
 
-      const command = `Remove-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -Confirm:$false -ErrorAction Stop`;
+        $user = "${username}"
+        $passwordPath = "${passwordPath}"
+
+        if (-not (Test-Path $passwordPath)) {
+          throw "Password file not found at $passwordPath. Please run setup first."
+        }
+        $securePassword = Get-Content $passwordPath | ConvertTo-SecureString
+        $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
+
+        Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
+
+        Remove-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -Confirm:\$false -ErrorAction Stop
+
+        Disconnect-ExchangeOnline -Confirm:$false
+        Write-Output "User removed from distribution group"
+      `;
+
       await this.executePowerShellCommand(command);
-      
       console.log(`Successfully removed ${userEmail} from ${groupEmail}`);
       return { success: true, message: `User removed from distribution group ${groupEmail}` };
     } catch (error) {
