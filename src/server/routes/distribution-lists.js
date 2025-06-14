@@ -212,8 +212,8 @@ router.post('/sync-user', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request. Hire ID and mailing lists are required.' });
     }
 
-    // Get hire information
-    const hires = await executeQuery('SELECT email, first_name, last_name FROM hires WHERE id = ?', [hireId]);
+    // Get hire information (email only)
+    const hires = await executeQuery('SELECT email FROM hires WHERE id = ?', [hireId]);
     if (hires.length === 0) {
       return res.status(404).json({ error: 'Hire not found' });
     }
@@ -291,8 +291,8 @@ router.post('/remove-user', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request. Hire ID and mailing lists are required.' });
     }
 
-    // Get hire information
-    const hires = await executeQuery('SELECT email, first_name, last_name FROM hires WHERE id = ?', [hireId]);
+    // Get hire information (email only)
+    const hires = await executeQuery('SELECT email FROM hires WHERE id = ?', [hireId]);
     if (hires.length === 0) {
       return res.status(404).json({ error: 'Hire not found' });
     }
