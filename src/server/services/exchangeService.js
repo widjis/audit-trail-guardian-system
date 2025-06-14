@@ -210,42 +210,81 @@ class ExchangeService {
   }
 
   /**
-   * Add user to distribution group
+   * Add user to distribution group or Office 365 group
    */
   async addUserToDistributionGroup(userEmail, groupEmail) {
     try {
-      // Always run everything in a single script so module/cmdlets are recognized
       const username = process.env.EXO_USER;
       const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
 
-      // PowerShell script to Import-Module, Connect, Add, then Disconnect in one go
+      // Script: try Get-DistributionGroup first; fallback to Office 365 Group logic if not found or not supported
       const command = `
         Import-Module ExchangeOnlineManagement -ErrorAction Stop
-        
+
         $user = "${username}"
         $passwordPath = "${passwordPath}"
-
         if (-not (Test-Path $passwordPath)) {
           throw "Password file not found at $passwordPath. Please run setup first."
         }
         $securePassword = Get-Content $passwordPath | ConvertTo-SecureString
         $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
-
         Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
 
-        Add-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -ErrorAction Stop
-
+        $group = Get-DistributionGroup -Identity "${groupEmail}" -ErrorAction SilentlyContinue
+        if ($group) {
+          try {
+            Add-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -ErrorAction Stop
+            $resultMsg = "User added to classic Distribution Group"
+          } catch {
+            if ($_.Exception.Message -match "already a member" -or $_.Exception.Message -match "recipient already exists") {
+              $resultMsg = "ALREADY_MEMBER"
+            } else {
+              throw $_
+            }
+          }
+        } else {
+          # Not a classic DG, try as Office 365 Group (Unified/GroupMailbox)
+          $unifiedGroup = Get-UnifiedGroup -Identity "${groupEmail}" -ErrorAction SilentlyContinue
+          if ($unifiedGroup) {
+            try {
+              Add-UnifiedGroupLinks -Identity "${groupEmail}" -Links "${userEmail}" -LinkType Members -ErrorAction Stop
+              $resultMsg = "User added to Office 365 group"
+            } catch {
+              if ($_.Exception.Message -match "already a member" -or $_.Exception.Message -match "is already present in the specified links") {
+                $resultMsg = "ALREADY_MEMBER"
+              } elseif ($_.Exception.Message -match "The current operation is not supported on GroupMailbox") {
+                throw "Can't add to GroupMailbox with Add-DistributionGroupMember, must use Add-UnifiedGroupLinks"
+              } else {
+                throw $_
+              }
+            }
+          } else {
+            throw "Group ${groupEmail} was not found as DistributionGroup or UnifiedGroup."
+          }
+        }
         Disconnect-ExchangeOnline -Confirm:$false
-        Write-Output "User added to distribution group"
+
+        if ($resultMsg -eq "ALREADY_MEMBER") {
+          Write-Output "ALREADY_MEMBER"
+        } else {
+          Write-Output $resultMsg
+        }
       `;
 
-      await this.executePowerShellCommand(command);
-      console.log(`Successfully added ${userEmail} to ${groupEmail}`);
+      const result = await this.executePowerShellCommand(command);
+      if (result.includes("ALREADY_MEMBER")) {
+        return { success: true, message: `User is already a member of ${groupEmail}`, alreadyMember: true };
+      }
       return { success: true, message: `User added to distribution group ${groupEmail}` };
     } catch (error) {
-      console.error(`Failed to add user to distribution group:`, error);
-
-      if (error.message.includes('already a member') || error.message.includes('recipient already exists')) {
+      // Expand error reporting for mailbox type
+      if (
+        error.message.includes('The current operation is not supported on GroupMailbox') ||
+        error.message.match(/Add-DistributionGroupMember.*not recognized/) // fallback
+      ) {
+        return { success: false, message: `This is an Office 365 Group (GroupMailbox), not a classic distribution group. Please ensure the group type is compatible.`, o365Group: true };
+      }
+      if (error.message.includes('already a member') || error.message.includes('recipient already exists') || error.message.includes("is already present in the specified links")) {
         return { success: true, message: `User is already a member of ${groupEmail}`, alreadyMember: true };
       }
       throw new Error(`Failed to add user to distribution group: ${error.message}`);
@@ -253,11 +292,10 @@ class ExchangeService {
   }
 
   /**
-   * Remove user from distribution group
+   * Remove user from distribution group or Office 365 group
    */
   async removeUserFromDistributionGroup(userEmail, groupEmail) {
     try {
-      // Always run everything in a single script so module/cmdlets are recognized
       const username = process.env.EXO_USER;
       const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
       const command = `
@@ -265,26 +303,35 @@ class ExchangeService {
 
         $user = "${username}"
         $passwordPath = "${passwordPath}"
-
         if (-not (Test-Path $passwordPath)) {
           throw "Password file not found at $passwordPath. Please run setup first."
         }
         $securePassword = Get-Content $passwordPath | ConvertTo-SecureString
         $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
-
         Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
 
-        Remove-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -Confirm:\$false -ErrorAction Stop
-
+        $group = Get-DistributionGroup -Identity "${groupEmail}" -ErrorAction SilentlyContinue
+        if ($group) {
+          Remove-DistributionGroupMember -Identity "${groupEmail}" -Member "${userEmail}" -Confirm:\$false -ErrorAction Stop
+          $resultMsg = "User removed from classic Distribution Group"
+        } else {
+          $unifiedGroup = Get-UnifiedGroup -Identity "${groupEmail}" -ErrorAction SilentlyContinue
+          if ($unifiedGroup) {
+            Remove-UnifiedGroupLinks -Identity "${groupEmail}" -Links "${userEmail}" -LinkType Members -Confirm:\$false -ErrorAction Stop
+            $resultMsg = "User removed from Office 365 group"
+          } else {
+            throw "Group ${groupEmail} was not found as DistributionGroup or UnifiedGroup."
+          }
+        }
         Disconnect-ExchangeOnline -Confirm:$false
-        Write-Output "User removed from distribution group"
+        Write-Output $resultMsg
       `;
-
-      await this.executePowerShellCommand(command);
-      console.log(`Successfully removed ${userEmail} from ${groupEmail}`);
+      const result = await this.executePowerShellCommand(command);
       return { success: true, message: `User removed from distribution group ${groupEmail}` };
     } catch (error) {
-      console.error(`Failed to remove user from distribution group:`, error);
+      if (error.message.includes('is not a member') || error.message.includes('is not present in the specified links')) {
+        return { success: true, message: `User was not a member of ${groupEmail}` };
+      }
       throw new Error(`Failed to remove user from distribution group: ${error.message}`);
     }
   }

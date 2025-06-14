@@ -237,20 +237,20 @@ router.post('/sync-user', async (req, res) => {
           ...result
         });
 
-        // Log the operation
-        const auditLog = {
-          id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-          hire_id: hireId,
-          action: 'sync_distribution_group',
-          details: `Added to distribution group: ${mailingListEmail}`,
-          performed_by: req.user?.username || 'System',
-          created_at: new Date().toISOString()
-        };
+        // AUDIT: Disabled due to schema errors, uncomment after schema fix
+        // const auditLog = {
+        //   id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+        //   hire_id: hireId,
+        //   action: 'sync_distribution_group',
+        //   details: `Added to distribution group: ${mailingListEmail}`,
+        //   performed_by: req.user?.username || 'System',
+        //   created_at: new Date().toISOString()
+        // };
 
-        await executeQuery(
-          'INSERT INTO audit_logs (id, hire_id, action, details, performed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [auditLog.id, auditLog.hire_id, auditLog.action, auditLog.details, auditLog.performed_by, auditLog.created_at]
-        );
+        // await executeQuery(
+        //   'INSERT INTO audit_logs (id, hire_id, action, details, performed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        //   [auditLog.id, auditLog.hire_id, auditLog.action, auditLog.details, auditLog.performed_by, auditLog.created_at]
+        // );
 
       } catch (error) {
         console.error(`Error adding user to ${mailingListEmail}:`, error);
@@ -316,20 +316,20 @@ router.post('/remove-user', async (req, res) => {
           ...result
         });
 
-        // Log the operation
-        const auditLog = {
-          id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-          hire_id: hireId,
-          action: 'remove_distribution_group',
-          details: `Removed from distribution group: ${mailingListEmail}`,
-          performed_by: req.user?.username || 'System',
-          created_at: new Date().toISOString()
-        };
+        // AUDIT: Disabled due to schema errors, uncomment after schema fix
+        // const auditLog = {
+        //   id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+        //   hire_id: hireId,
+        //   action: 'remove_distribution_group',
+        //   details: `Removed from distribution group: ${mailingListEmail}`,
+        //   performed_by: req.user?.username || 'System',
+        //   created_at: new Date().toISOString()
+        // };
 
-        await executeQuery(
-          'INSERT INTO audit_logs (id, hire_id, action, details, performed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [auditLog.id, auditLog.hire_id, auditLog.action, auditLog.details, auditLog.performed_by, auditLog.created_at]
-        );
+        // await executeQuery(
+        //   'INSERT INTO audit_logs (id, hire_id, action, details, performed_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        //   [auditLog.id, auditLog.hire_id, auditLog.action, auditLog.details, auditLog.performed_by, auditLog.created_at]
+        // );
 
       } catch (error) {
         console.error(`Error removing user from ${mailingListEmail}:`, error);
