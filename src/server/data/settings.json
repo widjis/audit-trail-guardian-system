@@ -8,7 +8,7 @@
   "positionGrades": [
     "General Management",
     "Superintendent",
-    "Supervisor", 
+    "Supervisor",
     "Staff",
     "Non-Staff"
   ],
@@ -329,9 +329,8 @@
     "enabled": true
   },
   "exchangeOnlineSettings": {
-    "enabled": false,
-    "appId": "",
-    "tenantId": "",
-    "certificateThumbprint": ""
+    "enabled": true,
+    "username": "widji.santoso@merdekabattery.com",
+    "passwordConfigured": true
   }
 }
