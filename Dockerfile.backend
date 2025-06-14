@@ -1,30 +1,36 @@
 # ── Stage 1: Build your Node app ──────────────────────────────────
-FROM node:18-alpine AS build
+FROM node:18-slim AS build
 WORKDIR /app
 
+# 1) Install production dependencies (ignore peer-dep warnings)
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
+
+# 2) Copy the rest of your application
 COPY . .
 
-# ── Stage 2: Runtime on PowerShell ──────────────────────────────
+# ── Stage 2: Runtime on PowerShell + Node 18 ─────────────────────
 FROM mcr.microsoft.com/powershell:latest AS runtime
 WORKDIR /app
 
-# 1) Install Node so your Express app can run
+# 1) Install Node 18 from NodeSource
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      nodejs \
-      npm && \
+      curl ca-certificates gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# 2) Copy over the built app and its dependencies
+# 2) Copy in your built app and its dependencies
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app ./
 
-# 3) Install the Exchange Online PowerShell module
-RUN pwsh -Command "Install-Module ExchangeOnlineManagement -Force -Scope AllUsers; Exit \$LASTEXITCODE"
+# 3) Install the ExchangeOnlineManagement module non-interactively
+RUN pwsh -NoProfile -NonInteractive -Command \
+    "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
+     Install-Module ExchangeOnlineManagement -Force -AllowClobber -Scope AllUsers; \
+     Exit \$LASTEXITCODE"
 
+# 4) Expose and start under pwsh so both Node and PowerShell are available
 EXPOSE 3001
-
-# 4) Start your app via pwsh so all modules are loaded
 CMD ["pwsh", "-c", "node src/server/start.js"]
