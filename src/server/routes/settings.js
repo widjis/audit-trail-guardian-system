@@ -479,9 +479,18 @@ router.get('/exchange-online', (req, res) => {
     const settings = getSettings();
     const exchangeSettings = settings.exchangeOnlineSettings || {
       enabled: false,
-      username: process.env.EXO_USER || '',
+      username: '',
       passwordConfigured: false
     };
+    
+    // Always get the username from environment variable on the server
+    const envUsername = process.env.EXO_USER || '';
+    exchangeSettings.username = envUsername;
+    
+    console.log('Exchange Online settings requested:', {
+      username: envUsername ? 'Set' : 'Not set',
+      passwordConfigured: exchangeSettings.passwordConfigured
+    });
     
     res.json(exchangeSettings);
   } catch (error) {

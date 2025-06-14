@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -88,15 +87,13 @@ export function ExchangeOnlineSetupWizard({
         return;
       }
       
-      // Use the actual username from environment or the provided username
-      const actualUsername = username || process.env.EXO_USER;
-      if (!actualUsername) {
-        toast.error("Username not configured. Please check EXO_USER environment variable.");
+      if (!username) {
+        toast.error("Username not configured on server. Please check EXO_USER environment variable.");
         return;
       }
       
-      console.log('Attempting to setup credentials for:', actualUsername);
-      setupMutation.mutate({ username: actualUsername, password });
+      console.log('Attempting to setup credentials for:', username);
+      setupMutation.mutate({ username, password });
     }
   };
 
@@ -157,12 +154,12 @@ export function ExchangeOnlineSetupWizard({
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
-                  value={username || 'Not configured (check EXO_USER environment variable)'}
+                  value={username || 'Not configured (server environment variable EXO_USER not set)'}
                   disabled
                   className="bg-gray-50"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Username loaded from environment variable EXO_USER
+                  Username loaded from server environment variable EXO_USER
                 </p>
               </div>
 
