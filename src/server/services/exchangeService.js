@@ -97,15 +97,25 @@ class ExchangeService {
    */
   async createSecurePassword(password) {
     try {
+      console.log('Creating secure password file...');
+      
+      if (!password) {
+        throw new Error('Password is required');
+      }
+
       const passwordPath = path.join(process.env.HOME || process.env.USERPROFILE || '.', 'exo_password.sec');
+      console.log('Password file path:', passwordPath);
+      
       const command = `
-        $secureString = ConvertTo-SecureString "${password}" -AsPlainText -Force
+        $secureString = ConvertTo-SecureString "${password.replace(/"/g, '""')}" -AsPlainText -Force
         $encryptedPassword = ConvertFrom-SecureString $secureString
         Set-Content -Path "${passwordPath}" -Value $encryptedPassword
-        Write-Output "Password saved securely"
+        Write-Output "Password saved securely to ${passwordPath}"
       `;
       
-      await this.executePowerShellCommand(command);
+      const result = await this.executePowerShellCommand(command);
+      console.log('PowerShell result:', result);
+      
       return { success: true, message: 'Password saved securely' };
     } catch (error) {
       console.error('Failed to create secure password:', error);

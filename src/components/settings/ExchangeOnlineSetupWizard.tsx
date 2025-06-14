@@ -34,9 +34,20 @@ export function ExchangeOnlineSetupWizard({
   // Setup/Reset password mutation
   const setupMutation = useMutation({
     mutationFn: async (data: { username: string; password: string }) => {
+      console.log('Setting up Exchange credentials for username:', data.username);
+      
+      if (!data.username || !data.password) {
+        throw new Error('Username and password are required');
+      }
+      
+      if (data.password.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+      
       return await distributionListService.setupExchangeCredentials(data.username, data.password);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Setup successful:', data);
       setStep(3);
       toast.success(isReset ? "Password reset successfully" : "Exchange Online setup completed");
       setTimeout(() => {
@@ -45,8 +56,10 @@ export function ExchangeOnlineSetupWizard({
         resetWizard();
       }, 2000);
     },
-    onError: (error) => {
-      toast.error(`Setup failed: ${error.message}`);
+    onError: (error: any) => {
+      console.error('Setup failed:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Setup failed';
+      toast.error(`Setup failed: ${errorMessage}`);
     }
   });
 
@@ -74,7 +87,16 @@ export function ExchangeOnlineSetupWizard({
         toast.error("Passwords do not match");
         return;
       }
-      setupMutation.mutate({ username, password });
+      
+      // Use the actual username from environment or the provided username
+      const actualUsername = username || process.env.EXO_USER;
+      if (!actualUsername) {
+        toast.error("Username not configured. Please check EXO_USER environment variable.");
+        return;
+      }
+      
+      console.log('Attempting to setup credentials for:', actualUsername);
+      setupMutation.mutate({ username: actualUsername, password });
     }
   };
 
@@ -135,7 +157,7 @@ export function ExchangeOnlineSetupWizard({
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
-                  value={username}
+                  value={username || 'Not configured (check EXO_USER environment variable)'}
                   disabled
                   className="bg-gray-50"
                 />
@@ -176,6 +198,15 @@ export function ExchangeOnlineSetupWizard({
                   Make sure MFA is disabled for this account and basic authentication is enabled in your Exchange Online settings.
                 </AlertDescription>
               </Alert>
+
+              {!username && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Username not configured. Please set the EXO_USER environment variable on your server.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
 
@@ -245,7 +276,7 @@ export function ExchangeOnlineSetupWizard({
               )}
               
               {step < 2 && (
-                <Button onClick={handleNext} disabled={!password}>
+                <Button onClick={handleNext} disabled={!password || !username}>
                   Next
                 </Button>
               )}
@@ -253,7 +284,7 @@ export function ExchangeOnlineSetupWizard({
               {step === 2 && (
                 <Button 
                   onClick={handleNext} 
-                  disabled={setupMutation.isPending || password !== confirmPassword || !password}
+                  disabled={setupMutation.isPending || password !== confirmPassword || !password || !username}
                 >
                   {setupMutation.isPending ? (
                     <>

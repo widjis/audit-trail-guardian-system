@@ -53,29 +53,54 @@ router.post('/setup-credentials', async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    console.log('Setup credentials request received');
+    console.log('Username provided:', username ? 'Yes' : 'No');
+    console.log('Password provided:', password ? 'Yes' : 'No');
+
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+      console.error('Missing username or password in request');
+      return res.status(400).json({ 
+        error: 'Username and password are required',
+        success: false,
+        message: 'Username and password are required' 
+      });
     }
 
+    if (password.length < 8) {
+      console.error('Password too short');
+      return res.status(400).json({ 
+        error: 'Password must be at least 8 characters long',
+        success: false,
+        message: 'Password must be at least 8 characters long' 
+      });
+    }
+
+    console.log('Creating secure password file...');
+    
     // Create secure password file
     const result = await exchangeService.createSecurePassword(password);
     
     if (result.success) {
+      console.log('Secure password created, testing connection...');
+      
       // Test the connection to make sure everything works
       const testResult = await exchangeService.testConnection(username, password);
       
       if (testResult.success) {
+        console.log('Connection test successful');
         res.json({ 
           success: true, 
           message: 'Credentials configured and tested successfully' 
         });
       } else {
+        console.error('Connection test failed:', testResult.message);
         res.status(400).json({ 
           success: false, 
           message: `Credentials saved but connection test failed: ${testResult.message}` 
         });
       }
     } else {
+      console.error('Failed to save credentials securely');
       res.status(500).json({ 
         success: false, 
         message: 'Failed to save credentials securely' 
@@ -84,7 +109,11 @@ router.post('/setup-credentials', async (req, res) => {
 
   } catch (error) {
     console.error('Error setting up Exchange credentials:', error);
-    res.status(500).json({ error: 'Failed to setup credentials', message: error.message });
+    res.status(500).json({ 
+      error: 'Failed to setup credentials', 
+      message: error.message,
+      success: false 
+    });
   }
 });
 
