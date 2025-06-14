@@ -47,7 +47,7 @@ export function calculateProgressPercentage(hire: NewHire): number {
 
   // Microsoft 365 License (10%)
   if (hire.microsoft_365_license && hire.microsoft_365_license !== "None" && hire.microsoft_365_license !== "") {
-    progress += 10;
+    progress += 15;
   }
 
   // Distribution List Sync (10%)
