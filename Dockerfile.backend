@@ -1,30 +1,30 @@
-# ── Stage 1: Build your Node app ──────────────────────────────────
-FROM node:18-slim AS build
+# ── Stage 1: Build your Node app on Alpine ───────────────────────
+FROM node:18-alpine AS build
 WORKDIR /app
+
+# Install any build-time deps you need (git, python, etc). If none, skip.
+RUN apk add --no-cache git
 
 COPY package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps
+
 COPY . .
 
-# ── Stage 2: Runtime on PowerShell ──────────────────────────────
-FROM mcr.microsoft.com/powershell:latest AS runtime
+# ── Stage 2: Runtime on Alpine PowerShell ────────────────────────
+FROM mcr.microsoft.com/powershell:7.3.0-alpine-3.15 AS runtime
 WORKDIR /app
 
-# 1) Install Node so your Express app can run
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      nodejs \
-      npm && \
-    rm -rf /var/lib/apt/lists/*
+# 1) Install Node (so your Express server can run)
+RUN apk add --no-cache nodejs npm
 
-# 2) Copy over the built app and its dependencies
+# 2) Copy over your production deps and app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app ./
 
-# 3) Install the Exchange Online PowerShell module
+# 3) Install the ExchangeOnlineManagement module
 RUN pwsh -Command "Install-Module ExchangeOnlineManagement -Force -Scope AllUsers; Exit \$LASTEXITCODE"
 
 EXPOSE 3001
 
-# 4) Start your app via pwsh so all modules are loaded
+# 4) Launch under pwsh so cmdlets are available
 CMD ["pwsh", "-c", "node src/server/start.js"]
