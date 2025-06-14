@@ -2,31 +2,26 @@
 FROM node:18-slim AS build
 WORKDIR /app
 
-# Copy & install only production dependencies
+# Install production deps
 COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
-
-# Copy source (so we can rebuild if you have TS, etc.)
 COPY . .
 
 # ── Stage 2: Runtime on PowerShell Image ─────────────────────────
-FROM mcr.microsoft.com/powershell:7.3-debian-11-slim AS runtime
+FROM mcr.microsoft.com/powershell:7.3-slim AS runtime
 WORKDIR /app
 
-# 1) Install Node (so we can run your Express server)
+# 1) Install Node so we can run the server
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      nodejs \
-      npm && \
+    apt-get install -y --no-install-recommends nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 
-# 2) Copy node_modules and app code from build stage
+# 2) Copy app and dependencies
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app ./
 
-# 3) Install the ExchangeOnlineManagement module
-RUN pwsh -Command "Install-Module -Name ExchangeOnlineManagement -Force -Scope AllUsers; Exit \$LASTEXITCODE"
+# 3) Install ExchangeOnlineManagement
+RUN pwsh -Command "Install-Module ExchangeOnlineManagement -Force -Scope AllUsers; Exit \$LASTEXITCODE"
 
-# 4) Expose & launch
 EXPOSE 3001
 CMD ["pwsh", "-c", "node src/server/start.js"]
