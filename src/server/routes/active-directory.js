@@ -61,12 +61,21 @@ const formatBindCredential = (settings, username) => {
     // Extract the username part if it's in UPN format (user@domain.com)
     const userPart = username.includes('@') ? username.split('@')[0] : username;
     
-    // Create a simple DN - customize based on your AD structure
-    // Using format CN=username,CN=Users,DC=domain,DC=com which is more standard
-    const formattedDN = `CN=${userPart},CN=Users,${settings.baseDN}`;
+    // Use baseDN directly without forcing CN=Users
+    const formattedDN = `CN=${userPart},${settings.baseDN}`;
     logger.api.debug(`Formatted DN: ${formattedDN}`);
     return formattedDN;
   }
+  // if (settings.authFormat === 'dn') {
+  //   // Extract the username part if it's in UPN format (user@domain.com)
+  //   const userPart = username.includes('@') ? username.split('@')[0] : username;
+    
+  //   // Create a simple DN - customize based on your AD structure
+  //   // Using format CN=username,CN=Users,DC=domain,DC=com which is more standard
+  //   const formattedDN = `CN=${userPart},CN=Users,${settings.baseDN}`;
+  //   logger.api.debug(`Formatted DN: ${formattedDN}`);
+  //   return formattedDN;
+  // }
   
   // Default to UPN format (or keep as is if it already has @domain)
   if (!username.includes('@')) {
@@ -519,6 +528,113 @@ router.post('/create-user/:id', async (req, res) => {
   }
 });
 
+// Add this function around line 500, before the createLdapUser function
+// Function to check if OU exists and create it if needed
+const ensureOUExists = async (client, ouPath, settings) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Skip if it's the default Users container
+      if (ouPath.startsWith('CN=Users')) {
+        return resolve(true);
+      }
+      
+      logger.api.debug(`Checking if OU exists: ${ouPath}`);
+      
+      // Search for the OU
+      client.search(ouPath, {
+        scope: 'base',
+        filter: '(objectClass=*)'
+      }, (err, res) => {
+        if (err) {
+          // If error code is "No Such Object", we need to create the OU
+          if (err.code === 0x20 || err.message.includes('No Such Object')) {
+            logger.api.info(`OU does not exist: ${ouPath}, attempting to create it`);
+            
+            // Parse the OU path to get the components
+            const ouMatch = ouPath.match(/OU=([^,]+),(.*)/);
+            if (!ouMatch) {
+              return reject(new Error(`Invalid OU path format: ${ouPath}`));
+            }
+            
+            const ouName = ouMatch[1];
+            const parentDN = ouMatch[2];
+            
+            // First ensure parent OU exists (recursive call)
+            if (parentDN.startsWith('OU=')) {
+              ensureOUExists(client, parentDN, settings)
+                .then(() => {
+                  // Now create the current OU
+                  const entry = {
+                    objectClass: ['top', 'organizationalUnit'],
+                    ou: ouName
+                  };
+                  
+                  client.add(ouPath, entry, (addErr) => {
+                    if (addErr) {
+                      logger.api.error(`Error creating OU ${ouPath}: ${addErr}`);
+                      return reject(addErr);
+                    }
+                    
+                    logger.api.info(`Successfully created OU: ${ouPath}`);
+                    resolve(true);
+                  });
+                })
+                .catch(reject);
+            } else {
+              // Parent is not an OU (e.g., DC components), just create the current OU
+              const entry = {
+                objectClass: ['top', 'organizationalUnit'],
+                ou: ouName
+              };
+              
+              client.add(ouPath, entry, (addErr) => {
+                if (addErr) {
+                  logger.api.error(`Error creating OU ${ouPath}: ${addErr}`);
+                  return reject(addErr);
+                }
+                
+                logger.api.info(`Successfully created OU: ${ouPath}`);
+                resolve(true);
+              });
+            }
+          } else {
+            // Other search error
+            logger.api.error(`Error searching for OU ${ouPath}: ${err}`);
+            reject(err);
+          }
+        } else {
+          // OU exists
+          let found = false;
+          
+          res.on('searchEntry', () => {
+            found = true;
+            logger.api.debug(`OU exists: ${ouPath}`);
+          });
+          
+          res.on('error', (err) => {
+            logger.api.error(`Search error for OU ${ouPath}: ${err}`);
+            reject(err);
+          });
+          
+          res.on('end', () => {
+            if (found) {
+              resolve(true);
+            } else {
+              // No entries found, OU doesn't exist
+              logger.api.info(`OU not found in search results: ${ouPath}, attempting to create it`);
+              reject(new Error(`OU not found: ${ouPath}`));
+            }
+          });
+        }
+      });
+    } catch (err) {
+      logger.api.error(`Error in ensureOUExists: ${err}`);
+      reject(err);
+    }
+  });
+};
+
+
 // Create user in AD - enhanced to handle existing users
 const createLdapUser = async (settings, userData) => {
   return new Promise(async (resolve, reject) => {
@@ -560,8 +676,22 @@ const createLdapUser = async (settings, userData) => {
         logger.api.debug('User does not exist, creating new user');
         
         // Create user DN
+        // Create user DN and ensure OU exists
         userDN = `CN=${userData.displayName},${userData.ou}`;
         logger.api.debug(`User DN will be: ${userDN}`);
+
+        // Ensure the OU exists before creating user
+        try {
+          logger.api.debug(`Ensuring OU exists: ${userData.ou}`);
+          await ensureOUExists(client, userData.ou, settings);
+          logger.api.info(`OU verified or created: ${userData.ou}`);
+        } catch (ouErr) {
+          logger.api.error(`Failed to verify/create OU: ${ouErr}`);
+          // If OU creation fails, fall back to Users container
+          userDN = `CN=${userData.displayName},CN=Users,${settings.baseDN}`;
+          logger.api.warn(`Falling back to default Users container: ${userDN}`);
+        }
+
         
         // Encode password for AD - with enhanced error handling
         let unicodePwd;
