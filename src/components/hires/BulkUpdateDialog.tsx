@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +43,7 @@ export function BulkUpdateDialog({
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState<{ subject: string; body: string } | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [includeAttachments, setIncludeAttachments] = useState(false);
   const { toast } = useToast();
   
   // For account status options
@@ -61,6 +62,20 @@ export function BulkUpdateDialog({
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
   const positionGrades = ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"];
   
+  // Load default email recipient from settings
+  const { data: graphSettings } = useQuery({
+    queryKey: ['microsoftGraphSettings'],
+    queryFn: settingsService.getMicrosoftGraphSettings,
+    enabled: updateFields.field === "license_request_email"
+  });
+
+  // Set default recipient when settings are loaded
+  useEffect(() => {
+    if (graphSettings?.defaultEmailRecipient && !emailRecipient) {
+      setEmailRecipient(graphSettings.defaultEmailRecipient);
+    }
+  }, [graphSettings, emailRecipient]);
+
   const handleEmailTemplatePreview = async () => {
     if (!selectedHires || selectedHires.length === 0) return;
     
@@ -96,6 +111,7 @@ export function BulkUpdateDialog({
     
     try {
       const hiresForEmail = selectedHires.map(hire => ({
+        id: hire.id,
         name: hire.name,
         department: hire.department,
         email: hire.email,
@@ -105,13 +121,14 @@ export function BulkUpdateDialog({
       
       const result = await microsoftGraphService.sendLicenseRequestEmail({
         recipient: emailRecipient,
-        hires: hiresForEmail
+        hires: hiresForEmail,
+        includeAttachments
       });
       
       if (result.success) {
         toast({
           title: "License Request Email Sent",
-          description: `Successfully sent license request for ${selectedHires.length} users to ${emailRecipient}`,
+          description: `Successfully sent license request for ${selectedHires.length} users to ${emailRecipient}${includeAttachments ? ' with attachments' : ''}`,
         });
         onClose();
       } else {
@@ -300,6 +317,17 @@ export function BulkUpdateDialog({
               Email address where the license request will be sent
             </p>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="include-attachments"
+              checked={includeAttachments}
+              onCheckedChange={setIncludeAttachments}
+            />
+            <Label htmlFor="include-attachments" className="text-sm">
+              Include SRF documents as attachments (when available)
+            </Label>
+          </div>
           
           <div className="flex gap-2">
             <Button
@@ -340,6 +368,14 @@ export function BulkUpdateDialog({
                     {emailTemplate.body}
                   </div>
                 </div>
+                {includeAttachments && (
+                  <div>
+                    <Label className="text-xs font-medium">Attachments:</Label>
+                    <p className="text-sm text-muted-foreground">
+                      SRF documents will be attached for employees who have uploaded them
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

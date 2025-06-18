@@ -64,6 +64,9 @@ interface MicrosoftGraphSettings {
   authority: string;
   scope: string[];
   lastConnectionTest?: string;
+  defaultEmailRecipient?: string;
+  emailSubjectTemplate?: string;
+  emailBodyTemplate?: string;
 }
 
 interface SettingsData {
