@@ -634,6 +634,16 @@ const ensureOUExists = async (client, ouPath, settings) => {
   });
 };
 
+// Helper function to get the default Users container DN dynamically
+const getDefaultUsersDN = (baseDN) => {
+  // Extract the DC components from baseDN
+  const dcParts = baseDN.match(/DC=[^,]+/gi);
+  if (dcParts) {
+    return `CN=Users,${dcParts.join(',')}`;
+  }
+  // Fallback to baseDN if no DC parts found
+  return `CN=Users,${baseDN}`;
+};
 
 // Create user in AD - enhanced to handle existing users
 const createLdapUser = async (settings, userData) => {
@@ -675,7 +685,6 @@ const createLdapUser = async (settings, userData) => {
       } else {
         logger.api.debug('User does not exist, creating new user');
         
-        // Create user DN
         // Create user DN and ensure OU exists
         userDN = `CN=${userData.displayName},${userData.ou}`;
         logger.api.debug(`User DN will be: ${userDN}`);
@@ -687,12 +696,12 @@ const createLdapUser = async (settings, userData) => {
           logger.api.info(`OU verified or created: ${userData.ou}`);
         } catch (ouErr) {
           logger.api.error(`Failed to verify/create OU: ${ouErr}`);
-          // If OU creation fails, fall back to Users container
-          userDN = `CN=${userData.displayName},CN=Users,${settings.baseDN}`;
+          // If OU creation fails, fall back to Users container using dynamic DN
+          const defaultUsersDN = getDefaultUsersDN(settings.baseDN);
+          userDN = `CN=${userData.displayName},${defaultUsersDN}`;
           logger.api.warn(`Falling back to default Users container: ${userDN}`);
         }
 
-        
         // Encode password for AD - with enhanced error handling
         let unicodePwd;
         try {
