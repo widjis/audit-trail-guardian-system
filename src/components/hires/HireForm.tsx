@@ -1158,15 +1158,9 @@ export function HireForm({ currentUser }: HireFormProps) {
           </CardContent>
         </Card>
 
-        {/* SRF Document Upload - Only show for existing hires */}
-        {!isNewHire && hire && hireData && (
-          <SrfDocumentUpload 
-            hire={hireData} 
-            onUploadSuccess={() => {
-              // Refresh hire data after SRF upload/delete
-              queryClient.invalidateQueries({ queryKey: ['hire', id] });
-            }}
-          />
+        {/* Documents Section - Only show for existing hires */}
+        {hire?.id && (
+          <SrfDocumentUpload hire={hire} />
         )}
 
         <div className="flex justify-end space-x-4">

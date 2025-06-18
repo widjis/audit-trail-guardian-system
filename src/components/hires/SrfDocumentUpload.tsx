@@ -8,17 +8,18 @@ import { Upload, Download, Trash2, FileText, AlertCircle } from "lucide-react";
 import { srfService } from "@/services/srf-service";
 import { NewHire } from "@/types/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SrfDocumentUploadProps {
   hire: NewHire;
-  onUploadSuccess: () => void;
 }
 
-export function SrfDocumentUpload({ hire, onUploadSuccess }: SrfDocumentUploadProps) {
+export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,7 +54,9 @@ export function SrfDocumentUpload({ hire, onUploadSuccess }: SrfDocumentUploadPr
         title: "Success",
         description: "SRF document uploaded successfully",
       });
-      onUploadSuccess();
+      
+      // Invalidate and refetch hire data
+      queryClient.invalidateQueries({ queryKey: ['hire', hire.id] });
     } catch (error) {
       console.error("Error uploading SRF document:", error);
       toast({
@@ -107,7 +110,9 @@ export function SrfDocumentUpload({ hire, onUploadSuccess }: SrfDocumentUploadPr
         title: "Success",
         description: "SRF document deleted successfully",
       });
-      onUploadSuccess();
+      
+      // Invalidate and refetch hire data
+      queryClient.invalidateQueries({ queryKey: ['hire', hire.id] });
       setShowDeleteDialog(false);
     } catch (error) {
       console.error("Error deleting SRF document:", error);
