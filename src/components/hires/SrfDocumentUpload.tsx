@@ -71,7 +71,10 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
     if (!hire.id || !hire.srf_document_name) return;
 
     try {
@@ -99,12 +102,19 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
     }
   };
 
+  const handleDeleteClick = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setShowDeleteDialog(true);
+  };
+
   const handleDelete = async () => {
     if (!hire.id) return;
 
     setIsDeleting(true);
 
     try {
+      console.log("Attempting to delete SRF document for hire ID:", hire.id);
       await srfService.deleteSrfDocument(hire.id);
       toast({
         title: "Success",
@@ -151,6 +161,7 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
               </div>
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   onClick={handleDownload}
                   size="sm"
                   variant="outline"
@@ -160,7 +171,8 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
                   Download
                 </Button>
                 <Button
-                  onClick={() => setShowDeleteDialog(true)}
+                  type="button"
+                  onClick={handleDeleteClick}
                   size="sm"
                   variant="outline"
                   className="flex items-center gap-1 text-red-600 hover:text-red-700"
@@ -182,6 +194,7 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
                   className="flex-1"
                 />
                 <Button
+                  type="button"
                   disabled={isUploading}
                   className="flex items-center gap-1"
                   size="sm"
@@ -210,6 +223,7 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
                   className="flex-1"
                 />
                 <Button
+                  type="button"
                   disabled={isUploading}
                   className="flex items-center gap-1"
                   size="sm"
