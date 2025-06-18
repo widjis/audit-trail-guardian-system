@@ -17,6 +17,48 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+// Set up multer for SRF document uploads with disk storage
+const srfStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(process.cwd(), 'uploads', 'srf');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const { id } = req.params;
+    const timestamp = Date.now();
+    const extension = path.extname(file.originalname);
+    const filename = `${id}_srf_${timestamp}${extension}`;
+    cb(null, filename);
+  }
+});
+
+// File filter for SRF documents
+const srfFileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF, DOC, and DOCX files are allowed.'), false);
+  }
+};
+
+const uploadSrf = multer({
+  storage: srfStorage,
+  fileFilter: srfFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 // Generate a unique ID
 const generateId = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -803,6 +845,274 @@ router.post('/import', upload.single('file'), async (req, res) => {
       success: false, 
       message: 'Failed to import hires', 
       error: error.message 
+    });
+  }
+});
+
+// Upload SRF document
+router.post('/:id/srf-upload', uploadSrf.single('srf-document'), async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    logger.api.info(`POST /hires/${id}/srf-upload - Processing SRF document upload`);
+    
+    if (!req.file) {
+      logger.api.warn('No SRF document uploaded');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No SRF document uploaded' 
+      });
+    }
+    
+    // Check if hire exists
+    const hires = await executeQuery(`
+      SELECT * FROM hires WHERE id = ?
+    `, [id]);
+    
+    if (hires.length === 0) {
+      // Clean up uploaded file if hire doesn't exist
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'New hire not found' });
+    }
+    
+    const hire = hires[0];
+    const now = new Date().toISOString();
+    
+    // If there's an existing SRF document, delete it
+    if (hire.srf_document_path && fs.existsSync(hire.srf_document_path)) {
+      try {
+        fs.unlinkSync(hire.srf_document_path);
+        logger.api.info(`Deleted old SRF document: ${hire.srf_document_path}`);
+      } catch (deleteError) {
+        logger.api.warn(`Failed to delete old SRF document: ${deleteError.message}`);
+      }
+    }
+    
+    // Update hire record with SRF document information
+    await executeQuery(`
+      UPDATE hires 
+      SET srf_document_path = ?, 
+          srf_document_name = ?, 
+          srf_document_uploaded_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `, [req.file.path, req.file.originalname, now, now, id]);
+    
+    // Create audit log for SRF document upload
+    const logId = generateId();
+    const auditLog = {
+      id: logId,
+      new_hire_id: id,
+      action_type: "SRF_UPLOAD",
+      status: "SUCCESS",
+      message: `SRF document uploaded: ${req.file.originalname}`,
+      details: JSON.stringify({
+        filename: req.file.originalname,
+        size: req.file.size,
+        path: req.file.path
+      }),
+      performed_by: req.user ? req.user.username : "system",
+      timestamp: now
+    };
+    
+    await executeQuery(`
+      INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, details, performed_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      auditLog.id, 
+      auditLog.new_hire_id, 
+      auditLog.action_type, 
+      auditLog.status, 
+      auditLog.message, 
+      auditLog.details, 
+      auditLog.performed_by, 
+      auditLog.timestamp
+    ]);
+    
+    logger.api.info(`SRF document uploaded successfully for hire ${id}: ${req.file.originalname}`);
+    
+    res.json({
+      success: true,
+      message: 'SRF document uploaded successfully',
+      filename: req.file.originalname,
+      uploadedAt: now
+    });
+    
+  } catch (error) {
+    logger.api.error('Error uploading SRF document:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        logger.api.error('Error cleaning up uploaded file:', cleanupError);
+      }
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to upload SRF document', 
+      error: error.message 
+    });
+  }
+});
+
+// Download SRF document
+router.get('/:id/srf-download', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    logger.api.info(`GET /hires/${id}/srf-download - Downloading SRF document`);
+    
+    // Get hire with SRF document info
+    const hires = await executeQuery(`
+      SELECT srf_document_path, srf_document_name FROM hires WHERE id = ?
+    `, [id]);
+    
+    if (hires.length === 0) {
+      return res.status(404).json({ error: 'New hire not found' });
+    }
+    
+    const hire = hires[0];
+    
+    if (!hire.srf_document_path || !hire.srf_document_name) {
+      return res.status(404).json({ error: 'No SRF document found for this hire' });
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(hire.srf_document_path)) {
+      return res.status(404).json({ error: 'SRF document file not found on server' });
+    }
+    
+    // Create audit log for download
+    const logId = generateId();
+    const now = new Date().toISOString();
+    const auditLog = {
+      id: logId,
+      new_hire_id: id,
+      action_type: "SRF_DOWNLOAD",
+      status: "SUCCESS",
+      message: `SRF document downloaded: ${hire.srf_document_name}`,
+      performed_by: req.user ? req.user.username : "system",
+      timestamp: now
+    };
+    
+    await executeQuery(`
+      INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      auditLog.id, 
+      auditLog.new_hire_id, 
+      auditLog.action_type, 
+      auditLog.status, 
+      auditLog.message, 
+      auditLog.performed_by, 
+      auditLog.timestamp
+    ]);
+    
+    // Send file
+    res.download(hire.srf_document_path, hire.srf_document_name, (err) => {
+      if (err) {
+        logger.api.error('Error sending SRF document:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to download SRF document' });
+        }
+      } else {
+        logger.api.info(`SRF document downloaded successfully: ${hire.srf_document_name}`);
+      }
+    });
+    
+  } catch (error) {
+    logger.api.error('Error downloading SRF document:', error);
+    res.status(500).json({ 
+      error: 'Failed to download SRF document', 
+      message: error.message 
+    });
+  }
+});
+
+// Delete SRF document
+router.delete('/:id/srf-document', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    logger.api.info(`DELETE /hires/${id}/srf-document - Deleting SRF document`);
+    
+    // Get hire with SRF document info
+    const hires = await executeQuery(`
+      SELECT srf_document_path, srf_document_name FROM hires WHERE id = ?
+    `, [id]);
+    
+    if (hires.length === 0) {
+      return res.status(404).json({ error: 'New hire not found' });
+    }
+    
+    const hire = hires[0];
+    
+    if (!hire.srf_document_path) {
+      return res.status(404).json({ error: 'No SRF document found for this hire' });
+    }
+    
+    // Delete file from filesystem
+    if (fs.existsSync(hire.srf_document_path)) {
+      try {
+        fs.unlinkSync(hire.srf_document_path);
+        logger.api.info(`Deleted SRF document file: ${hire.srf_document_path}`);
+      } catch (deleteError) {
+        logger.api.error(`Failed to delete SRF document file: ${deleteError.message}`);
+      }
+    }
+    
+    const now = new Date().toISOString();
+    
+    // Update hire record to remove SRF document information
+    await executeQuery(`
+      UPDATE hires 
+      SET srf_document_path = NULL, 
+          srf_document_name = NULL, 
+          srf_document_uploaded_at = NULL,
+          updated_at = ?
+      WHERE id = ?
+    `, [now, id]);
+    
+    // Create audit log for deletion
+    const logId = generateId();
+    const auditLog = {
+      id: logId,
+      new_hire_id: id,
+      action_type: "SRF_DELETE",
+      status: "SUCCESS",
+      message: `SRF document deleted: ${hire.srf_document_name || 'Unknown'}`,
+      performed_by: req.user ? req.user.username : "system",
+      timestamp: now
+    };
+    
+    await executeQuery(`
+      INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      auditLog.id, 
+      auditLog.new_hire_id, 
+      auditLog.action_type, 
+      auditLog.status, 
+      auditLog.message, 
+      auditLog.performed_by, 
+      auditLog.timestamp
+    ]);
+    
+    logger.api.info(`SRF document deleted successfully for hire ${id}`);
+    
+    res.json({
+      success: true,
+      message: 'SRF document deleted successfully'
+    });
+    
+  } catch (error) {
+    logger.api.error('Error deleting SRF document:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete SRF document', 
+      message: error.message 
     });
   }
 });

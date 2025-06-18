@@ -1,3 +1,4 @@
+
 export interface AuditLog {
   id: string;
   hire_id: string;
@@ -42,6 +43,11 @@ export interface NewHire {
   // Add for DL sync status
   distribution_list_sync_status?: 'Synced' | 'Partial' | 'Failed' | null;
   distribution_list_sync_date?: string | null;
+
+  // Add for SRF document
+  srf_document_path?: string | null;
+  srf_document_name?: string | null;
+  srf_document_uploaded_at?: string | null;
 }
 
 // Add missing types for sorting
@@ -108,4 +114,13 @@ export interface Settings {
   };
   exchangeOnlineSettings?: ExchangeOnlineSettings;
   [key: string]: any;
+}
+
+// Add type for SRF document upload response
+export interface SrfUploadResponse {
+  success: boolean;
+  message: string;
+  filename?: string;
+  uploadedAt?: string;
+  error?: string;
 }

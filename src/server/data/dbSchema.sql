@@ -1,5 +1,4 @@
 
-
 -- Check if the users table already exists
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
 BEGIN
@@ -101,3 +100,20 @@ BEGIN
     ALTER TABLE hires ADD distribution_list_sync_date DATETIME DEFAULT NULL;
 END
 
+-- Check if srf_document_path column exists in hires table
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'srf_document_path')
+BEGIN
+    ALTER TABLE hires ADD srf_document_path VARCHAR(500) DEFAULT NULL;
+END
+
+-- Check if srf_document_name column exists in hires table
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'srf_document_name')
+BEGIN
+    ALTER TABLE hires ADD srf_document_name VARCHAR(255) DEFAULT NULL;
+END
+
+-- Check if srf_document_uploaded_at column exists in hires table
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'srf_document_uploaded_at')
+BEGIN
+    ALTER TABLE hires ADD srf_document_uploaded_at DATETIME DEFAULT NULL;
+END
