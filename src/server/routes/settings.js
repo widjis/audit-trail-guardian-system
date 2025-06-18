@@ -647,4 +647,261 @@ router.post('/microsoft-graph/test-connection', async (req, res) => {
   }
 });
 
+// Send license request email via Microsoft Graph
+router.post('/microsoft-graph/send-license-request', async (req, res) => {
+  try {
+    const { recipient, hires } = req.body;
+    
+    if (!recipient || !hires || !Array.isArray(hires)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Recipient and hires array are required' 
+      });
+    }
+
+    // Get Microsoft Graph settings
+    const settings = getSettings();
+    const graphSettings = settings.microsoftGraphSettings;
+    
+    if (!graphSettings || !graphSettings.enabled) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Microsoft Graph is not configured or enabled' 
+      });
+    }
+
+    // Get access token
+    const tokenResponse = await fetch(`https://login.microsoftonline.com/${graphSettings.tenantId}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: graphSettings.clientId,
+        client_secret: graphSettings.clientSecret,
+        scope: 'https://graph.microsoft.com/.default',
+        grant_type: 'client_credentials'
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.text();
+      console.error('Token request failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to authenticate with Microsoft Graph' 
+      });
+    }
+
+    const { access_token } = await tokenResponse.json();
+
+    // Create email content
+    const subject = `License Request for ${hires.length} New Hire${hires.length > 1 ? 's' : ''}`;
+    
+    let emailBody = `Dear License Administrator,\n\n`;
+    emailBody += `Please process the following Microsoft 365 license requests for new employees:\n\n`;
+    
+    hires.forEach((hire, index) => {
+      emailBody += `${index + 1}. ${hire.name}\n`;
+      emailBody += `   Department: ${hire.department}\n`;
+      emailBody += `   Job Title: ${hire.title}\n`;
+      emailBody += `   Email: ${hire.email}\n`;
+      emailBody += `   Requested License: ${hire.microsoft_365_license}\n\n`;
+    });
+    
+    emailBody += `Please assign the appropriate licenses and confirm once completed.\n\n`;
+    emailBody += `Best regards,\n`;
+    emailBody += `IT Administration System`;
+
+    // Send email via Microsoft Graph
+    const emailMessage = {
+      message: {
+        subject: subject,
+        body: {
+          contentType: 'Text',
+          content: emailBody
+        },
+        toRecipients: [
+          {
+            emailAddress: {
+              address: recipient
+            }
+          }
+        ]
+      }
+    };
+
+    const sendResponse = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailMessage)
+    });
+
+    if (!sendResponse.ok) {
+      const error = await sendResponse.text();
+      console.error('Email send failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to send email via Microsoft Graph' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `License request email sent successfully to ${recipient}`,
+      sentCount: 1
+    });
+
+  } catch (error) {
+    console.error('Error sending license request email:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error while sending email' 
+    });
+  }
+});
+
+// Test email send functionality
+router.post('/microsoft-graph/test-email', async (req, res) => {
+  try {
+    const { recipient } = req.body;
+    
+    if (!recipient) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Recipient email is required' 
+      });
+    }
+
+    // Get Microsoft Graph settings
+    const settings = getSettings();
+    const graphSettings = settings.microsoftGraphSettings;
+    
+    if (!graphSettings || !graphSettings.enabled) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Microsoft Graph is not configured or enabled' 
+      });
+    }
+
+    // Get access token
+    const tokenResponse = await fetch(`https://login.microsoftonline.com/${graphSettings.tenantId}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: graphSettings.clientId,
+        client_secret: graphSettings.clientSecret,
+        scope: 'https://graph.microsoft.com/.default',
+        grant_type: 'client_credentials'
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to authenticate with Microsoft Graph' 
+      });
+    }
+
+    const { access_token } = await tokenResponse.json();
+
+    // Send test email
+    const testMessage = {
+      message: {
+        subject: 'Test Email from IT Administration System',
+        body: {
+          contentType: 'Text',
+          content: 'This is a test email to verify Microsoft Graph email functionality is working correctly.\n\nBest regards,\nIT Administration System'
+        },
+        toRecipients: [
+          {
+            emailAddress: {
+              address: recipient
+            }
+          }
+        ]
+      }
+    };
+
+    const sendResponse = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(testMessage)
+    });
+
+    if (!sendResponse.ok) {
+      const error = await sendResponse.text();
+      console.error('Test email send failed:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to send test email' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Test email sent successfully to ${recipient}` 
+    });
+
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error while sending test email' 
+    });
+  }
+});
+
+// Get email template preview
+router.post('/microsoft-graph/email-template-preview', async (req, res) => {
+  try {
+    const { hires } = req.body;
+    
+    if (!hires || !Array.isArray(hires)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Hires array is required' 
+      });
+    }
+
+    // Generate email template
+    const subject = `License Request for ${hires.length} New Hire${hires.length > 1 ? 's' : ''}`;
+    
+    let emailBody = `Dear License Administrator,\n\n`;
+    emailBody += `Please process the following Microsoft 365 license requests for new employees:\n\n`;
+    
+    hires.forEach((hire, index) => {
+      emailBody += `${index + 1}. ${hire.name}\n`;
+      emailBody += `   Department: ${hire.department}\n`;
+      emailBody += `   Job Title: ${hire.title}\n`;
+      emailBody += `   Email: ${hire.email}\n`;
+      emailBody += `   Requested License: ${hire.microsoft_365_license}\n\n`;
+    });
+    
+    emailBody += `Please assign the appropriate licenses and confirm once completed.\n\n`;
+    emailBody += `Best regards,\n`;
+    emailBody += `IT Administration System`;
+
+    res.json({ 
+      subject: subject,
+      body: emailBody
+    });
+
+  } catch (error) {
+    console.error('Error generating email template preview:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error while generating email template' 
+    });
+  }
+});
+
 export default router;

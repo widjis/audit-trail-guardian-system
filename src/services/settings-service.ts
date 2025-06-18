@@ -1,4 +1,3 @@
-
 import apiClient from "./api-client";
 
 // Settings types
@@ -204,6 +203,31 @@ export const settingsService = {
     const response = await apiClient.post<{ success: boolean; message: string }>(
       `${SETTINGS_ENDPOINT}/microsoft-graph/test-connection`,
       settings
+    );
+    return response.data;
+  },
+
+  // New Microsoft Graph email methods
+  sendLicenseRequestEmail: async (emailData: { recipient: string; hires: any[] }) => {
+    const response = await apiClient.post<{ success: boolean; message: string; sentCount?: number }>(
+      `${SETTINGS_ENDPOINT}/microsoft-graph/send-license-request`,
+      emailData
+    );
+    return response.data;
+  },
+
+  testGraphEmail: async (recipient: string) => {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      `${SETTINGS_ENDPOINT}/microsoft-graph/test-email`,
+      { recipient }
+    );
+    return response.data;
+  },
+
+  getEmailTemplatePreview: async (hires: any[]) => {
+    const response = await apiClient.post<{ subject: string; body: string }>(
+      `${SETTINGS_ENDPOINT}/microsoft-graph/email-template-preview`,
+      { hires }
     );
     return response.data;
   },
