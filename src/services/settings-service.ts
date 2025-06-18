@@ -1,3 +1,4 @@
+
 import apiClient from "./api-client";
 
 // Settings types
@@ -56,6 +57,16 @@ interface HrisDatabaseConfig {
   enabled: boolean;
 }
 
+interface MicrosoftGraphSettings {
+  enabled: boolean;
+  clientId: string;
+  clientSecret: string;
+  tenantId: string;
+  authority: string;
+  scope: string[];
+  lastConnectionTest?: string;
+}
+
 interface SettingsData {
   accountStatuses?: string[];
   positionGrades?: string[];
@@ -66,6 +77,7 @@ interface SettingsData {
   activeDirectorySettings?: ActiveDirectorySettings;
   exchangeOnlineSettings?: ExchangeOnlineSettings;
   hrisDbConfig?: HrisDatabaseConfig;
+  microsoftGraphSettings?: MicrosoftGraphSettings;
 }
 
 // The API client already includes /api in its baseURL, so we don't need to include it again
@@ -170,6 +182,28 @@ export const settingsService = {
     const response = await apiClient.post<{ success: boolean; message?: string; error?: string }>(
       `${SETTINGS_ENDPOINT}/hris-database/test-connection`,
       config
+    );
+    return response.data;
+  },
+
+  // Microsoft Graph settings methods
+  getMicrosoftGraphSettings: async () => {
+    const response = await apiClient.get<MicrosoftGraphSettings>(`${SETTINGS_ENDPOINT}/microsoft-graph`);
+    return response.data;
+  },
+
+  updateMicrosoftGraphSettings: async (settings: MicrosoftGraphSettings) => {
+    const response = await apiClient.put<MicrosoftGraphSettings>(
+      `${SETTINGS_ENDPOINT}/microsoft-graph`,
+      settings
+    );
+    return response.data;
+  },
+
+  testMicrosoftGraphConnection: async (settings: MicrosoftGraphSettings) => {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      `${SETTINGS_ENDPOINT}/microsoft-graph/test-connection`,
+      settings
     );
     return response.data;
   },

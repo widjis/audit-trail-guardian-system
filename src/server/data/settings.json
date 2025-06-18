@@ -1,3 +1,4 @@
+
 {
   "accountStatuses": [
     "Pending",
@@ -332,5 +333,13 @@
     "enabled": true,
     "username": "widji.santoso@merdekabattery.com",
     "passwordConfigured": true
+  },
+  "microsoftGraphSettings": {
+    "enabled": false,
+    "clientId": "5d7d0543-c459-4ef7-9636-d89dab421eb0",
+    "clientSecret": "hS18Q~yRrvY-Y51wlsMyht6F~s2te7apQPr61bAK",
+    "tenantId": "b428d519-22b4-458f-af45-f020150f5839",
+    "authority": "https://login.microsoftonline.com/b428d519-22b4-458f-af45-f020150f5839",
+    "scope": ["https://graph.microsoft.com/.default"]
   }
 }

@@ -520,4 +520,131 @@ router.put('/exchange-online', (req, res) => {
   }
 });
 
+// Add Microsoft Graph settings routes
+router.get('/microsoft-graph', (req, res) => {
+  try {
+    const settings = getSettings();
+    const graphSettings = settings.microsoftGraphSettings || {
+      enabled: false,
+      clientId: '',
+      clientSecret: '',
+      tenantId: '',
+      authority: '',
+      scope: ["https://graph.microsoft.com/.default"]
+    };
+    
+    res.json(graphSettings);
+  } catch (error) {
+    console.error('Error fetching Microsoft Graph settings:', error);
+    res.status(500).json({ error: 'Failed to fetch Microsoft Graph settings' });
+  }
+});
+
+router.put('/microsoft-graph', (req, res) => {
+  try {
+    const { enabled, clientId, clientSecret, tenantId, authority, scope, lastConnectionTest } = req.body;
+    
+    const settings = getSettings();
+    settings.microsoftGraphSettings = {
+      enabled: enabled || false,
+      clientId: clientId || '',
+      clientSecret: clientSecret || '',
+      tenantId: tenantId || '',
+      authority: authority || '',
+      scope: scope || ["https://graph.microsoft.com/.default"],
+      lastConnectionTest
+    };
+    
+    saveSettings(settings);
+    
+    res.json(settings.microsoftGraphSettings);
+  } catch (error) {
+    console.error('Error updating Microsoft Graph settings:', error);
+    res.status(500).json({ error: 'Failed to update Microsoft Graph settings' });
+  }
+});
+
+// Test Microsoft Graph connection
+router.post('/microsoft-graph/test-connection', async (req, res) => {
+  const { clientId, clientSecret, tenantId, authority, scope } = req.body;
+  
+  try {
+    // Validate required fields
+    if (!clientId || !clientSecret || !tenantId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: clientId, clientSecret, and tenantId are required' 
+      });
+    }
+
+    // Create the authority URL if not provided
+    const authUrl = authority || `https://login.microsoftonline.com/${tenantId}`;
+    const tokenEndpoint = `${authUrl}/oauth2/v2.0/token`;
+    
+    // Prepare the token request
+    const tokenParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: (scope || ["https://graph.microsoft.com/.default"]).join(' '),
+      grant_type: 'client_credentials'
+    });
+
+    console.log('Testing Microsoft Graph connection...');
+    console.log('Token endpoint:', tokenEndpoint);
+    console.log('Client ID:', clientId);
+    console.log('Scope:', scope);
+
+    // Make the token request using fetch (built-in in Node.js 18+)
+    const tokenResponse = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: tokenParams.toString()
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Token request failed:', errorText);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Authentication failed: ${tokenResponse.status} ${tokenResponse.statusText}` 
+      });
+    }
+
+    const tokenData = await tokenResponse.json();
+    console.log('Token acquired successfully');
+
+    // Test a simple Graph API call to verify the token works
+    const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`
+      }
+    });
+
+    if (graphResponse.ok || graphResponse.status === 404) {
+      // 404 is expected for app-only auth when calling /me
+      // What matters is that we got a valid response (not 401)
+      res.json({ 
+        success: true, 
+        message: `Successfully connected to Microsoft Graph API for tenant ${tenantId}`
+      });
+    } else {
+      const errorText = await graphResponse.text();
+      console.error('Graph API test failed:', errorText);
+      res.status(400).json({ 
+        success: false, 
+        message: `Graph API test failed: ${graphResponse.status} ${graphResponse.statusText}` 
+      });
+    }
+  } catch (error) {
+    console.error('Microsoft Graph connection test failed:', error);
+    res.status(400).json({ 
+      success: false, 
+      message: 'Failed to connect to Microsoft Graph API', 
+      error: error.message 
+    });
+  }
+});
+
 export default router;
