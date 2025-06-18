@@ -329,7 +329,7 @@ HR Department`
                 placeholder="License Request for {{hireCount}} New Employees"
               />
               <p className="text-xs text-muted-foreground">
-                Use {{hireCount}} for the number of employees
+                Use {"{{hireCount}}"} for the number of employees
               </p>
             </div>
 
@@ -343,7 +343,7 @@ HR Department`
                 placeholder="Use {{hireDetails}} to insert employee information"
               />
               <p className="text-xs text-muted-foreground">
-                Use {{hireDetails}} to insert formatted employee information and {{hireCount}} for count
+                Use {"{{hireDetails}}"} to insert formatted employee information and {"{{hireCount}}"} for count
               </p>
             </div>
 
