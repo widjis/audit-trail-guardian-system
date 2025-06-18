@@ -1159,8 +1159,8 @@ export function HireForm({ currentUser }: HireFormProps) {
         </Card>
 
         {/* Documents Section - Only show for existing hires */}
-        {hire?.id && (
-          <SrfDocumentUpload hire={hire} />
+        {!isNewHire && hireData && (
+          <SrfDocumentUpload hire={hireData} />
         )}
 
         <div className="flex justify-end space-x-4">
