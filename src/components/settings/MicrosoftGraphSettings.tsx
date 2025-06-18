@@ -23,6 +23,7 @@ interface MicrosoftGraphSettings {
   defaultEmailRecipient?: string;
   emailSubjectTemplate?: string;
   emailBodyTemplate?: string;
+  senderEmail?: string;
 }
 
 export function MicrosoftGraphSettings() {
@@ -34,6 +35,7 @@ export function MicrosoftGraphSettings() {
     authority: '',
     scope: ["https://graph.microsoft.com/.default"],
     defaultEmailRecipient: '',
+    senderEmail: '',
     emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
     emailBodyTemplate: `Dear IT Team,
 
@@ -305,6 +307,20 @@ HR Department`
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="sender-email">Sender Email Address</Label>
+              <Input
+                id="sender-email"
+                type="email"
+                value={settings.senderEmail || ''}
+                onChange={(e) => setSettings({ ...settings, senderEmail: e.target.value })}
+                placeholder="hr@company.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Email address that will appear as the sender of license request emails
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="default-recipient">Default Email Recipient</Label>
               <Input

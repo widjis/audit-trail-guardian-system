@@ -97,7 +97,7 @@ export const microsoftGraphService = {
     }
   },
 
-  // Test Microsoft Graph email functionality
+  // Test Microsoft Graph email functionality with actual sending
   testEmailSend: async (testRecipient: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await apiClient.post<{ success: boolean; message: string }>('/settings/microsoft-graph/test-email', {

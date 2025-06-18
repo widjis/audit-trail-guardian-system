@@ -67,6 +67,7 @@ interface MicrosoftGraphSettings {
   defaultEmailRecipient?: string;
   emailSubjectTemplate?: string;
   emailBodyTemplate?: string;
+  senderEmail?: string;
 }
 
 interface SettingsData {
