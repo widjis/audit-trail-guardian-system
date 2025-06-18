@@ -232,9 +232,16 @@ export function HiresTable() {
     const matchesEmail = filters.email === "" || 
       hire.email.toLowerCase().includes(filters.email.toLowerCase());
     
-    // Progress filter - check percentage ranges
+    // Enhanced progress filter - check both percentage ranges and status-based filters
     const hireProgress = calculateProgressPercentage(hire);
     const matchesProgress = filters.progress === "" || 
+      // Status-based filters
+      (filters.progress === "not-started" && hireProgress === 0) ||
+      (filters.progress === "in-progress" && hireProgress > 0 && hireProgress < 100) ||
+      (filters.progress === "completed" && hireProgress === 100) ||
+      (filters.progress === "at-risk" && hireProgress < 50) ||
+      (filters.progress === "nearly-done" && hireProgress >= 75) ||
+      // Existing percentage range filters
       (filters.progress === "0-25" && hireProgress >= 0 && hireProgress <= 25) ||
       (filters.progress === "26-50" && hireProgress >= 26 && hireProgress <= 50) ||
       (filters.progress === "51-75" && hireProgress >= 51 && hireProgress <= 75) ||
@@ -535,11 +542,38 @@ export function HiresTable() {
                           isActive={isFilterActive("progress")}
                           onClear={() => clearFilter("progress")}
                         >
-                          <Label className="text-xs mb-2">Select progress range</Label>
+                          <Label className="text-xs mb-2">Filter by progress status</Label>
                           <RadioGroup 
                             value={filters.progress} 
                             onValueChange={(value) => setFilters(prev => ({ ...prev, progress: value }))}
                           >
+                            {/* Status-based filters */}
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="not-started" id="progress-not-started" />
+                              <Label htmlFor="progress-not-started" className="text-sm">Not Started (0%)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="in-progress" id="progress-in-progress" />
+                              <Label htmlFor="progress-in-progress" className="text-sm">In Progress (1-99%)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="completed" id="progress-completed" />
+                              <Label htmlFor="progress-completed" className="text-sm">Completed (100%)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="at-risk" id="progress-at-risk" />
+                              <Label htmlFor="progress-at-risk" className="text-sm">At Risk (&lt;50%)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="nearly-done" id="progress-nearly-done" />
+                              <Label htmlFor="progress-nearly-done" className="text-sm">Nearly Done (≥75%)</Label>
+                            </div>
+                            
+                            {/* Separator */}
+                            <div className="border-t my-2"></div>
+                            <Label className="text-xs text-muted-foreground">Detailed Ranges:</Label>
+                            
+                            {/* Existing percentage range filters */}
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="0-25" id="progress-0-25" />
                               <Label htmlFor="progress-0-25" className="text-sm">0-25%</Label>
