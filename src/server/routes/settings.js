@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
 import sql from 'mssql';
+import { microsoftGraphService } from '../services/microsoftGraphService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -569,31 +570,29 @@ router.put('/microsoft-graph', async (req, res) => {
 
 router.post('/microsoft-graph/test-connection', async (req, res) => {
   try {
-    const { clientId, clientSecret, tenantId, authority, scope } = req.body;
+    const settings = req.body;
     
-    if (!clientId || !clientSecret || !tenantId) {
+    if (!settings.clientId || !settings.clientSecret || !settings.tenantId) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: clientId, clientSecret, or tenantId'
       });
     }
 
-    // For now, we'll just validate the format and return success
-    // In a real implementation, you would test the actual Graph API connection
-    const isValidClientId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId);
-    const isValidTenantId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId);
+    console.log('Testing Microsoft Graph connection with provided settings...');
+    const result = await microsoftGraphService.testConnection(settings);
     
-    if (!isValidClientId || !isValidTenantId) {
-      return res.json({
-        success: false,
-        message: 'Invalid client ID or tenant ID format'
-      });
+    // Update last connection test timestamp if successful
+    if (result.success) {
+      const currentSettings = getSettings();
+      currentSettings.microsoftGraphSettings = {
+        ...currentSettings.microsoftGraphSettings,
+        lastConnectionTest: new Date().toISOString()
+      };
+      saveSettings(currentSettings);
     }
-
-    res.json({
-      success: true,
-      message: 'Microsoft Graph connection test successful'
-    });
+    
+    res.json(result);
     
   } catch (error) {
     console.error('Error testing Microsoft Graph connection:', error);
@@ -617,6 +616,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       });
     }
 
+    console.log(`Processing license request email for ${hires.length} hires to ${recipient}`);
+
     // Format hire details for email template
     const hireDetails = hires.map((hire, index) => {
       return `${index + 1}. ${hire.name}
@@ -634,20 +635,44 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       .replace('{{hireDetails}}', hireDetails)
       .replace('{{hireCount}}', hires.length.toString());
 
-    // For now, simulate email sending
-    console.log('Sending license request email to:', recipient);
-    console.log('Subject:', subject);
-    console.log('Body:', body);
-    console.log('Attachments:', attachments?.length || 0);
+    // Prepare email data
+    const emailData = {
+      recipient: recipient,
+      subject: subject,
+      body: {
+        contentType: 'Text',
+        content: body
+      },
+      senderName: 'HR Department'
+    };
 
-    // In a real implementation, you would use Microsoft Graph API to send the email
-    // This would include proper OAuth authentication and email sending
+    // Add attachments if provided
+    if (attachments && attachments.length > 0) {
+      emailData.attachments = attachments.map(attachment => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType
+      }));
+      console.log(`Including ${attachments.length} attachments`);
+    }
 
-    res.json({
-      success: true,
-      message: `License request email sent successfully to ${recipient}`,
-      sentCount: 1
-    });
+    // Send email using Microsoft Graph
+    const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
+
+    if (result.success) {
+      console.log('License request email sent successfully');
+      res.json({
+        success: true,
+        message: result.message,
+        sentCount: 1
+      });
+    } else {
+      console.error('Failed to send license request email:', result.error);
+      res.status(500).json({
+        success: false,
+        message: result.message
+      });
+    }
 
   } catch (error) {
     console.error('Error sending license request email:', error);
@@ -671,13 +696,35 @@ router.post('/microsoft-graph/test-email', async (req, res) => {
       });
     }
 
-    console.log('Sending test email to:', recipient);
+    console.log(`Sending test email to: ${recipient}`);
 
-    // In a real implementation, you would send a test email via Microsoft Graph API
-    res.json({
-      success: true,
-      message: `Test email sent successfully to ${recipient}`
-    });
+    // Prepare test email data
+    const emailData = {
+      recipient: recipient,
+      subject: 'Test Email from HR System',
+      body: {
+        contentType: 'Text',
+        content: 'This is a test email sent from the HR Management System using Microsoft Graph API.\n\nIf you received this email, the email configuration is working correctly.\n\nBest regards,\nHR Department'
+      },
+      senderName: 'HR System'
+    };
+
+    // Send test email using Microsoft Graph
+    const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
+
+    if (result.success) {
+      console.log('Test email sent successfully');
+      res.json({
+        success: true,
+        message: result.message
+      });
+    } else {
+      console.error('Failed to send test email:', result.error);
+      res.status(500).json({
+        success: false,
+        message: result.message
+      });
+    }
 
   } catch (error) {
     console.error('Error sending test email:', error);
