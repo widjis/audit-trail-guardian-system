@@ -89,7 +89,7 @@ export const microsoftGraphService = {
         attachments: attachments.length > 0 ? attachments : undefined
       };
 
-      const response = await apiClient.post<EmailSendResult>('/microsoft-graph/send-license-request', requestData);
+      const response = await apiClient.post<EmailSendResult>('/settings/microsoft-graph/send-license-request', requestData);
       return response.data;
     } catch (error) {
       console.error('Error sending license request email:', error);
@@ -100,7 +100,7 @@ export const microsoftGraphService = {
   // Test Microsoft Graph email functionality
   testEmailSend: async (testRecipient: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string }>('/microsoft-graph/test-email', {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/settings/microsoft-graph/test-email', {
         recipient: testRecipient
       });
       return response.data;
@@ -113,7 +113,7 @@ export const microsoftGraphService = {
   // Get email template preview
   getEmailTemplate: async (hires: LicenseRequestEmailData['hires']): Promise<{ subject: string; body: string }> => {
     try {
-      const response = await apiClient.post<{ subject: string; body: string }>('/microsoft-graph/email-template-preview', {
+      const response = await apiClient.post<{ subject: string; body: string }>('/settings/microsoft-graph/email-template-preview', {
         hires
       });
       return response.data;
