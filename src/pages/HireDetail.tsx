@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { HireForm } from "@/components/hires/HireForm";
 import { AuditLogsList } from "@/components/hires/AuditLogsList";
@@ -8,7 +9,7 @@ import { hiresApi } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { NewHire } from "@/types/types";
 import { Button } from "@/components/ui/button";
-import { Send, UserPlus, RefreshCw, Mail } from "lucide-react";
+import { Send, UserPlus, RefreshCw, Mail, FileText, AlertCircle } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { SendWhatsAppDialog } from "@/components/hires/SendWhatsAppDialog";
 import { CreateADAccountDialog } from "@/components/hires/CreateADAccountDialog";

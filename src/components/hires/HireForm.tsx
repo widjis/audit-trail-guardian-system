@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { MultiSelectMailingList } from "./MultiSelectMailingList";
 import { ADUserLookup } from "./ADUserLookup";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { SrfDocumentUpload } from "./SrfDocumentUpload";
 
 // Type definition for Active Directory account details
 interface ADAccountDetails {
@@ -1156,6 +1157,17 @@ export function HireForm({ currentUser }: HireFormProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* SRF Document Upload - Only show for existing hires */}
+        {!isNewHire && hire && hireData && (
+          <SrfDocumentUpload 
+            hire={hireData} 
+            onUploadSuccess={() => {
+              // Refresh hire data after SRF upload/delete
+              queryClient.invalidateQueries({ queryKey: ['hire', id] });
+            }}
+          />
+        )}
 
         <div className="flex justify-end space-x-4">
           <Button 
