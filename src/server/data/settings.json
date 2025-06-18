@@ -1,7 +1,17 @@
-
 {
-  "accountStatuses": ["Pending", "Active", "Inactive", "Suspended"],
-  "positionGrades": ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"],
+  "accountStatuses": [
+    "Pending",
+    "Active",
+    "Inactive",
+    "Suspended"
+  ],
+  "positionGrades": [
+    "General Management",
+    "Superintendent",
+    "Supervisor",
+    "Staff",
+    "Non-Staff"
+  ],
   "mailingLists": {
     "mandatory": [
       {
@@ -63,9 +73,9 @@
     "authFormat": "username@domain"
   },
   "exchangeOnlineSettings": {
-    "enabled": false,
-    "username": "",
-    "passwordConfigured": false
+    "enabled": true,
+    "username": "widji.santoso@merdekabattery.com",
+    "passwordConfigured": true
   },
   "hrisDbConfig": {
     "server": "",
@@ -76,14 +86,17 @@
     "enabled": false
   },
   "microsoftGraphSettings": {
-    "enabled": false,
-    "clientId": "",
-    "clientSecret": "",
-    "tenantId": "",
-    "authority": "",
-    "scope": ["https://graph.microsoft.com/.default"],
-    "defaultEmailRecipient": "",
-    "emailSubjectTemplate": "License Request for {{hireCount}} New Employees",
-    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\nBest regards,\nHR Department"
+    "enabled": true,
+    "clientId": "5d7d0543-c459-4ef7-9636-d89dab421eb0",
+    "clientSecret": "hS18Q~yRrvY-Y51wlsMyht6F~s2te7apQPr61bAK",
+    "tenantId": "b428d519-22b4-458f-af45-f020150f5839",
+    "authority": "https://login.microsoftonline.com/b428d519-22b4-458f-af45-f020150f5839",
+    "scope": [
+      "https://graph.microsoft.com/.default"
+    ],
+    "defaultEmailRecipient": "widji.santoso@gmail.com",
+    "emailSubjectTemplate": "testing",
+    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\nBest regards,\nHR Department",
+    "lastConnectionTest": "2025-06-18T15:01:47.882Z"
   }
 }
