@@ -618,29 +618,49 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
 
     console.log(`Processing license request email for ${hires.length} hires to ${recipient}`);
 
-    // Format hire details for email template
-    const hireDetails = hires.map((hire, index) => {
-      return `${index + 1}. ${hire.name}
-   - Department: ${hire.department}
-   - Position: ${hire.title}
-   - Email: ${hire.email}
-   - Requested License: ${hire.microsoft_365_license}`;
-    }).join('\n\n');
+    // Format hire details as HTML table
+    const hireDetailsHtml = `
+      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hires.map((hire, index) => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
     // Apply template substitution
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
       .replace('{{hireCount}}', hires.length.toString());
 
     const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
-      .replace('{{hireDetails}}', hireDetails)
-      .replace('{{hireCount}}', hires.length.toString());
+      .replace('{{hireDetails}}', hireDetailsHtml)
+      .replace('{{hireCount}}', hires.length.toString())
+      .replace(/\n/g, '<br>'); // Convert line breaks to HTML
 
     // Prepare email data
     const emailData = {
       recipient: recipient,
       subject: subject,
       body: {
-        contentType: 'Text',
+        contentType: 'HTML',
         content: body
       },
       senderName: 'HR Department'
@@ -741,22 +761,42 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
 
-    // Format hire details for email template
-    const hireDetails = hires.map((hire, index) => {
-      return `${index + 1}. ${hire.name}
-   - Department: ${hire.department}
-   - Position: ${hire.title}
-   - Email: ${hire.email}
-   - Requested License: ${hire.microsoft_365_license}`;
-    }).join('\n\n');
+    // Format hire details as HTML table
+    const hireDetailsHtml = `
+      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hires.map((hire, index) => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
     // Apply template substitution
     const subject = (graphSettings?.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
       .replace('{{hireCount}}', hires.length.toString());
 
     const body = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
-      .replace('{{hireDetails}}', hireDetails)
-      .replace('{{hireCount}}', hires.length.toString());
+      .replace('{{hireDetails}}', hireDetailsHtml)
+      .replace('{{hireCount}}', hires.length.toString())
+      .replace(/\n/g, '<br>'); // Convert line breaks to HTML
 
     res.json({
       subject,
