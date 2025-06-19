@@ -650,10 +650,12 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
       .replace('{{hireCount}}', hires.length.toString());
 
+    // Improved line break handling - convert double newlines to single <br> and single newlines to nothing
     const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
-      .replace(/\n/g, '<br>'); // Convert line breaks to HTML
+      .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
+      .replace(/\n/g, ' '); // Convert single newlines to space
 
     // Prepare email data
     const emailData = {
@@ -789,14 +791,15 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       </table>
     `;
 
-    // Apply template substitution
+    // Apply template substitution with improved line break handling
     const subject = (graphSettings?.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
       .replace('{{hireCount}}', hires.length.toString());
 
     const body = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
-      .replace(/\n/g, '<br>'); // Convert line breaks to HTML
+      .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
+      .replace(/\n/g, ' '); // Convert single newlines to space
 
     res.json({
       subject,
