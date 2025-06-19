@@ -1,6 +1,6 @@
 
 import { Client } from '@microsoft/microsoft-graph-client';
-import { ClientCredentialRequest, ConfidentialClientApplication } from '@azure/msal-node';
+import { ConfidentialClientApplication } from '@azure/msal-node';
 
 class MicrosoftGraphService {
   constructor() {
