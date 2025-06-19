@@ -646,14 +646,23 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       </table>
     `;
 
+    // Get current date for template substitution
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
     // Apply template substitution
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
-      .replace('{{hireCount}}', hires.length.toString());
+      .replace('{{hireCount}}', hires.length.toString())
+      .replace('{{hireDate}}', currentDate);
 
     // Improved line break handling - convert double newlines to single <br> and single newlines to nothing
     const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
+      .replace('{{hireDate}}', currentDate)
       .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
       .replace(/\n/g, ' '); // Convert single newlines to space
 
@@ -705,58 +714,6 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
   }
 });
 
-router.post('/microsoft-graph/test-email', async (req, res) => {
-  try {
-    const { recipient } = req.body;
-    const settings = await getSettings();
-    const graphSettings = settings.microsoftGraphSettings;
-
-    if (!graphSettings?.enabled) {
-      return res.status(400).json({
-        success: false,
-        message: 'Microsoft Graph integration is not enabled'
-      });
-    }
-
-    console.log(`Sending test email to: ${recipient}`);
-
-    // Prepare test email data
-    const emailData = {
-      recipient: recipient,
-      subject: 'Test Email from HR System',
-      body: {
-        contentType: 'Text',
-        content: 'This is a test email sent from the HR Management System using Microsoft Graph API.\n\nIf you received this email, the email configuration is working correctly.\n\nBest regards,\nHR Department'
-      },
-      senderName: 'HR System'
-    };
-
-    // Send test email using Microsoft Graph
-    const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
-
-    if (result.success) {
-      console.log('Test email sent successfully');
-      res.json({
-        success: true,
-        message: result.message
-      });
-    } else {
-      console.error('Failed to send test email:', result.error);
-      res.status(500).json({
-        success: false,
-        message: result.message
-      });
-    }
-
-  } catch (error) {
-    console.error('Error sending test email:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send test email: ' + error.message
-    });
-  }
-});
-
 router.post('/microsoft-graph/email-template-preview', async (req, res) => {
   try {
     const { hires } = req.body;
@@ -791,13 +748,22 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       </table>
     `;
 
+    // Get current date for template substitution
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
     // Apply template substitution with improved line break handling
     const subject = (graphSettings?.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
-      .replace('{{hireCount}}', hires.length.toString());
+      .replace('{{hireCount}}', hires.length.toString())
+      .replace('{{hireDate}}', currentDate);
 
     const body = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
+      .replace('{{hireDate}}', currentDate)
       .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
       .replace(/\n/g, ' '); // Convert single newlines to space
 
