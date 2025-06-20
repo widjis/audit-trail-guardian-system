@@ -6,11 +6,13 @@ import { executeQuery } from '../utils/dbConnection.js';
 import sql from 'mssql';
 import { microsoftGraphService } from '../services/microsoftGraphService.js';
 import { getAdUserInfo } from './active-directory.js';
+import { resolveSenderEmail } from '../utils/emailUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
 
 // Data storage paths
 const DATA_DIR = path.join(__dirname, '../data');
@@ -774,12 +776,11 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       .join(''); // Join without extra spacing
 
     // Determine sender email
-    let senderEmail = graphSettings.senderEmail;
-    if (graphSettings.useLoggedInUserAsSender) {
-      // TODO: Get logged-in user's email from session/token
-      // For now, fall back to settings sender email
-      senderEmail = graphSettings.senderEmail;
-    }
+    const senderEmail = await resolveSenderEmail(
+      graphSettings,
+      adSettings,
+      req
+    );
 
     const emailData = {
       recipients: finalToRecipients,

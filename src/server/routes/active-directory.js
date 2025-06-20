@@ -1137,7 +1137,7 @@ export const getAdUserInfo = async (settings, username) => {
         const searchOptions = {
           filter: `(&(objectClass=user)(sAMAccountName=${safeUser}))`,
           scope: 'sub',
-          attributes: ['displayName', 'title', 'department']
+          attributes: ['displayName', 'title', 'department', 'mail']
         };
 
         client.search(settings.baseDN, searchOptions, (err, res) => {
@@ -1147,12 +1147,13 @@ export const getAdUserInfo = async (settings, username) => {
             return reject(err);
           }
 
-          let info = { displayName: '', title: '', department: '' };
+          let info = { displayName: '', title: '', department: '', mail: '' };
 
           res.on('searchEntry', (entry) => {
             info.displayName = entry.object.displayName || '';
             info.title = entry.object.title || '';
             info.department = entry.object.department || '';
+            info.mail = entry.object.mail || '';
           });
 
           res.on('error', (err) => {
