@@ -632,28 +632,49 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       });
     }
 
-    // Generate email content from template
+    // Generate email content from template using HTML table format (same as preview)
     const hireCount = hires.length;
     const hireDate = new Date().toLocaleDateString();
     
-    // Format hire details for email body
-    const hireDetails = hires.map((hire, index) => {
-      return `${index + 1}. ${hire.name}
-   - Position: ${hire.title}
-   - Department: ${hire.department}
-   - Email: ${hire.email}
-   - License Type: ${hire.microsoft_365_license || 'Standard'}`;
-    }).join('\n\n');
+    // Format hire details as HTML table (identical to preview logic)
+    const hireDetailsHtml = `
+      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hires.map((hire, index) => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
     // Replace template variables
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
       .replace(/\{\{hireDate\}\}/g, hireDate);
 
-    const body =  (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
-      .replace(/\{\{hireDetails\}\}/g, hireDetails)
+    const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
+      .replace(/\{\{hireDetails\}\}/g, hireDetailsHtml)
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
-      .replace(/\{\{hireDate\}\}/g, hireDate);
+      .replace(/\{\{hireDate\}\}/g, hireDate)
+      .replace(/\n\n+/g, '<br><br>') // Convert multiple newlines to double <br>
+      .replace(/\n/g, '<br>'); // Convert single newlines to <br>
 
     // Determine sender email
     let senderEmail = graphSettings.senderEmail;
@@ -669,7 +690,7 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       bccRecipients: finalBccRecipients.length > 0 ? finalBccRecipients : undefined,
       subject: subject,
       body: {
-        contentType: 'Text',
+        contentType: 'HTML', // Changed from 'Text' to 'HTML'
         content: body
       },
       senderEmail: senderEmail,
@@ -756,8 +777,8 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
       .replace('{{hireDate}}', currentDate)
-      .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
-      .replace(/\n/g, ' '); // Convert single newlines to space
+      .replace(/\n\n+/g, '<br><br>') // Convert multiple newlines to double <br>
+      .replace(/\n/g, '<br>'); // Convert single newlines to <br>
 
     res.json({
       subject,

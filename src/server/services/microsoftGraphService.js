@@ -124,12 +124,13 @@ class MicrosoftGraphService {
         console.log(`BCC: ${bccRecipients.map(r => r.emailAddress.address).join(', ')}`);
       }
       console.log(`Email subject: ${emailData.subject}`);
+      console.log(`Email content type: ${emailData.body.contentType}`);
 
       // Prepare email message
       const message = {
         subject: emailData.subject,
         body: {
-          contentType: emailData.body.contentType || 'Text',
+          contentType: emailData.body.contentType || 'Text', // Support both HTML and Text
           content: emailData.body.content
         },
         toRecipients: toRecipients,
