@@ -1134,8 +1134,18 @@ export const getAdUserInfo = async (settings, username) => {
         }
 
         const safeUser = escapeLdapFilterValue(username);
+        let searchFilter = `(&(objectClass=user)(sAMAccountName=${safeUser}))`;
+        if (username.includes('@')) {
+          const userPart = username.split('@')[0];
+          const safeUserPart = escapeLdapFilterValue(userPart);
+          searchFilter =
+            `(&(objectClass=user)(|(sAMAccountName=${safeUserPart})(userPrincipalName=${safeUser})(mail=${safeUser})))`;
+        }
+
+        logger.api.debug(`User info search filter: ${searchFilter}`);
+
         const searchOptions = {
-          filter: `(&(objectClass=user)(sAMAccountName=${safeUser}))`,
+          filter: searchFilter,
           scope: 'sub',
           attributes: ['displayName', 'title', 'department', 'mail']
         };
