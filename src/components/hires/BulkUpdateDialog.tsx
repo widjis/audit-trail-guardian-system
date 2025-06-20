@@ -364,9 +364,14 @@ export function BulkUpdateDialog({
                 </div>
                 <div>
                   <Label className="text-xs font-medium">Body:</Label>
-                  <div className="text-sm bg-muted p-3 rounded max-h-48 overflow-y-auto whitespace-pre-wrap">
-                    {emailTemplate.body}
-                  </div>
+                  <div 
+                    className="text-sm bg-muted p-3 rounded max-h-48 overflow-y-auto prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: emailTemplate.body }}
+                    style={{
+                      fontSize: '14px',
+                      lineHeight: '1.4'
+                    }}
+                  />
                 </div>
                 {includeAttachments && (
                   <div>
