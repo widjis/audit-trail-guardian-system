@@ -1133,14 +1133,13 @@ export const getAdUserInfo = async (settings, username) => {
           return reject(err);
         }
 
-        const safeUser = escapeLdapFilterValue(username);
-        let searchFilter = `(&(objectClass=user)(sAMAccountName=${safeUser}))`;
-        if (username.includes('@')) {
-          const userPart = username.split('@')[0];
-          const safeUserPart = escapeLdapFilterValue(userPart);
-          searchFilter =
-            `(&(objectClass=user)(|(sAMAccountName=${safeUserPart})(userPrincipalName=${safeUser})(mail=${safeUser})))`;
+        let userForSam = username;
+        if (userForSam.includes('@')) {
+          userForSam = userForSam.split('@')[0];
         }
+
+        const safeUser = escapeLdapFilterValue(userForSam);
+        const searchFilter = `(&(objectClass=user)(sAMAccountName=${safeUser}))`;
 
         logger.api.debug(`User info search filter: ${searchFilter}`);
 
@@ -1160,10 +1159,14 @@ export const getAdUserInfo = async (settings, username) => {
           let info = { displayName: '', title: '', department: '', mail: '' };
 
           res.on('searchEntry', (entry) => {
-            info.displayName = entry.object.displayName || '';
-            info.title = entry.object.title || '';
-            info.department = entry.object.department || '';
-            info.mail = entry.object.mail || '';
+            if (entry && entry.object) {
+              info.displayName = entry.object.displayName || '';
+              info.title = entry.object.title || '';
+              info.department = entry.object.department || '';
+              info.mail = entry.object.mail || '';
+            } else {
+              logger.api.warn('Received searchEntry without object property, skipping');
+            }
           });
 
           res.on('error', (err) => {
@@ -1175,7 +1178,7 @@ export const getAdUserInfo = async (settings, username) => {
           res.on('end', () => {
             client.unbind();
             if (!info.displayName && !info.title && !info.department) {
-              logger.api.warn('No AD info found for', username);
+              logger.api.warn('No AD info found for', userForSam);
             }
             resolve(info);
           });
