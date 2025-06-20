@@ -616,7 +616,19 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     console.log('=== Microsoft Graph License Request Start ===');
     console.log('Request body keys:', Object.keys(req.body));
     console.log('includeAttachments flag:', includeAttachments);
+    console.log('includeAttachments type:', typeof includeAttachments);
     console.log('Number of hires:', hires?.length || 0);
+
+    // Log each hire's SRF information upfront
+    if (hires && hires.length > 0) {
+      console.log('\n=== Hire SRF Information ===');
+      hires.forEach((hire, index) => {
+        console.log(`Hire ${index + 1}: ${hire.name}`);
+        console.log(`  - srf_document_path: ${hire.srf_document_path || 'NOT SET'}`);
+        console.log(`  - srf_document_name: ${hire.srf_document_name || 'NOT SET'}`);
+        console.log(`  - Has SRF data: ${!!(hire.srf_document_path && hire.srf_document_name)}`);
+      });
+    }
 
     if (!graphSettings?.enabled) {
       return res.status(400).json({
@@ -639,6 +651,11 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
 
     // Process SRF attachments if requested
     let attachments = [];
+    
+    console.log('\n=== Attachment Processing Decision ===');
+    console.log('includeAttachments flag is:', includeAttachments);
+    console.log('Will process attachments:', !!includeAttachments);
+    
     if (includeAttachments) {
       console.log('=== SRF Attachment Processing Start ===');
       console.log('Processing SRF attachments for email...');
@@ -716,7 +733,7 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       console.log(`Total SRF attachments processed: ${attachments.length}`);
       console.log('Attachment filenames:', attachments.map(a => a.filename));
     } else {
-      console.log('includeAttachments is false, skipping SRF processing');
+      console.log('includeAttachments is false/undefined, skipping SRF processing');
     }
 
     // Generate email content from template using HTML table format (same as preview)
