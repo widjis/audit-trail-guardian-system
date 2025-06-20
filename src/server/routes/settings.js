@@ -669,14 +669,17 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
       .replace(/\{\{hireDate\}\}/g, hireDate);
 
-    const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
+    const bodyTemplate = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace(/\{\{hireDetails\}\}/g, hireDetailsHtml)
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
-      .replace(/\{\{hireDate\}\}/g, hireDate)
-      .replace(/\n\n+/g, '</p><p>') // Convert paragraph breaks to proper HTML paragraphs
-      .replace(/\n/g, '<br>') // Convert single newlines to line breaks
-      .replace(/^/, '<p>') // Add opening paragraph tag at start
-      .replace(/$/, '</p>'); // Add closing paragraph tag at end
+      .replace(/\{\{hireDate\}\}/g, hireDate);
+
+    // Fixed line break processing - split by double newlines to create paragraphs
+    const paragraphs = bodyTemplate.split(/\n\n+/);
+    const body = paragraphs
+      .map(paragraph => paragraph.replace(/\n/g, '<br>')) // Convert single newlines to <br>
+      .map(paragraph => `<p>${paragraph}</p>`) // Wrap each paragraph in <p> tags
+      .join(''); // Join without extra spacing
 
     // Determine sender email
     let senderEmail = graphSettings.senderEmail;
@@ -775,14 +778,17 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       .replace('{{hireCount}}', hires.length.toString())
       .replace('{{hireDate}}', currentDate);
 
-    const body = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
+    const bodyTemplate = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
-      .replace('{{hireDate}}', currentDate)
-      .replace(/\n\n+/g, '</p><p>') // Convert paragraph breaks to proper HTML paragraphs
-      .replace(/\n/g, '<br>') // Convert single newlines to line breaks
-      .replace(/^/, '<p>') // Add opening paragraph tag at start
-      .replace(/$/, '</p>'); // Add closing paragraph tag at end
+      .replace('{{hireDate}}', currentDate);
+
+    // Fixed line break processing - split by double newlines to create paragraphs
+    const paragraphs = bodyTemplate.split(/\n\n+/);
+    const body = paragraphs
+      .map(paragraph => paragraph.replace(/\n/g, '<br>')) // Convert single newlines to <br>
+      .map(paragraph => `<p>${paragraph}</p>`) // Wrap each paragraph in <p> tags
+      .join(''); // Join without extra spacing
 
     res.json({
       subject,
