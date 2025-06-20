@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
 import sql from 'mssql';
 import { microsoftGraphService } from '../services/microsoftGraphService.js';
+import { getAdUserInfo } from './active-directory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -612,6 +613,17 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const { recipients, ccRecipients, bccRecipients, hires, includeAttachments } = req.body;
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
+    const adSettings = settings.activeDirectorySettings;
+    let signature = '';
+
+    if (req.user?.username && adSettings?.enabled) {
+      try {
+        const info = await getAdUserInfo(adSettings, req.user.username);
+        signature = `Best regards,<br>${info.displayName} | ${info.title}<br>${info.department}`;
+      } catch (err) {
+        console.error('Failed to fetch AD user info:', err);
+      }
+    }
 
     console.log('=== Microsoft Graph License Request Start ===');
     console.log('Request body keys:', Object.keys(req.body));
@@ -751,7 +763,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const bodyTemplate = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace(/\{\{hireDetails\}\}/g, hireDetailsHtml)
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
-      .replace(/\{\{hireDate\}\}/g, hireDate);
+      .replace(/\{\{hireDate\}\}/g, hireDate)
+      .replace(/\{\{signature\}\}/g, signature);
 
     // Fixed line break processing - split by double newlines to create paragraphs
     const paragraphs = bodyTemplate.split(/\n\n+/);
@@ -840,6 +853,17 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
     const { hires } = req.body;
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
+    const adSettings = settings.activeDirectorySettings;
+
+    let signature = '';
+    if (req.user?.username && adSettings?.enabled) {
+      try {
+        const info = await getAdUserInfo(adSettings, req.user.username);
+        signature = `Best regards,<br>${info.displayName} | ${info.title}<br>${info.department}`;
+      } catch (err) {
+        console.error('Failed to fetch AD user info:', err);
+      }
+    }
 
     // Format hire details as HTML table - FIXED: removed all unnecessary whitespace
     const hireDetailsHtml = `<table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;"><thead><tr style="background-color: #f2f2f2;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th></tr></thead><tbody>${hires.map((hire, index) => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td></tr>`).join('')}</tbody></table>`;
@@ -859,7 +883,8 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
     const bodyTemplate = (graphSettings?.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
-      .replace('{{hireDate}}', currentDate);
+      .replace('{{hireDate}}', currentDate)
+      .replace('{{signature}}', signature);
 
     // Fixed line break processing - split by double newlines to create paragraphs
     const paragraphs = bodyTemplate.split(/\n\n+/);

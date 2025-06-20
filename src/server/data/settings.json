@@ -352,7 +352,7 @@
     "senderEmail": "widji.santoso@merdekabattery.com",
     "useLoggedInUserAsSender": false,
     "emailSubjectTemplate": "REQUEST PROSES LICENSE FOR {{hireCount}} NEW HIRE MTI - {{hireDate}}",
-    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\nBest regards,\nMTI ICT Team",
+    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\n{{signature}}",
     "lastConnectionTest": "2025-06-18T15:01:47.882Z"
   }
 }

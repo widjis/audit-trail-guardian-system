@@ -54,8 +54,7 @@ Please process these license assignments at your earliest convenience. If you ne
 
 Thank you for your assistance.
 
-Best regards,
-HR Department`
+{{signature}}`
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -432,7 +431,7 @@ HR Department`
                 placeholder="Use {{hireDetails}} to insert employee information"
               />
               <p className="text-xs text-muted-foreground">
-                Use {"{{hireDetails}}"} to insert formatted employee information and {"{{hireCount}}"} for count
+                Use {"{{hireDetails}}"} to insert formatted employee information, {"{{hireCount}}"} for count, and {"{{signature}}"} for the sender signature
               </p>
             </div>
 
