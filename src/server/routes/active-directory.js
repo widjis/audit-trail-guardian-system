@@ -1141,7 +1141,7 @@ export const getAdUserInfo = async (settings, username) => {
         }
         console.log('UserForSam:', userForSam);
         const safeUser = escapeLdapFilterValue(userForSam);
-        const searchFilter = `(&(objectClass=user)(sAMAccountName=${safeUser}))`;
+        const searchFilter = `(&(objectClass=user)(sAMAccountName=*${safeUser}*))`;
         
         console.log('searchFilter',searchFilter);
         logger.api.debug(`User info search filter: ${searchFilter}`);
@@ -1163,8 +1163,9 @@ export const getAdUserInfo = async (settings, username) => {
 
           res.on('searchEntry', (entry) => {
             if (entry) {
-              userDN = entry.dn.toString();
-              logger.api.debug(`Found user DN: ${userDN}`);
+              console.log('entry', entry);
+              //userDN = entry.dn.toString();
+              //logger.api.debug(`Found user DN: ${userDN}`);
               // info.displayName = entry.object.displayName || '';
               // info.title = entry.object.title || '';
               // info.department = entry.object.department || '';
