@@ -16,6 +16,8 @@ interface EmailMessage {
     content: string;
   };
   toRecipients: EmailRecipient[];
+  ccRecipients?: EmailRecipient[];
+  bccRecipients?: EmailRecipient[];
   attachments?: Array<{
     "@odata.type": string;
     name: string;
@@ -25,7 +27,10 @@ interface EmailMessage {
 }
 
 interface LicenseRequestEmailData {
-  recipient: string;
+  recipients?: string[] | string; // Support both array and single string
+  recipient?: string; // For backward compatibility
+  ccRecipients?: string[];
+  bccRecipients?: string[];
   hires: Array<{
     id?: string;
     name: string;
@@ -43,6 +48,11 @@ interface EmailSendResult {
   sentCount?: number;
   failedCount?: number;
   errors?: string[];
+  recipients?: {
+    to: string[];
+    cc: string[];
+    bcc: string[];
+  };
 }
 
 export const microsoftGraphService = {
@@ -85,7 +95,11 @@ export const microsoftGraphService = {
       }
 
       const requestData = {
-        ...emailData,
+        // Support both new multi-recipient format and old single recipient format
+        recipients: emailData.recipients || emailData.recipient,
+        ccRecipients: emailData.ccRecipients,
+        bccRecipients: emailData.bccRecipients,
+        hires: emailData.hires,
         attachments: attachments.length > 0 ? attachments : undefined
       };
 
@@ -110,7 +124,6 @@ export const microsoftGraphService = {
     }
   },
 
-  // Get email template preview
   getEmailTemplate: async (hires: LicenseRequestEmailData['hires']): Promise<{ subject: string; body: string }> => {
     try {
       const response = await apiClient.post<{ subject: string; body: string }>('/settings/microsoft-graph/email-template-preview', {

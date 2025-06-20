@@ -605,7 +605,7 @@ router.post('/microsoft-graph/test-connection', async (req, res) => {
 
 router.post('/microsoft-graph/send-license-request', async (req, res) => {
   try {
-    const { recipient, hires, attachments } = req.body;
+    const { recipients, ccRecipients, bccRecipients, hires, attachments } = req.body;
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
 
@@ -616,7 +616,23 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       });
     }
 
-    console.log(`Processing license request email for ${hires.length} hires to ${recipient}`);
+    // Support both old single recipient format and new multiple recipients format
+    const finalRecipients = recipients || req.body.recipient;
+    if (!finalRecipients) {
+      return res.status(400).json({
+        success: false,
+        message: 'No recipients specified'
+      });
+    }
+
+    console.log(`Processing license request email for ${hires.length} hires`);
+    console.log(`Recipients - TO: ${Array.isArray(finalRecipients) ? finalRecipients.join(', ') : finalRecipients}`);
+    if (ccRecipients && ccRecipients.length > 0) {
+      console.log(`Recipients - CC: ${ccRecipients.join(', ')}`);
+    }
+    if (bccRecipients && bccRecipients.length > 0) {
+      console.log(`Recipients - BCC: ${bccRecipients.join(', ')}`);
+    }
 
     // Format hire details as HTML table
     const hireDetailsHtml = `
@@ -666,9 +682,11 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
       .replace(/\n/g, ' '); // Convert single newlines to space
 
-    // Prepare email data
+    // Prepare email data with multiple recipient support
     const emailData = {
-      recipient: recipient,
+      recipients: finalRecipients,
+      ccRecipients: ccRecipients || [],
+      bccRecipients: bccRecipients || [],
       subject: subject,
       body: {
         contentType: 'HTML',
@@ -695,7 +713,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       res.json({
         success: true,
         message: result.message,
-        sentCount: 1
+        sentCount: 1,
+        recipients: result.recipients
       });
     } else {
       console.error('Failed to send license request email:', result.error);

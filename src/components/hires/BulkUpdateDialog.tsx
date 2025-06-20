@@ -16,6 +16,7 @@ import { microsoftGraphService } from "@/services/microsoft-graph-service";
 import { NewHire } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { getACLForDepartment } from "@/utils/aclMapping";
+import { MultiEmailInput } from "@/components/ui/multi-email-input";
 
 interface BulkUpdateDialogProps {
   isOpen: boolean;
@@ -39,7 +40,9 @@ export function BulkUpdateDialog({
     field: "",
     value: "",
   });
-  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
+  const [ccRecipients, setCcRecipients] = useState<string[]>([]);
+  const [bccRecipients, setBccRecipients] = useState<string[]>([]);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState<{ subject: string; body: string } | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -71,10 +74,10 @@ export function BulkUpdateDialog({
 
   // Set default recipient when settings are loaded
   useEffect(() => {
-    if (graphSettings?.defaultEmailRecipient && !emailRecipient) {
-      setEmailRecipient(graphSettings.defaultEmailRecipient);
+    if (graphSettings?.defaultEmailRecipient && emailRecipients.length === 0) {
+      setEmailRecipients([graphSettings.defaultEmailRecipient]);
     }
-  }, [graphSettings, emailRecipient]);
+  }, [graphSettings, emailRecipients.length]);
 
   const handleEmailTemplatePreview = async () => {
     if (!selectedHires || selectedHires.length === 0) return;
@@ -105,7 +108,7 @@ export function BulkUpdateDialog({
   };
 
   const handleLicenseRequestEmail = async () => {
-    if (!selectedHires || selectedHires.length === 0 || !emailRecipient) return;
+    if (!selectedHires || selectedHires.length === 0 || emailRecipients.length === 0) return;
     
     setIsSubmitting(true);
     
@@ -120,15 +123,18 @@ export function BulkUpdateDialog({
       }));
       
       const result = await microsoftGraphService.sendLicenseRequestEmail({
-        recipient: emailRecipient,
+        recipients: emailRecipients,
+        ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
+        bccRecipients: bccRecipients.length > 0 ? bccRecipients : undefined,
         hires: hiresForEmail,
         includeAttachments
       });
       
       if (result.success) {
+        const totalRecipients = emailRecipients.length + ccRecipients.length + bccRecipients.length;
         toast({
           title: "License Request Email Sent",
-          description: `Successfully sent license request for ${selectedHires.length} users to ${emailRecipient}${includeAttachments ? ' with attachments' : ''}`,
+          description: `Successfully sent license request for ${selectedHires.length} users to ${totalRecipients} recipient(s)${includeAttachments ? ' with attachments' : ''}`,
         });
         onClose();
       } else {
@@ -277,7 +283,6 @@ export function BulkUpdateDialog({
     }
   };
   
-  // Render appropriate input based on field type
   const renderValueInput = () => {
     if (!updateFields.field) return null;
     
@@ -305,16 +310,38 @@ export function BulkUpdateDialog({
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email-recipient">Email Recipient</Label>
-            <Input
-              id="email-recipient"
-              type="email"
-              value={emailRecipient}
-              onChange={(e) => setEmailRecipient(e.target.value)}
-              placeholder="recipient@company.com"
+            <Label htmlFor="email-recipients">To Recipients *</Label>
+            <MultiEmailInput
+              value={emailRecipients}
+              onChange={setEmailRecipients}
+              placeholder="Enter email addresses (press Enter, comma, or semicolon to add)"
             />
             <p className="text-xs text-muted-foreground">
-              Email address where the license request will be sent
+              Primary recipients who will receive the license request
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cc-recipients">CC Recipients (Optional)</Label>
+            <MultiEmailInput
+              value={ccRecipients}
+              onChange={setCcRecipients}
+              placeholder="Enter CC email addresses (optional)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Recipients who will receive a copy of the email
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bcc-recipients">BCC Recipients (Optional)</Label>
+            <MultiEmailInput
+              value={bccRecipients}
+              onChange={setBccRecipients}
+              placeholder="Enter BCC email addresses (optional)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Recipients who will receive a blind copy (hidden from other recipients)
             </p>
           </div>
 
@@ -355,7 +382,16 @@ export function BulkUpdateDialog({
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Email Preview</CardTitle>
-                <CardDescription>This is how the license request email will look</CardDescription>
+                <CardDescription>
+                  This email will be sent to:{" "}
+                  <strong>TO:</strong> {emailRecipients.join(", ")}
+                  {ccRecipients.length > 0 && (
+                    <><br /><strong>CC:</strong> {ccRecipients.join(", ")}</>
+                  )}
+                  {bccRecipients.length > 0 && (
+                    <><br /><strong>BCC:</strong> {bccRecipients.join(", ")}</>
+                  )}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
@@ -505,7 +541,9 @@ export function BulkUpdateDialog({
               value={updateFields.field} 
               onValueChange={(value) => {
                 setUpdateFields({ field: value, value: "" });
-                setEmailRecipient("");
+                setEmailRecipients([]);
+                setCcRecipients([]);
+                setBccRecipients([]);
                 setShowEmailPreview(false);
                 setEmailTemplate(null);
               }}
@@ -549,7 +587,7 @@ export function BulkUpdateDialog({
             onClick={handleSubmit} 
             disabled={
               (!updateFields.field) || 
-              (updateFields.field === "license_request_email" && !emailRecipient) ||
+              (updateFields.field === "license_request_email" && emailRecipients.length === 0) ||
               (updateFields.field !== "excel_report" && updateFields.field !== "ad_account_creation" && updateFields.field !== "license_request_email" && !updateFields.value) || 
               isSubmitting
             }

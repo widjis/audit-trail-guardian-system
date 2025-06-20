@@ -53,6 +53,40 @@ class MicrosoftGraphService {
     return this.graphClient;
   }
 
+  // Helper to format email recipients for Graph API
+  formatRecipients(recipients) {
+    if (typeof recipients === 'string') {
+      // Single recipient or comma-separated string
+      return recipients.split(',').map(email => ({
+        emailAddress: {
+          address: email.trim(),
+          name: email.trim()
+        }
+      }));
+    } else if (Array.isArray(recipients)) {
+      // Array of recipients
+      return recipients.map(recipient => {
+        if (typeof recipient === 'string') {
+          return {
+            emailAddress: {
+              address: recipient.trim(),
+              name: recipient.trim()
+            }
+          };
+        } else if (recipient.email || recipient.address) {
+          return {
+            emailAddress: {
+              address: recipient.email || recipient.address,
+              name: recipient.name || recipient.email || recipient.address
+            }
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+    return [];
+  }
+
   // Send email using Microsoft Graph API
   async sendEmail(settings, emailData) {
     try {
@@ -70,7 +104,25 @@ class MicrosoftGraphService {
       }
 
       console.log(`Sending email from: ${senderEmail}`);
-      console.log(`Sending email to: ${emailData.recipient}`);
+
+      // Format recipients - support both old single recipient and new multiple recipients
+      const toRecipients = emailData.recipients ? 
+        this.formatRecipients(emailData.recipients) : 
+        this.formatRecipients(emailData.recipient);
+
+      const ccRecipients = emailData.ccRecipients ? 
+        this.formatRecipients(emailData.ccRecipients) : [];
+
+      const bccRecipients = emailData.bccRecipients ? 
+        this.formatRecipients(emailData.bccRecipients) : [];
+
+      console.log(`Sending email to: ${toRecipients.map(r => r.emailAddress.address).join(', ')}`);
+      if (ccRecipients.length > 0) {
+        console.log(`CC: ${ccRecipients.map(r => r.emailAddress.address).join(', ')}`);
+      }
+      if (bccRecipients.length > 0) {
+        console.log(`BCC: ${bccRecipients.map(r => r.emailAddress.address).join(', ')}`);
+      }
       console.log(`Email subject: ${emailData.subject}`);
 
       // Prepare email message
@@ -80,12 +132,7 @@ class MicrosoftGraphService {
           contentType: emailData.body.contentType || 'Text',
           content: emailData.body.content
         },
-        toRecipients: [{
-          emailAddress: {
-            address: emailData.recipient,
-            name: emailData.recipientName || emailData.recipient
-          }
-        }],
+        toRecipients: toRecipients,
         from: {
           emailAddress: {
             address: senderEmail,
@@ -93,6 +140,16 @@ class MicrosoftGraphService {
           }
         }
       };
+
+      // Add CC recipients if any
+      if (ccRecipients.length > 0) {
+        message.ccRecipients = ccRecipients;
+      }
+
+      // Add BCC recipients if any
+      if (bccRecipients.length > 0) {
+        message.bccRecipients = bccRecipients;
+      }
 
       // Add attachments if provided
       if (emailData.attachments && emailData.attachments.length > 0) {
@@ -106,7 +163,6 @@ class MicrosoftGraphService {
       }
 
       // Send the email using the appropriate endpoint
-      // Try /me/sendMail first, fallback to /users/{userId}/sendMail if needed
       let sendResult;
       try {
         console.log('Attempting to send email via /me/sendMail...');
@@ -126,10 +182,16 @@ class MicrosoftGraphService {
         console.log('Email sent successfully via /users endpoint');
       }
 
+      const totalRecipients = toRecipients.length + ccRecipients.length + bccRecipients.length;
       return {
         success: true,
-        message: `Email sent successfully to ${emailData.recipient}`,
-        messageId: sendResult?.id || 'sent'
+        message: `Email sent successfully to ${totalRecipients} recipient(s)`,
+        messageId: sendResult?.id || 'sent',
+        recipients: {
+          to: toRecipients.map(r => r.emailAddress.address),
+          cc: ccRecipients.map(r => r.emailAddress.address),
+          bcc: bccRecipients.map(r => r.emailAddress.address)
+        }
       };
 
     } catch (error) {
