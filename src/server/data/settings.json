@@ -14,68 +14,300 @@
   ],
   "mailingLists": {
     "mandatory": [
-      { "id": "1", "name": "Acid Plant", "email": "mti-ap@merdekabattery.com", "code": "AP", "departmentCode": "AP" },
-      { "id": "2", "name": "Chloride Plant", "email": "mti-cp@merdekabattery.com", "code": "CP", "departmentCode": "CP" },
-      { "id": "3", "name": "Commercial", "email": "mti-logistics@merdekabattery.com", "code": "COM", "departmentCode": "COM" },
-      { "id": "4", "name": "Copper Cathode Plant", "email": "mti-ccp@merdekabattery.com", "code": "CCP", "departmentCode": "CCP" },
-      { "id": "5", "name": "Environment", "email": "mti-environment@merdekabattery.com", "code": "ENV", "departmentCode": "ENV" },
-      { "id": "6", "name": "External Affair", "email": "mti-external-affair@merdekabattery.com", "code": "EA", "departmentCode": "EA" },
-      { "id": "7", "name": "Finance", "email": "mti-finance@merdekabattery.com", "code": "FN", "departmentCode": "FN" },
-      { "id": "8", "name": "General Management", "email": "mti-gm@merdekabattery.com", "code": "GM", "departmentCode": "GM" },
-      { "id": "9", "name": "Human Resources", "email": "mti-hr@merdekabattery.com", "code": "HR", "departmentCode": "HR" },
-      { "id": "10", "name": "Maintenance", "email": "mti-mtc@merdekabattery.com", "code": "MTC", "departmentCode": "MTC" },
-      { "id": "11", "name": "Occupational Health and Safety", "email": "mti-ohs@merdekabattery.com", "code": "OHS", "departmentCode": "OHS" },
-      { "id": "12", "name": "Pyrite Plant", "email": "mti-pp@merdekabattery.com", "code": "PP", "departmentCode": "PP" },
-      { "id": "13", "name": "Supply Chain Management", "email": "mti-scm@merdekabattery.com", "code": "SCM", "departmentCode": "SCM" },
-      { "id": "14", "name": "Technical Service", "email": "mti-ts@merdekabattery.com", "code": "TS", "departmentCode": "TS" }
+      {
+        "id": "1",
+        "name": "Acid Plant",
+        "email": "mti-ap@merdekabattery.com",
+        "code": "AP",
+        "departmentCode": "AP"
+      },
+      {
+        "id": "2",
+        "name": "Chloride Plant",
+        "email": "mti-cp@merdekabattery.com",
+        "code": "CP",
+        "departmentCode": "CP"
+      },
+      {
+        "id": "3",
+        "name": "Commercial",
+        "email": "mti-logistics@merdekabattery.com",
+        "code": "COM",
+        "departmentCode": "COM"
+      },
+      {
+        "id": "4",
+        "name": "Copper Cathode Plant",
+        "email": "mti-ccp@merdekabattery.com",
+        "code": "CCP",
+        "departmentCode": "CCP"
+      },
+      {
+        "id": "5",
+        "name": "Environment",
+        "email": "mti-environment@merdekabattery.com",
+        "code": "ENV",
+        "departmentCode": "ENV"
+      },
+      {
+        "id": "6",
+        "name": "External Affair",
+        "email": "mti-external-affair@merdekabattery.com",
+        "code": "EA",
+        "departmentCode": "EA"
+      },
+      {
+        "id": "7",
+        "name": "Finance",
+        "email": "mti-finance@merdekabattery.com",
+        "code": "FN",
+        "departmentCode": "FN"
+      },
+      {
+        "id": "8",
+        "name": "General Management",
+        "email": "mti-gm@merdekabattery.com",
+        "code": "GM",
+        "departmentCode": "GM"
+      },
+      {
+        "id": "9",
+        "name": "Human Resources",
+        "email": "mti-hr@merdekabattery.com",
+        "code": "HR",
+        "departmentCode": "HR"
+      },
+      {
+        "id": "10",
+        "name": "Maintenance",
+        "email": "mti-mtc@merdekabattery.com",
+        "code": "MTC",
+        "departmentCode": "MTC"
+      },
+      {
+        "id": "11",
+        "name": "Occupational Health and Safety",
+        "email": "mti-ohs@merdekabattery.com",
+        "code": "OHS",
+        "departmentCode": "OHS"
+      },
+      {
+        "id": "12",
+        "name": "Pyrite Plant",
+        "email": "mti-pp@merdekabattery.com",
+        "code": "PP",
+        "departmentCode": "PP"
+      },
+      {
+        "id": "13",
+        "name": "Supply Chain Management",
+        "email": "mti-scm@merdekabattery.com",
+        "code": "SCM",
+        "departmentCode": "SCM"
+      },
+      {
+        "id": "14",
+        "name": "Technical Service",
+        "email": "mti-ts@merdekabattery.com",
+        "code": "TS",
+        "departmentCode": "TS"
+      }
     ],
     "optional": [
-      { "id": "15", "name": "MTI All Admin", "email": "mti-alladmin@merdekabattery.com" },
-      { "id": "16", "name": "MTI All Employee", "email": "mti-employee@merdekabattery.com" },
-      { "id": "17", "name": "MTI All Manager", "email": "mti-manager@merdekabattery.com" },
-      { "id": "18", "name": "MTI All Superintendent", "email": "mti-superintendent@merdekabattery.com" },
-      { "id": "19", "name": "MTI All Supervisor", "email": "mti-supervisor@merdekabattery.com" },
-      { "id": "20", "name": "MTI Asset Protection", "email": "mti-asset-protection@merdekabattery.com" },
-      { "id": "21", "name": "MTI CHN-Engineers", "email": "mti-chnengineers@merdekabattery.com" },
-      { "id": "22", "name": "MTI Compensation & Benefit", "email": "mti-cnb@merdekabattery.com" },
-      { "id": "23", "name": "MTI Contract", "email": "mti-contract@merdekabattery.com" },
-      { "id": "24", "name": "MTI EI Automation", "email": "mti-ei-automation@merdekabattery.com" },
-      { "id": "25", "name": "MTI Engineering Maintenance", "email": "mti-engineeringmtc@merdekabattery.com" },
-      { "id": "26", "name": "MTI ER & IR", "email": "mti-erir@merdekabattery.com" },
-      { "id": "27", "name": "MTI HR Section", "email": "mti-hrsection@merdekabattery.com" },
-      { "id": "28", "name": "MTI ICT HD DocCon", "email": "mti.icthddoccon@merdekabattery.com" },
-      { "id": "29", "name": "MTI ICT HD Network", "email": "mti.icthdnetwork@merdekabattery.com" },
-      { "id": "30", "name": "MTI ICT HD Support", "email": "mti.icthdsupport@merdekabattery.com" },
-      { "id": "31", "name": "MTI Information & Communication Technology", "email": "mti-ict@merdekabattery.com" },
-      { "id": "32", "name": "MTI Jakarta", "email": "mti-jakarta@merdekabattery.com" },
-      { "id": "33", "name": "MTI Metallurgy Processing", "email": "mti.metallurgy.processing@merdekabattery.com" },
-      { "id": "34", "name": "MTI Morowali", "email": "mti-morowali@merdekabattery.com" },
-      { "id": "35", "name": "MTI OHS System & Reporting", "email": "mti-ohssysreport@merdekabattery.com" },
-      { "id": "36", "name": "MTI Operation Readiness Team", "email": "mti-operationreadiness@merdekabattery.com" },
-      { "id": "37", "name": "MTI Recruitment", "email": "recruitment-mti@merdekabattery.com" },
-      { "id": "38", "name": "MTI Site Service", "email": "mti-site-service@merdekabattery.com" },
-      { "id": "39", "name": "MTI Special Purchase Commissioning", "email": "mti-spcpurcom@merdekabattery.com" },
-      { "id": "40", "name": "MTI Transport", "email": "mti-transport@merdekabattery.com" },
-      { "id": "41", "name": "MTI Warehouse", "email": "mti-warehouse@merdekabattery.com" }
+      {
+        "id": "15",
+        "name": "MTI All Admin",
+        "email": "mti-alladmin@merdekabattery.com"
+      },
+      {
+        "id": "16",
+        "name": "MTI All Employee",
+        "email": "mti-employee@merdekabattery.com"
+      },
+      {
+        "id": "17",
+        "name": "MTI All Manager",
+        "email": "mti-manager@merdekabattery.com"
+      },
+      {
+        "id": "18",
+        "name": "MTI All Superintendent",
+        "email": "mti-superintendent@merdekabattery.com"
+      },
+      {
+        "id": "19",
+        "name": "MTI All Supervisor",
+        "email": "mti-supervisor@merdekabattery.com"
+      },
+      {
+        "id": "20",
+        "name": "MTI Asset Protection",
+        "email": "mti-asset-protection@merdekabattery.com"
+      },
+      {
+        "id": "21",
+        "name": "MTI CHN-Engineers",
+        "email": "mti-chnengineers@merdekabattery.com"
+      },
+      {
+        "id": "22",
+        "name": "MTI Compensation & Benefit",
+        "email": "mti-cnb@merdekabattery.com"
+      },
+      {
+        "id": "23",
+        "name": "MTI Contract",
+        "email": "mti-contract@merdekabattery.com"
+      },
+      {
+        "id": "24",
+        "name": "MTI EI Automation",
+        "email": "mti-ei-automation@merdekabattery.com"
+      },
+      {
+        "id": "25",
+        "name": "MTI Engineering Maintenance",
+        "email": "mti-engineeringmtc@merdekabattery.com"
+      },
+      {
+        "id": "26",
+        "name": "MTI ER & IR",
+        "email": "mti-erir@merdekabattery.com"
+      },
+      {
+        "id": "27",
+        "name": "MTI HR Section",
+        "email": "mti-hrsection@merdekabattery.com"
+      },
+      {
+        "id": "28",
+        "name": "MTI ICT HD DocCon",
+        "email": "mti.icthddoccon@merdekabattery.com"
+      },
+      {
+        "id": "29",
+        "name": "MTI ICT HD Network",
+        "email": "mti.icthdnetwork@merdekabattery.com"
+      },
+      {
+        "id": "30",
+        "name": "MTI ICT HD Support",
+        "email": "mti.icthdsupport@merdekabattery.com"
+      },
+      {
+        "id": "31",
+        "name": "MTI Information & Communication Technology",
+        "email": "mti-ict@merdekabattery.com"
+      },
+      {
+        "id": "32",
+        "name": "MTI Jakarta",
+        "email": "mti-jakarta@merdekabattery.com"
+      },
+      {
+        "id": "33",
+        "name": "MTI Metallurgy Processing",
+        "email": "mti.metallurgy.processing@merdekabattery.com"
+      },
+      {
+        "id": "34",
+        "name": "MTI Morowali",
+        "email": "mti-morowali@merdekabattery.com"
+      },
+      {
+        "id": "35",
+        "name": "MTI OHS System & Reporting",
+        "email": "mti-ohssysreport@merdekabattery.com"
+      },
+      {
+        "id": "36",
+        "name": "MTI Operation Readiness Team",
+        "email": "mti-operationreadiness@merdekabattery.com"
+      },
+      {
+        "id": "37",
+        "name": "MTI Recruitment",
+        "email": "recruitment-mti@merdekabattery.com"
+      },
+      {
+        "id": "38",
+        "name": "MTI Site Service",
+        "email": "mti-site-service@merdekabattery.com"
+      },
+      {
+        "id": "39",
+        "name": "MTI Special Purchase Commissioning",
+        "email": "mti-spcpurcom@merdekabattery.com"
+      },
+      {
+        "id": "40",
+        "name": "MTI Transport",
+        "email": "mti-transport@merdekabattery.com"
+      },
+      {
+        "id": "41",
+        "name": "MTI Warehouse",
+        "email": "mti-warehouse@merdekabattery.com"
+      }
     ],
     "roleBased": [
-      { "id": "42", "name": "MTI General Management", "email": "mti-gm@merdekabattery.com", "positionGrade": "General Management" },
-      { "id": "43", "name": "MTI All Manager", "email": "mti-manager@merdekabattery.com", "positionGrade": "Manager" },
-      { "id": "44", "name": "MTI All Superintendent", "email": "mti-superintendent@merdekabattery.com", "positionGrade": "Superintendent" },
-      { "id": "45", "name": "MTI All Supervisor", "email": "mti-supervisor@merdekabattery.com", "positionGrade": "Supervisor" }
+      {
+        "id": "42",
+        "name": "MTI General Management",
+        "email": "mti-gm@merdekabattery.com",
+        "positionGrade": "General Management"
+      },
+      {
+        "id": "43",
+        "name": "MTI All Manager",
+        "email": "mti-manager@merdekabattery.com",
+        "positionGrade": "Manager"
+      },
+      {
+        "id": "44",
+        "name": "MTI All Superintendent",
+        "email": "mti-superintendent@merdekabattery.com",
+        "positionGrade": "Superintendent"
+      },
+      {
+        "id": "45",
+        "name": "MTI All Supervisor",
+        "email": "mti-supervisor@merdekabattery.com",
+        "positionGrade": "Supervisor"
+      }
     ]
   },
   "departments": [
-    { "id": "1", "name": "Engineering", "code": "ENG" },
-    { "id": "2", "name": "Human Resources", "code": "HR" },
-    { "id": "3", "name": "Finance", "code": "FIN" },
-    { "id": "4", "name": "Marketing", "code": "MKT" },
-    { "id": "5", "name": "Sales", "code": "SLS" }
+    {
+      "id": "1",
+      "name": "Engineering",
+      "code": "ENG"
+    },
+    {
+      "id": "2",
+      "name": "Human Resources",
+      "code": "HR"
+    },
+    {
+      "id": "3",
+      "name": "Finance",
+      "code": "FIN"
+    },
+    {
+      "id": "4",
+      "name": "Marketing",
+      "code": "MKT"
+    },
+    {
+      "id": "5",
+      "name": "Sales",
+      "code": "SLS"
+    }
   ],
   "mailingListDisplayAsDropdown": true,
   "whatsappSettings": {
     "apiUrl": "http://10.60.10.46:8192",
-    "defaultMessage": "*\ud83d\udce2 Welcome to PT. Merdeka Tsingshan Indonesia!* \ud83c\udf89\n\nBy this message, we inform you regarding your account information for the email address:\n\n*Your Account Information:*\n*Name:* {{name}}\n*Title:* {{title}}\n*Department:* {{department}}\n*Email:* {{email}}\n*Password:* `{{password}}`\n\n_Please contact ICT Support at mti.icthelpdesk@merdekabattery.com if you have any questions._",
+    "defaultMessage": "*📢 Welcome to PT. Merdeka Tsingshan Indonesia!* 🎉\n\nBy this message, we inform you regarding your account information for the email address:\n\n*Your Account Information:*\n*Name:* {{name}}\n*Title:* {{title}}\n*Department:* {{department}}\n*Email:* {{email}}\n*Password:* `{{password}}`\n\n_Please contact ICT Support at mti.icthelpdesk@merdekabattery.com if you have any questions._",
     "defaultRecipient": "userNumber"
   },
   "activeDirectorySettings": {
@@ -107,14 +339,18 @@
     "clientSecret": "hS18Q~yRrvY-Y51wlsMyht6F~s2te7apQPr61bAK",
     "tenantId": "b428d519-22b4-458f-af45-f020150f5839",
     "authority": "https://login.microsoftonline.com/b428d519-22b4-458f-af45-f020150f5839",
-    "scope": ["https://graph.microsoft.com/.default"],
-    "defaultToRecipients": ["widji.santoso@gmail.com"],
+    "scope": [
+      "https://graph.microsoft.com/.default"
+    ],
+    "defaultToRecipients": [
+      "widji.santoso@gmail.com"
+    ],
     "defaultCcRecipients": [],
     "defaultBccRecipients": [],
     "senderEmail": "widji.santoso@merdekabattery.com",
     "useLoggedInUserAsSender": false,
     "emailSubjectTemplate": "REQUEST PROSES LICENSE FOR {{hireCount}} NEW HIRE MTI - {{hireDate}}",
-    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\nBest regards,\nHR Department",
+    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\nBest regards,\nMTI ICT Team",
     "lastConnectionTest": "2025-06-18T15:01:47.882Z"
   }
 }
