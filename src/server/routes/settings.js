@@ -636,33 +636,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const hireCount = hires.length;
     const hireDate = new Date().toLocaleDateString();
     
-    // Format hire details as HTML table (identical to preview logic)
-    const hireDetailsHtml = `
-      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${hires.map((hire, index) => `
-            <tr>
-              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+    // Format hire details as HTML table - FIXED: removed all unnecessary whitespace
+    const hireDetailsHtml = `<table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;"><thead><tr style="background-color: #f2f2f2;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th></tr></thead><tbody>${hires.map((hire, index) => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td></tr>`).join('')}</tbody></table>`;
 
     // Replace template variables
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
@@ -738,33 +713,8 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
 
-    // Format hire details as HTML table
-    const hireDetailsHtml = `
-      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${hires.map((hire, index) => `
-            <tr>
-              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+    // Format hire details as HTML table - FIXED: removed all unnecessary whitespace
+    const hireDetailsHtml = `<table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;"><thead><tr style="background-color: #f2f2f2;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th></tr></thead><tbody>${hires.map((hire, index) => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td><td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td></tr>`).join('')}</tbody></table>`;
 
     // Get current date for template substitution
     const currentDate = new Date().toLocaleDateString('en-US', {
