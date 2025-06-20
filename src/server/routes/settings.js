@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -614,6 +613,11 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
 
+    console.log('=== Microsoft Graph License Request Start ===');
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('includeAttachments flag:', includeAttachments);
+    console.log('Number of hires:', hires?.length || 0);
+
     if (!graphSettings?.enabled) {
       return res.status(400).json({
         success: false,
@@ -636,38 +640,84 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     // Process SRF attachments if requested
     let attachments = [];
     if (includeAttachments) {
+      console.log('=== SRF Attachment Processing Start ===');
       console.log('Processing SRF attachments for email...');
       
+      // Verify uploads directory path
+      const uploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
+      console.log('Uploads directory path:', uploadsDir);
+      console.log('Uploads directory exists:', fs.existsSync(uploadsDir));
+      
+      if (fs.existsSync(uploadsDir)) {
+        const uploadsDirContents = fs.readdirSync(uploadsDir);
+        console.log('Uploads directory contents:', uploadsDirContents);
+      }
+      
       for (const hire of hires) {
+        console.log(`\n--- Processing hire: ${hire.name} ---`);
+        console.log('Hire ID:', hire.id);
+        console.log('Hire has ID:', !!hire.id);
+        
         if (hire.id) {
           try {
-            // Check if SRF file exists for this hire
-            const uploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
-            const srfFilePath = path.join(uploadsDir, hire.id, 'srf-document.pdf');
+            const hireUploadDir = path.join(uploadsDir, hire.id);
+            const srfFilePath = path.join(hireUploadDir, 'srf-document.pdf');
+            
+            console.log('Hire upload directory:', hireUploadDir);
+            console.log('Hire upload directory exists:', fs.existsSync(hireUploadDir));
+            
+            if (fs.existsSync(hireUploadDir)) {
+              const hireDirContents = fs.readdirSync(hireUploadDir);
+              console.log('Hire directory contents:', hireDirContents);
+            }
+            
+            console.log('SRF file path:', srfFilePath);
+            console.log('SRF file exists:', fs.existsSync(srfFilePath));
             
             if (fs.existsSync(srfFilePath)) {
+              console.log('Reading SRF file...');
+              
+              // Get file stats
+              const fileStats = fs.statSync(srfFilePath);
+              console.log('File size:', fileStats.size, 'bytes');
+              console.log('File modified:', fileStats.mtime);
+              
               // Read file and convert to base64
               const fileBuffer = fs.readFileSync(srfFilePath);
+              console.log('File buffer length:', fileBuffer.length);
+              
               const base64Content = fileBuffer.toString('base64');
+              console.log('Base64 content length:', base64Content.length);
+              console.log('Base64 content preview (first 100 chars):', base64Content.substring(0, 100));
+              
+              const attachmentFilename = `SRF_${hire.name.replace(/\s+/g, '_')}.pdf`;
+              console.log('Attachment filename:', attachmentFilename);
               
               attachments.push({
-                filename: `SRF_${hire.name.replace(/\s+/g, '_')}.pdf`,
+                filename: attachmentFilename,
                 content: base64Content,
                 contentType: 'application/pdf'
               });
               
-              console.log(`Added SRF attachment for ${hire.name}`);
+              console.log(`✓ Successfully added SRF attachment for ${hire.name}`);
             } else {
-              console.log(`No SRF file found for ${hire.name}, skipping attachment`);
+              console.log(`✗ No SRF file found for ${hire.name} at path: ${srfFilePath}`);
             }
           } catch (error) {
-            console.error(`Error processing SRF attachment for ${hire.name}:`, error);
+            console.error(`✗ Error processing SRF attachment for ${hire.name}:`, error.message);
+            console.error('Error stack:', error.stack);
             // Continue processing other attachments even if one fails
           }
+        } else {
+          console.log(`⚠ Hire ${hire.name} has no ID, skipping SRF attachment`);
         }
       }
       
+      console.log(`\n=== SRF Processing Complete ===`);
       console.log(`Total SRF attachments processed: ${attachments.length}`);
+      console.log('Attachment filenames:', attachments.map(a => a.filename));
+    } else {
+      console.log('includeAttachments is false, skipping SRF processing');
     }
 
     // Generate email content from template using HTML table format (same as preview)
@@ -715,12 +765,31 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       attachments: attachments.length > 0 ? attachments : undefined
     };
 
-    console.log('Sending license request email with Microsoft Graph...');
+    console.log('\n=== Email Data Summary ===');
+    console.log('Recipients count:', finalToRecipients.length);
+    console.log('CC recipients count:', finalCcRecipients.length);
+    console.log('BCC recipients count:', finalBccRecipients.length);
+    console.log('Subject:', subject);
+    console.log('Body content type:', emailData.body.contentType);
+    console.log('Body length:', emailData.body.content.length);
+    console.log('Attachments included:', !!emailData.attachments);
+    console.log('Attachments count:', emailData.attachments?.length || 0);
+    
+    if (emailData.attachments && emailData.attachments.length > 0) {
+      console.log('Attachment details:');
+      emailData.attachments.forEach((att, index) => {
+        console.log(`  ${index + 1}. ${att.filename} (${att.contentType}, ${att.content.length} chars)`);
+      });
+    }
+
+    console.log('\n=== Sending email with Microsoft Graph ===');
     const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
     
     if (result.success) {
       const totalRecipients = finalToRecipients.length + finalCcRecipients.length + finalBccRecipients.length;
       const attachmentInfo = attachments.length > 0 ? ` with ${attachments.length} SRF attachment(s)` : '';
+      console.log(`✓ Email sent successfully to ${totalRecipients} recipient(s)${attachmentInfo}`);
+      
       res.json({
         success: true,
         message: `License request email sent successfully to ${totalRecipients} recipient(s)${attachmentInfo}`,
@@ -733,13 +802,16 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
         }
       });
     } else {
+      console.log('✗ Email sending failed:', result.message);
       res.json({
         success: false,
         message: result.message || 'Failed to send license request email'
       });
     }
   } catch (error) {
-    console.error('Error sending license request email:', error);
+    console.error('=== Email Sending Error ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Failed to send license request email: ' + error.message
