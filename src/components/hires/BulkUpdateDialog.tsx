@@ -127,7 +127,9 @@ export function BulkUpdateDialog({
         department: hire.department,
         email: hire.email,
         title: hire.title,
-        microsoft_365_license: hire.microsoft_365_license || 'Standard'
+        microsoft_365_license: hire.microsoft_365_license || 'Standard',
+        srf_document_path: hire.srf_document_path,
+        srf_document_name: hire.srf_document_name
       }));
       
       const result = await microsoftGraphService.sendLicenseRequestEmail({
