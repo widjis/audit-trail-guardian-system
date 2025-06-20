@@ -1126,6 +1126,7 @@ export const getAdUserInfo = async (settings, username) => {
 
     try {
       const bindDN = formatBindCredential(settings, settings.username);
+      console.log('bindDN',bindDN);
       client.bind(bindDN, settings.password, (err) => {
         if (err) {
           logger.api.error('Error binding to AD for user info:', err);
@@ -1134,18 +1135,21 @@ export const getAdUserInfo = async (settings, username) => {
         }
 
         let userForSam = username;
+        
         if (userForSam.includes('@')) {
           userForSam = userForSam.split('@')[0];
         }
+        console.log('UserForSam:', userForSam);
         const safeUser = escapeLdapFilterValue(userForSam);
         const searchFilter = `(&(objectClass=user)(sAMAccountName=${safeUser}))`;
-
+        
+        console.log('searchFilter',searchFilter);
         logger.api.debug(`User info search filter: ${searchFilter}`);
 
         const searchOptions = {
           filter: searchFilter,
           scope: 'sub',
-          attributes: ['displayName', 'title', 'department', 'mail']
+          attributes: ['displayName', 'title', 'department', 'mail','sAMAccountName', 'distinguishedName']
         };
 
         client.search(settings.baseDN, searchOptions, (err, res) => {
@@ -1158,11 +1162,13 @@ export const getAdUserInfo = async (settings, username) => {
           let info = { displayName: '', title: '', department: '', mail: '' };
 
           res.on('searchEntry', (entry) => {
-            if (entry && entry.object) {
-              info.displayName = entry.object.displayName || '';
-              info.title = entry.object.title || '';
-              info.department = entry.object.department || '';
-              info.mail = entry.object.mail || '';
+            if (entry) {
+              userDN = entry.dn.toString();
+              logger.api.debug(`Found user DN: ${userDN}`);
+              // info.displayName = entry.object.displayName || '';
+              // info.title = entry.object.title || '';
+              // info.department = entry.object.department || '';
+              // info.mail = entry.object.mail || '';
             } else {
               logger.api.warn('Received searchEntry without object property, skipping:', entry);
             }
