@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import ldap from 'ldapjs';
 import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
+import { search, escapeFilter } from '../lib/ldapService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1121,84 +1122,35 @@ const searchAdUsers = async (settings, query) => {
 
 // Fetch basic user info by sAMAccountName
 export const getAdUserInfo = async (settings, username) => {
-  return new Promise((resolve, reject) => {
-    const client = createLdapClient(settings);
+  let sam = username;
+  if (sam.includes('@')) {
+    sam = sam.split('@')[0];
+  }
 
-    try {
-      const bindDN = formatBindCredential(settings, settings.username);
-      console.log('bindDN',bindDN);
-      client.bind(bindDN, settings.password, (err) => {
-        if (err) {
-          logger.api.error('Error binding to AD for user info:', err);
-          client.destroy();
-          return reject(err);
-        }
+  const filter = `(&(objectClass=user)(sAMAccountName=*${escapeFilter(sam)}*))`;
+  const attrs = [
+    'displayName',
+    'title',
+    'department',
+    'mail',
+    'sAMAccountName',
+    'distinguishedName'
+  ];
 
-        let userForSam = username;
-        
-        if (userForSam.includes('@')) {
-          userForSam = userForSam.split('@')[0];
-        }
-        console.log('UserForSam:', userForSam);
-        const safeUser = escapeLdapFilterValue(userForSam);
-        const searchFilter = `(&(objectClass=user)(sAMAccountName=*${safeUser}*))`;
-        
-        console.log('searchFilter',searchFilter);
-        logger.api.debug(`User info search filter: ${searchFilter}`);
-
-        const searchOptions = {
-          filter: searchFilter,
-          scope: 'sub',
-          attributes: ['displayName', 'title', 'department', 'mail','sAMAccountName', 'distinguishedName']
-        };
-
-        client.search(settings.baseDN, searchOptions, (err, res) => {
-          if (err) {
-            logger.api.error('Error searching AD for user info:', err);
-            client.destroy();
-            return reject(err);
-          }
-
-          let info = { displayName: '', title: '', department: '', mail: '' };
-
-          res.on('searchEntry', (entry) => {
-            if (entry) {
-              console.log('entry', entry);
-              //userDN = entry.dn.toString();
-              //logger.api.debug(`Found user DN: ${userDN}`);
-              // info.displayName = entry.object.displayName || '';
-              // info.title = entry.object.title || '';
-              // info.department = entry.object.department || '';
-              // info.mail = entry.object.mail || '';
-            } else {
-              logger.api.warn('Received searchEntry without object property, skipping:', entry);
-            }
-          });
-
-          res.on('error', (err) => {
-            logger.api.error('Search error while getting user info:', err);
-            client.destroy();
-            reject(err);
-          });
-
-          res.on('end', () => {
-            client.unbind();
-            if (!info.displayName && !info.title && !info.department) {
-              logger.api.warn('No AD info found for', username);
-            }
-            resolve(info);
-          });
-        });
-      });
-    } catch (err) {
-      try {
-        client.unbind();
-      } catch (unbindErr) {
-        logger.api.debug('Error unbinding client:', unbindErr);
-      }
-      reject(err);
-    }
-  });
+  try {
+    const [info] = await search(settings.baseDN, filter, attrs);
+    return {
+      displayName: info?.displayName || '',
+      title: info?.title || '',
+      department: info?.department || '',
+      mail: info?.mail || '',
+      sAMAccountName: info?.sAMAccountName || '',
+      distinguishedName: info?.distinguishedName || ''
+    };
+  } catch (err) {
+    logger.api.error('Error fetching AD user info:', err);
+    throw err;
+  }
 };
 
 // Helper function to safely escape special characters in LDAP search filters
