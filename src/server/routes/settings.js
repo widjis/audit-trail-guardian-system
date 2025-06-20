@@ -621,7 +621,7 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     if (req.user?.username && adSettings?.enabled) {
       try {
         const info = await getAdUserInfo(adSettings, req.user.username);
-        signature = `Best regards,<br>${info.displayName} | ${info.title}<br>${info.department}`;
+        signature = `Best regards,<br>${info.displayName}<br>${info.title} | ${info.department}`;
         console.log('Generated signature:', signature.replace(/<br>/g, ' | '));
       } catch (err) {
         console.error('Failed to fetch AD user info:', err);
