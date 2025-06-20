@@ -1160,10 +1160,14 @@ export const getAdUserInfo = async (settings, username) => {
           let info = { displayName: '', title: '', department: '', mail: '' };
 
           res.on('searchEntry', (entry) => {
-            info.displayName = entry.object.displayName || '';
-            info.title = entry.object.title || '';
-            info.department = entry.object.department || '';
-            info.mail = entry.object.mail || '';
+            if (entry && entry.object) {
+              info.displayName = entry.object.displayName || '';
+              info.title = entry.object.title || '';
+              info.department = entry.object.department || '';
+              info.mail = entry.object.mail || '';
+            } else {
+              logger.api.warn('Received searchEntry without object property, skipping:', entry);
+            }
           });
 
           res.on('error', (err) => {
