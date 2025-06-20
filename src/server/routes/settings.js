@@ -643,23 +643,28 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       console.log('=== SRF Attachment Processing Start ===');
       console.log('Processing SRF attachments for email...');
       
-      // Get the base uploads directory path
-      const baseUploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
-      console.log('Base uploads directory path:', baseUploadsDir);
-      console.log('Base uploads directory exists:', fs.existsSync(baseUploadsDir));
-      
       for (const hire of hires) {
         console.log(`\n--- Processing hire: ${hire.name} ---`);
         console.log('Hire ID:', hire.id);
-        console.log('SRF document path:', hire.srf_document_path);
-        console.log('SRF document name:', hire.srf_document_name);
+        console.log('SRF document path from DB:', hire.srf_document_path);
+        console.log('SRF document name from DB:', hire.srf_document_name);
         
         if (hire.srf_document_path && hire.srf_document_name) {
           try {
-            // Use the database-stored path directly
-            const fullSrfPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', hire.srf_document_path);
+            let fullSrfPath;
             
-            console.log('Full SRF file path:', fullSrfPath);
+            // Check if the stored path is already absolute (Windows or Unix)
+            if (path.isAbsolute(hire.srf_document_path)) {
+              // Use the absolute path directly
+              fullSrfPath = path.resolve(hire.srf_document_path);
+              console.log('Using absolute path from database:', fullSrfPath);
+            } else {
+              // Construct relative path from server directory
+              fullSrfPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', hire.srf_document_path);
+              console.log('Constructed relative path:', fullSrfPath);
+            }
+            
+            console.log('Final resolved SRF file path:', fullSrfPath);
             console.log('SRF file exists:', fs.existsSync(fullSrfPath));
             
             if (fs.existsSync(fullSrfPath)) {
@@ -691,8 +696,9 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
               
               console.log(`✓ Successfully added SRF attachment for ${hire.name}`);
             } else {
-              console.log(`✗ SRF file not found at database path: ${fullSrfPath}`);
-              console.log(`Database path was: ${hire.srf_document_path}`);
+              console.log(`✗ SRF file not found at resolved path: ${fullSrfPath}`);
+              console.log(`Original database path was: ${hire.srf_document_path}`);
+              console.log(`Path is absolute: ${path.isAbsolute(hire.srf_document_path)}`);
             }
           } catch (error) {
             console.error(`✗ Error processing SRF attachment for ${hire.name}:`, error.message);
