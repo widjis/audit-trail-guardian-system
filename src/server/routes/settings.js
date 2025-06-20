@@ -673,8 +673,10 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       .replace(/\{\{hireDetails\}\}/g, hireDetailsHtml)
       .replace(/\{\{hireCount\}\}/g, hireCount.toString())
       .replace(/\{\{hireDate\}\}/g, hireDate)
-      .replace(/\n\n+/g, '<br><br>') // Convert multiple newlines to double <br>
-      .replace(/\n/g, '<br>'); // Convert single newlines to <br>
+      .replace(/\n\n+/g, '</p><p>') // Convert paragraph breaks to proper HTML paragraphs
+      .replace(/\n/g, '<br>') // Convert single newlines to line breaks
+      .replace(/^/, '<p>') // Add opening paragraph tag at start
+      .replace(/$/, '</p>'); // Add closing paragraph tag at end
 
     // Determine sender email
     let senderEmail = graphSettings.senderEmail;
@@ -777,8 +779,10 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       .replace('{{hireDetails}}', hireDetailsHtml)
       .replace('{{hireCount}}', hires.length.toString())
       .replace('{{hireDate}}', currentDate)
-      .replace(/\n\n+/g, '<br><br>') // Convert multiple newlines to double <br>
-      .replace(/\n/g, '<br>'); // Convert single newlines to <br>
+      .replace(/\n\n+/g, '</p><p>') // Convert paragraph breaks to proper HTML paragraphs
+      .replace(/\n/g, '<br>') // Convert single newlines to line breaks
+      .replace(/^/, '<p>') // Add opening paragraph tag at start
+      .replace(/$/, '</p>'); // Add closing paragraph tag at end
 
     res.json({
       subject,
