@@ -345,7 +345,9 @@
     "defaultToRecipients": [
       "widji.santoso@gmail.com"
     ],
-    "defaultCcRecipients": [],
+    "defaultCcRecipients": [
+      "widji.santoso@merdekabattery.com"
+    ],
     "defaultBccRecipients": [],
     "senderEmail": "widji.santoso@merdekabattery.com",
     "useLoggedInUserAsSender": false,
