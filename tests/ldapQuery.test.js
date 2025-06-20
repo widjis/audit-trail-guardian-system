@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const settingsPath = path.join(__dirname, '../src/server/data/settings.json');
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+
 test('getAdUserInfo retrieves data', async () => {
   const info = await getAdUserInfo(settings.activeDirectorySettings, 'widji.santoso');
   console.log(info);
