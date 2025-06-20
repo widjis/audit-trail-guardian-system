@@ -643,55 +643,45 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       console.log('=== SRF Attachment Processing Start ===');
       console.log('Processing SRF attachments for email...');
       
-      // Verify uploads directory path
-      const uploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
-      console.log('Uploads directory path:', uploadsDir);
-      console.log('Uploads directory exists:', fs.existsSync(uploadsDir));
-      
-      if (fs.existsSync(uploadsDir)) {
-        const uploadsDirContents = fs.readdirSync(uploadsDir);
-        console.log('Uploads directory contents:', uploadsDirContents);
-      }
+      // Get the base uploads directory path
+      const baseUploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
+      console.log('Base uploads directory path:', baseUploadsDir);
+      console.log('Base uploads directory exists:', fs.existsSync(baseUploadsDir));
       
       for (const hire of hires) {
         console.log(`\n--- Processing hire: ${hire.name} ---`);
         console.log('Hire ID:', hire.id);
-        console.log('Hire has ID:', !!hire.id);
+        console.log('SRF document path:', hire.srf_document_path);
+        console.log('SRF document name:', hire.srf_document_name);
         
-        if (hire.id) {
+        if (hire.srf_document_path && hire.srf_document_name) {
           try {
-            const hireUploadDir = path.join(uploadsDir, hire.id);
-            const srfFilePath = path.join(hireUploadDir, 'srf-document.pdf');
+            // Use the database-stored path directly
+            const fullSrfPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', hire.srf_document_path);
             
-            console.log('Hire upload directory:', hireUploadDir);
-            console.log('Hire upload directory exists:', fs.existsSync(hireUploadDir));
+            console.log('Full SRF file path:', fullSrfPath);
+            console.log('SRF file exists:', fs.existsSync(fullSrfPath));
             
-            if (fs.existsSync(hireUploadDir)) {
-              const hireDirContents = fs.readdirSync(hireUploadDir);
-              console.log('Hire directory contents:', hireDirContents);
-            }
-            
-            console.log('SRF file path:', srfFilePath);
-            console.log('SRF file exists:', fs.existsSync(srfFilePath));
-            
-            if (fs.existsSync(srfFilePath)) {
+            if (fs.existsSync(fullSrfPath)) {
               console.log('Reading SRF file...');
               
               // Get file stats
-              const fileStats = fs.statSync(srfFilePath);
+              const fileStats = fs.statSync(fullSrfPath);
               console.log('File size:', fileStats.size, 'bytes');
               console.log('File modified:', fileStats.mtime);
               
               // Read file and convert to base64
-              const fileBuffer = fs.readFileSync(srfFilePath);
+              const fileBuffer = fs.readFileSync(fullSrfPath);
               console.log('File buffer length:', fileBuffer.length);
               
               const base64Content = fileBuffer.toString('base64');
               console.log('Base64 content length:', base64Content.length);
               console.log('Base64 content preview (first 100 chars):', base64Content.substring(0, 100));
               
+              // Use the original filename from database for attachment
               const attachmentFilename = `SRF_${hire.name.replace(/\s+/g, '_')}.pdf`;
               console.log('Attachment filename:', attachmentFilename);
+              console.log('Original filename from DB:', hire.srf_document_name);
               
               attachments.push({
                 filename: attachmentFilename,
@@ -701,7 +691,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
               
               console.log(`✓ Successfully added SRF attachment for ${hire.name}`);
             } else {
-              console.log(`✗ No SRF file found for ${hire.name} at path: ${srfFilePath}`);
+              console.log(`✗ SRF file not found at database path: ${fullSrfPath}`);
+              console.log(`Database path was: ${hire.srf_document_path}`);
             }
           } catch (error) {
             console.error(`✗ Error processing SRF attachment for ${hire.name}:`, error.message);
@@ -709,7 +700,9 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
             // Continue processing other attachments even if one fails
           }
         } else {
-          console.log(`⚠ Hire ${hire.name} has no ID, skipping SRF attachment`);
+          console.log(`⚠ Hire ${hire.name} missing SRF document path or name in database`);
+          console.log('srf_document_path:', hire.srf_document_path || 'NOT SET');
+          console.log('srf_document_name:', hire.srf_document_name || 'NOT SET');
         }
       }
       

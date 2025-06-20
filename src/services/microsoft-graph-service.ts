@@ -38,6 +38,8 @@ interface LicenseRequestEmailData {
     email: string;
     title: string;
     microsoft_365_license: string;
+    srf_document_path?: string; // Database path to SRF file
+    srf_document_name?: string; // Original filename
   }>;
   includeAttachments?: boolean;
 }
@@ -59,48 +61,16 @@ export const microsoftGraphService = {
   // Send license request email using Microsoft Graph API
   sendLicenseRequestEmail: async (emailData: LicenseRequestEmailData): Promise<EmailSendResult> => {
     try {
-      // If attachments are requested, collect SRF files
-      let attachments: Array<{
-        hireId: string;
-        hireName: string;
-        filename: string;
-        content: string;
-        contentType: string;
-      }> = [];
-
-      if (emailData.includeAttachments) {
-        for (const hire of emailData.hires) {
-          if (hire.id) {
-            try {
-              // Check if SRF file exists for this hire
-              const srfBlob = await srfService.downloadSrfDocument(hire.id, 'srf-document.pdf');
-              if (srfBlob && srfBlob.size > 0) {
-                // Convert blob to base64
-                const arrayBuffer = await srfBlob.arrayBuffer();
-                const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                
-                attachments.push({
-                  hireId: hire.id,
-                  hireName: hire.name,
-                  filename: `SRF_${hire.name.replace(/\s+/g, '_')}.pdf`,
-                  content: base64String,
-                  contentType: 'application/pdf'
-                });
-              }
-            } catch (error) {
-              console.log(`No SRF file found for ${hire.name}, skipping attachment`);
-            }
-          }
-        }
-      }
-
+      // If attachments are requested, we'll let the backend handle the file processing
+      // since it has direct access to the file system and database paths
+      
       const requestData = {
         // Support both new multi-recipient format and old single recipient format
         recipients: emailData.recipients || emailData.recipient,
         ccRecipients: emailData.ccRecipients,
         bccRecipients: emailData.bccRecipients,
         hires: emailData.hires,
-        attachments: attachments.length > 0 ? attachments : undefined
+        includeAttachments: emailData.includeAttachments
       };
 
       const response = await apiClient.post<EmailSendResult>('/settings/microsoft-graph/send-license-request', requestData);
