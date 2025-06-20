@@ -1164,6 +1164,9 @@ export const getAdUserInfo = async (settings, username) => {
 
           res.on('end', () => {
             client.unbind();
+            if (!info.displayName && !info.title && !info.department) {
+              logger.api.warn('No AD info found for', username);
+            }
             resolve(info);
           });
         });
