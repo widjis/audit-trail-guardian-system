@@ -1119,6 +1119,65 @@ const searchAdUsers = async (settings, query) => {
   });
 };
 
+// Fetch basic user info by sAMAccountName
+export const getAdUserInfo = async (settings, username) => {
+  return new Promise((resolve, reject) => {
+    const client = createLdapClient(settings);
+
+    try {
+      const bindDN = formatBindCredential(settings, settings.username);
+      client.bind(bindDN, settings.password, (err) => {
+        if (err) {
+          logger.api.error('Error binding to AD for user info:', err);
+          client.destroy();
+          return reject(err);
+        }
+
+        const safeUser = escapeLdapFilterValue(username);
+        const searchOptions = {
+          filter: `(&(objectClass=user)(sAMAccountName=${safeUser}))`,
+          scope: 'sub',
+          attributes: ['displayName', 'title', 'department']
+        };
+
+        client.search(settings.baseDN, searchOptions, (err, res) => {
+          if (err) {
+            logger.api.error('Error searching AD for user info:', err);
+            client.destroy();
+            return reject(err);
+          }
+
+          let info = { displayName: '', title: '', department: '' };
+
+          res.on('searchEntry', (entry) => {
+            info.displayName = entry.object.displayName || '';
+            info.title = entry.object.title || '';
+            info.department = entry.object.department || '';
+          });
+
+          res.on('error', (err) => {
+            logger.api.error('Search error while getting user info:', err);
+            client.destroy();
+            reject(err);
+          });
+
+          res.on('end', () => {
+            client.unbind();
+            resolve(info);
+          });
+        });
+      });
+    } catch (err) {
+      try {
+        client.unbind();
+      } catch (unbindErr) {
+        logger.api.debug('Error unbinding client:', unbindErr);
+      }
+      reject(err);
+    }
+  });
+};
+
 // Helper function to safely escape special characters in LDAP search filters
 function escapeLdapFilterValue(value) {
   // Replace special characters that need to be escaped in LDAP filter
