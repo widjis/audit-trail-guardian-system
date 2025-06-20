@@ -1,3 +1,4 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -609,7 +610,7 @@ router.post('/microsoft-graph/test-connection', async (req, res) => {
 
 router.post('/microsoft-graph/send-license-request', async (req, res) => {
   try {
-    const { recipients, ccRecipients, bccRecipients, hires, attachments } = req.body;
+    const { recipients, ccRecipients, bccRecipients, hires, includeAttachments } = req.body;
     const settings = await getSettings();
     const graphSettings = settings.microsoftGraphSettings;
 
@@ -630,6 +631,43 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
         success: false,
         message: 'No recipients specified. Please configure default recipients in settings or provide recipients in the request.'
       });
+    }
+
+    // Process SRF attachments if requested
+    let attachments = [];
+    if (includeAttachments) {
+      console.log('Processing SRF attachments for email...');
+      
+      for (const hire of hires) {
+        if (hire.id) {
+          try {
+            // Check if SRF file exists for this hire
+            const uploadsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
+            const srfFilePath = path.join(uploadsDir, hire.id, 'srf-document.pdf');
+            
+            if (fs.existsSync(srfFilePath)) {
+              // Read file and convert to base64
+              const fileBuffer = fs.readFileSync(srfFilePath);
+              const base64Content = fileBuffer.toString('base64');
+              
+              attachments.push({
+                filename: `SRF_${hire.name.replace(/\s+/g, '_')}.pdf`,
+                content: base64Content,
+                contentType: 'application/pdf'
+              });
+              
+              console.log(`Added SRF attachment for ${hire.name}`);
+            } else {
+              console.log(`No SRF file found for ${hire.name}, skipping attachment`);
+            }
+          } catch (error) {
+            console.error(`Error processing SRF attachment for ${hire.name}:`, error);
+            // Continue processing other attachments even if one fails
+          }
+        }
+      }
+      
+      console.log(`Total SRF attachments processed: ${attachments.length}`);
     }
 
     // Generate email content from template using HTML table format (same as preview)
@@ -674,7 +712,7 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
         content: body
       },
       senderEmail: senderEmail,
-      attachments: attachments
+      attachments: attachments.length > 0 ? attachments : undefined
     };
 
     console.log('Sending license request email with Microsoft Graph...');
@@ -682,10 +720,12 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     
     if (result.success) {
       const totalRecipients = finalToRecipients.length + finalCcRecipients.length + finalBccRecipients.length;
+      const attachmentInfo = attachments.length > 0 ? ` with ${attachments.length} SRF attachment(s)` : '';
       res.json({
         success: true,
-        message: `License request email sent successfully to ${totalRecipients} recipient(s)`,
+        message: `License request email sent successfully to ${totalRecipients} recipient(s)${attachmentInfo}`,
         sentCount: hires.length,
+        attachmentCount: attachments.length,
         recipients: {
           to: finalToRecipients,
           cc: finalCcRecipients,
