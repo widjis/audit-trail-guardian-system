@@ -622,9 +622,12 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       try {
         const info = await getAdUserInfo(adSettings, req.user.username);
         signature = `Best regards,<br>${info.displayName} | ${info.title}<br>${info.department}`;
+        console.log('Generated signature:', signature.replace(/<br>/g, ' | '));
       } catch (err) {
         console.error('Failed to fetch AD user info:', err);
       }
+    } else {
+      console.log('Signature could not be generated from AD information');
     }
 
     console.log('=== Microsoft Graph License Request Start ===');
@@ -861,9 +864,12 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
       try {
         const info = await getAdUserInfo(adSettings, req.user.username);
         signature = `Best regards,<br>${info.displayName} | ${info.title}<br>${info.department}`;
+        console.log('Generated signature:', signature.replace(/<br>/g, ' | '));
       } catch (err) {
         console.error('Failed to fetch AD user info:', err);
       }
+    } else {
+      console.log('Signature could not be generated from AD information');
     }
 
     // Format hire details as HTML table - FIXED: removed all unnecessary whitespace
