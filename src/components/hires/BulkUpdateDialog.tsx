@@ -65,19 +65,27 @@ export function BulkUpdateDialog({
   const laptopStatuses = ["Pending", "In Progress", "Ready", "Done"];
   const positionGrades = ["General Management", "Superintendent", "Supervisor", "Staff", "Non-Staff"];
   
-  // Load default email recipient from settings
+  // Load default email recipient from Microsoft Graph settings
   const { data: graphSettings } = useQuery({
     queryKey: ['microsoftGraphSettings'],
     queryFn: settingsService.getMicrosoftGraphSettings,
     enabled: updateFields.field === "license_request_email"
   });
 
-  // Set default recipient when settings are loaded
+  // Set default recipients when settings are loaded
   useEffect(() => {
-    if (graphSettings?.defaultEmailRecipient && emailRecipients.length === 0) {
-      setEmailRecipients([graphSettings.defaultEmailRecipient]);
+    if (graphSettings && updateFields.field === "license_request_email") {
+      if (graphSettings.defaultToRecipients && emailRecipients.length === 0) {
+        setEmailRecipients(graphSettings.defaultToRecipients);
+      }
+      if (graphSettings.defaultCcRecipients && ccRecipients.length === 0) {
+        setCcRecipients(graphSettings.defaultCcRecipients);
+      }
+      if (graphSettings.defaultBccRecipients && bccRecipients.length === 0) {
+        setBccRecipients(graphSettings.defaultBccRecipients);
+      }
     }
-  }, [graphSettings, emailRecipients.length]);
+  }, [graphSettings, updateFields.field, emailRecipients.length, ccRecipients.length, bccRecipients.length]);
 
   const handleEmailTemplatePreview = async () => {
     if (!selectedHires || selectedHires.length === 0) return;
@@ -317,7 +325,7 @@ export function BulkUpdateDialog({
               placeholder="Enter email addresses (press Enter, comma, or semicolon to add)"
             />
             <p className="text-xs text-muted-foreground">
-              Primary recipients who will receive the license request
+              Primary recipients who will receive the license request (loaded from settings)
             </p>
           </div>
 
@@ -329,7 +337,7 @@ export function BulkUpdateDialog({
               placeholder="Enter CC email addresses (optional)"
             />
             <p className="text-xs text-muted-foreground">
-              Recipients who will receive a copy of the email
+              Recipients who will receive a copy of the email (loaded from settings)
             </p>
           </div>
 
@@ -341,7 +349,7 @@ export function BulkUpdateDialog({
               placeholder="Enter BCC email addresses (optional)"
             />
             <p className="text-xs text-muted-foreground">
-              Recipients who will receive a blind copy (hidden from other recipients)
+              Recipients who will receive a blind copy (loaded from settings)
             </p>
           </div>
 

@@ -532,7 +532,11 @@ router.get('/microsoft-graph', async (req, res) => {
       tenantId: '',
       authority: '',
       scope: ["https://graph.microsoft.com/.default"],
-      defaultEmailRecipient: '',
+      defaultToRecipients: [],
+      defaultCcRecipients: [],
+      defaultBccRecipients: [],
+      senderEmail: '',
+      useLoggedInUserAsSender: false,
       emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
       emailBodyTemplate: `Dear IT Team,
 
@@ -616,114 +620,83 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       });
     }
 
-    // Support both old single recipient format and new multiple recipients format
-    const finalRecipients = recipients || req.body.recipient;
-    if (!finalRecipients) {
+    // Use recipients from request or fall back to settings defaults
+    const finalToRecipients = recipients && recipients.length > 0 ? recipients : graphSettings.defaultToRecipients || [];
+    const finalCcRecipients = ccRecipients && ccRecipients.length > 0 ? ccRecipients : graphSettings.defaultCcRecipients || [];
+    const finalBccRecipients = bccRecipients && bccRecipients.length > 0 ? bccRecipients : graphSettings.defaultBccRecipients || [];
+
+    if (finalToRecipients.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No recipients specified'
+        message: 'No recipients specified. Please configure default recipients in settings or provide recipients in the request.'
       });
     }
 
-    console.log(`Processing license request email for ${hires.length} hires`);
-    console.log(`Recipients - TO: ${Array.isArray(finalRecipients) ? finalRecipients.join(', ') : finalRecipients}`);
-    if (ccRecipients && ccRecipients.length > 0) {
-      console.log(`Recipients - CC: ${ccRecipients.join(', ')}`);
-    }
-    if (bccRecipients && bccRecipients.length > 0) {
-      console.log(`Recipients - BCC: ${bccRecipients.join(', ')}`);
-    }
+    // Generate email content from template
+    const hireCount = hires.length;
+    const hireDate = new Date().toLocaleDateString();
+    
+    // Format hire details for email body
+    const hireDetails = hires.map((hire, index) => {
+      return `${index + 1}. ${hire.name}
+   - Position: ${hire.title}
+   - Department: ${hire.department}
+   - Email: ${hire.email}
+   - License Type: ${hire.microsoft_365_license || 'Standard'}`;
+    }).join('\n\n');
 
-    // Format hire details as HTML table
-    const hireDetailsHtml = `
-      <table border="1" style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">No.</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Position</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Email</th>
-            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">License Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${hires.map((hire, index) => `
-            <tr>
-              <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.name}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.title}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.department}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.email}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${hire.microsoft_365_license}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-
-    // Get current date for template substitution
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Apply template substitution
+    // Replace template variables
     const subject = (graphSettings.emailSubjectTemplate || 'License Request for {{hireCount}} New Employees')
-      .replace('{{hireCount}}', hires.length.toString())
-      .replace('{{hireDate}}', currentDate);
+      .replace(/\{\{hireCount\}\}/g, hireCount.toString())
+      .replace(/\{\{hireDate\}\}/g, hireDate);
 
-    // Improved line break handling - convert double newlines to single <br> and single newlines to nothing
-    const body = (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
-      .replace('{{hireDetails}}', hireDetailsHtml)
-      .replace('{{hireCount}}', hires.length.toString())
-      .replace('{{hireDate}}', currentDate)
-      .replace(/\n\n+/g, '<br>') // Convert multiple newlines to single <br>
-      .replace(/\n/g, ' '); // Convert single newlines to space
+    const body =  (graphSettings.emailBodyTemplate || 'License request for new employees:\n\n{{hireDetails}}')
+      .replace(/\{\{hireDetails\}\}/g, hireDetails)
+      .replace(/\{\{hireCount\}\}/g, hireCount.toString())
+      .replace(/\{\{hireDate\}\}/g, hireDate);
 
-    // Prepare email data with multiple recipient support
+    // Determine sender email
+    let senderEmail = graphSettings.senderEmail;
+    if (graphSettings.useLoggedInUserAsSender) {
+      // TODO: Get logged-in user's email from session/token
+      // For now, fall back to settings sender email
+      senderEmail = graphSettings.senderEmail;
+    }
+
     const emailData = {
-      recipients: finalRecipients,
-      ccRecipients: ccRecipients || [],
-      bccRecipients: bccRecipients || [],
+      recipients: finalToRecipients,
+      ccRecipients: finalCcRecipients.length > 0 ? finalCcRecipients : undefined,
+      bccRecipients: finalBccRecipients.length > 0 ? finalBccRecipients : undefined,
       subject: subject,
       body: {
-        contentType: 'HTML',
+        contentType: 'Text',
         content: body
       },
-      senderName: 'HR Department'
+      senderEmail: senderEmail,
+      attachments: attachments
     };
 
-    // Add attachments if provided
-    if (attachments && attachments.length > 0) {
-      emailData.attachments = attachments.map(attachment => ({
-        filename: attachment.filename,
-        content: attachment.content,
-        contentType: attachment.contentType
-      }));
-      console.log(`Including ${attachments.length} attachments`);
-    }
-
-    // Send email using Microsoft Graph
+    console.log('Sending license request email with Microsoft Graph...');
     const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
-
+    
     if (result.success) {
-      console.log('License request email sent successfully');
+      const totalRecipients = finalToRecipients.length + finalCcRecipients.length + finalBccRecipients.length;
       res.json({
         success: true,
-        message: result.message,
-        sentCount: 1,
-        recipients: result.recipients
+        message: `License request email sent successfully to ${totalRecipients} recipient(s)`,
+        sentCount: hires.length,
+        recipients: {
+          to: finalToRecipients,
+          cc: finalCcRecipients,
+          bcc: finalBccRecipients
+        }
       });
     } else {
-      console.error('Failed to send license request email:', result.error);
-      res.status(500).json({
+      res.json({
         success: false,
-        message: result.message
+        message: result.message || 'Failed to send license request email'
       });
     }
-
   } catch (error) {
     console.error('Error sending license request email:', error);
     res.status(500).json({

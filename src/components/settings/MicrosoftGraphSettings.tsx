@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { settingsService } from "@/services/settings-service";
 import { microsoftGraphService } from "@/services/microsoft-graph-service";
 import { Loader2, TestTube, CheckCircle, XCircle, Mail } from "lucide-react";
+import { MultiEmailInput } from "@/components/ui/multi-email-input";
 
 interface MicrosoftGraphSettings {
   enabled: boolean;
@@ -20,10 +21,13 @@ interface MicrosoftGraphSettings {
   authority: string;
   scope: string[];
   lastConnectionTest?: string;
-  defaultEmailRecipient?: string;
+  defaultToRecipients?: string[];
+  defaultCcRecipients?: string[];
+  defaultBccRecipients?: string[];
   emailSubjectTemplate?: string;
   emailBodyTemplate?: string;
   senderEmail?: string;
+  useLoggedInUserAsSender?: boolean;
 }
 
 export function MicrosoftGraphSettings() {
@@ -34,8 +38,11 @@ export function MicrosoftGraphSettings() {
     tenantId: '',
     authority: '',
     scope: ["https://graph.microsoft.com/.default"],
-    defaultEmailRecipient: '',
+    defaultToRecipients: [],
+    defaultCcRecipients: [],
+    defaultBccRecipients: [],
     senderEmail: '',
+    useLoggedInUserAsSender: false,
     emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
     emailBodyTemplate: `Dear IT Team,
 
@@ -64,7 +71,7 @@ HR Department`
     try {
       const data = await settingsService.getMicrosoftGraphSettings();
       setSettings(data);
-      setTestEmailRecipient(data.defaultEmailRecipient || '');
+      setTestEmailRecipient(data.defaultToRecipients?.[0] || '');
     } catch (error) {
       console.error('Error loading Microsoft Graph settings:', error);
       toast.error("Failed to load Microsoft Graph settings");
@@ -238,7 +245,10 @@ HR Department`
             <Textarea
               id="scope"
               value={settings.scope.join('\n')}
-              onChange={(e) => handleScopeChange(e.target.value)}
+              onChange={(e) => {
+                const scopes = e.target.value.split('\n').filter(scope => scope.trim() !== '');
+                setSettings({ ...settings, scope: scopes });
+              }}
               placeholder="https://graph.microsoft.com/.default"
               rows={3}
               disabled={!settings.enabled}
@@ -254,7 +264,33 @@ HR Department`
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleTestConnection}
+                  onClick={() => {
+                    setIsTesting(true);
+                    setTestResult(null);
+                    settingsService.testMicrosoftGraphConnection(settings)
+                      .then((result) => {
+                        setTestResult(result);
+                        if (result.success) {
+                          toast.success("Microsoft Graph connection test successful");
+                          const updatedSettings = { 
+                            ...settings, 
+                            lastConnectionTest: new Date().toISOString() 
+                          };
+                          setSettings(updatedSettings);
+                        } else {
+                          toast.error("Microsoft Graph connection test failed");
+                        }
+                      })
+                      .catch((error) => {
+                        console.error('Error testing Microsoft Graph connection:', error);
+                        setTestResult({ 
+                          success: false, 
+                          message: error instanceof Error ? error.message : 'Connection test failed' 
+                        });
+                        toast.error("Microsoft Graph connection test failed");
+                      })
+                      .finally(() => setIsTesting(false));
+                  }}
                   disabled={isTesting || !settings.clientId || !settings.clientSecret || !settings.tenantId}
                 >
                   {isTesting ? (
@@ -315,23 +351,60 @@ HR Department`
                 value={settings.senderEmail || ''}
                 onChange={(e) => setSettings({ ...settings, senderEmail: e.target.value })}
                 placeholder="hr@company.com"
+                disabled={settings.useLoggedInUserAsSender}
               />
               <p className="text-xs text-muted-foreground">
                 Email address that will appear as the sender of license request emails
               </p>
             </div>
 
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-logged-user">Use Logged-in User as Sender</Label>
+                <p className="text-sm text-muted-foreground">
+                  Use the currently logged-in user's email as sender instead of fixed sender
+                </p>
+              </div>
+              <Switch
+                id="use-logged-user"
+                checked={settings.useLoggedInUserAsSender || false}
+                onCheckedChange={(checked) => setSettings({ ...settings, useLoggedInUserAsSender: checked })}
+              />
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="default-recipient">Default Email Recipient</Label>
-              <Input
-                id="default-recipient"
-                type="email"
-                value={settings.defaultEmailRecipient || ''}
-                onChange={(e) => setSettings({ ...settings, defaultEmailRecipient: e.target.value })}
-                placeholder="it-team@company.com"
+              <Label htmlFor="default-to-recipients">Default TO Recipients</Label>
+              <MultiEmailInput
+                value={settings.defaultToRecipients || []}
+                onChange={(emails) => setSettings({ ...settings, defaultToRecipients: emails })}
+                placeholder="Enter primary recipients (e.g., it-team@company.com)"
               />
               <p className="text-xs text-muted-foreground">
-                Default recipient for license request emails
+                Primary recipients for license request emails
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="default-cc-recipients">Default CC Recipients (Optional)</Label>
+              <MultiEmailInput
+                value={settings.defaultCcRecipients || []}
+                onChange={(emails) => setSettings({ ...settings, defaultCcRecipients: emails })}
+                placeholder="Enter CC recipients (optional)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Recipients who will receive a copy of license request emails
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="default-bcc-recipients">Default BCC Recipients (Optional)</Label>
+              <MultiEmailInput
+                value={settings.defaultBccRecipients || []}
+                onChange={(emails) => setSettings({ ...settings, defaultBccRecipients: emails })}
+                placeholder="Enter BCC recipients (optional)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Recipients who will receive a blind copy (hidden from other recipients)
               </p>
             </div>
 
@@ -378,7 +451,26 @@ HR Department`
                   />
                   <Button
                     variant="outline"
-                    onClick={handleTestEmail}
+                    onClick={() => {
+                      if (!testEmailRecipient) {
+                        toast.error("Please enter a test email recipient");
+                        return;
+                      }
+                      setIsTesting(true);
+                      microsoftGraphService.testEmailSend(testEmailRecipient)
+                        .then((result) => {
+                          if (result.success) {
+                            toast.success("Test email sent successfully");
+                          } else {
+                            toast.error("Test email failed: " + result.message);
+                          }
+                        })
+                        .catch((error) => {
+                          console.error('Error sending test email:', error);
+                          toast.error("Test email failed");
+                        })
+                        .finally(() => setIsTesting(false));
+                    }}
                     disabled={isTesting || !testEmailRecipient}
                   >
                     {isTesting ? (

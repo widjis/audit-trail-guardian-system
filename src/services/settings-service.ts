@@ -64,10 +64,13 @@ interface MicrosoftGraphSettings {
   authority: string;
   scope: string[];
   lastConnectionTest?: string;
-  defaultEmailRecipient?: string;
+  defaultToRecipients?: string[];
+  defaultCcRecipients?: string[];
+  defaultBccRecipients?: string[];
   emailSubjectTemplate?: string;
   emailBodyTemplate?: string;
   senderEmail?: string;
+  useLoggedInUserAsSender?: boolean;
 }
 
 interface SettingsData {
