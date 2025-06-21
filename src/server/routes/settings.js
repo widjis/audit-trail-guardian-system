@@ -782,7 +782,8 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
     const senderEmail = await resolveSenderEmail(
       graphSettings,
       adSettings,
-      req
+      req,
+      getAdUserInfo
     );
 
     const emailData = {
