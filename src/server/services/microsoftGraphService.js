@@ -93,9 +93,18 @@ class MicrosoftGraphService {
       console.log('Initializing Microsoft Graph client...');
       const graphClient = await this.initializeGraphClient(settings);
 
-      // Determine sender email
-      let senderEmail = settings.senderEmail;
+      // Determine sender email with detailed logging
+      console.log('Sender override attempt', {
+        emailDataSender: emailData.senderEmail,
+        settingsSender: settings.senderEmail,
+        settingsUsername: settings.username
+      });
+
+      // Prefer sender provided in emailData (e.g., from logged-in user)
+      let senderEmail = emailData.senderEmail || settings.senderEmail;
+
       if (!senderEmail && settings.username && this.isValidEmail(settings.username)) {
+        console.log('Falling back to settings.username as sender');
         senderEmail = settings.username;
       }
 
@@ -141,6 +150,7 @@ class MicrosoftGraphService {
           }
         }
       };
+      console.log('Message from field:', message.from.emailAddress);
 
       // Add CC recipients if any
       if (ccRecipients.length > 0) {
@@ -171,7 +181,7 @@ class MicrosoftGraphService {
           message: message,
           saveToSentItems: true
         });
-        console.log('Email sent successfully via /me/sendMail');
+        console.log('Email sent successfully via /me/sendMail', sendResult);
       } catch (meError) {
         console.log('Failed to send via /me/sendMail, trying /users endpoint:', meError.message);
         
@@ -180,7 +190,7 @@ class MicrosoftGraphService {
           message: message,
           saveToSentItems: true
         });
-        console.log('Email sent successfully via /users endpoint');
+        console.log('Email sent successfully via /users endpoint', sendResult);
       }
 
       const totalRecipients = toRecipients.length + ccRecipients.length + bccRecipients.length;
