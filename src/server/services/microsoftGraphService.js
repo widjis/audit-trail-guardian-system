@@ -94,7 +94,9 @@ class MicrosoftGraphService {
       const graphClient = await this.initializeGraphClient(settings);
 
       // Determine sender email
-      let senderEmail = settings.senderEmail;
+      // Prefer sender provided in emailData (e.g., from logged-in user)
+      let senderEmail = emailData.senderEmail || settings.senderEmail;
+
       if (!senderEmail && settings.username && this.isValidEmail(settings.username)) {
         senderEmail = settings.username;
       }
