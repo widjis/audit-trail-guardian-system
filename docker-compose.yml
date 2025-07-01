@@ -8,6 +8,8 @@ services:
     env_file: .env.production
     ports:
       - "9002:3001"
+    volumes:
+      - ./uploads:/app/uploads      # persist anything written under /app/uploads
     restart: unless-stopped
 
   frontend:
