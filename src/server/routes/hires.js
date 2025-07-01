@@ -1117,6 +1117,90 @@ router.delete('/:id/srf-document', async (req, res) => {
   }
 });
 
+// Preview SRF document (inline viewing)
+router.get('/:id/srf-preview', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    logger.api.info(`GET /hires/${id}/srf-preview - Previewing SRF document`);
+    
+    // Get hire with SRF document info
+    const hires = await executeQuery(`
+      SELECT srf_document_path, srf_document_name FROM hires WHERE id = ?
+    `, [id]);
+    
+    if (hires.length === 0) {
+      return res.status(404).json({ error: 'New hire not found' });
+    }
+    
+    const hire = hires[0];
+    
+    if (!hire.srf_document_path || !hire.srf_document_name) {
+      return res.status(404).json({ error: 'No SRF document found for this hire' });
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(hire.srf_document_path)) {
+      return res.status(404).json({ error: 'SRF document file not found on server' });
+    }
+    
+    // Create audit log for preview
+    const logId = generateId();
+    const now = new Date().toISOString();
+    const auditLog = {
+      id: logId,
+      new_hire_id: id,
+      action_type: "SRF_PREVIEW",
+      status: "SUCCESS",
+      message: `SRF document previewed: ${hire.srf_document_name}`,
+      performed_by: req.user ? req.user.username : "system",
+      timestamp: now
+    };
+    
+    await executeQuery(`
+      INSERT INTO audit_logs (id, new_hire_id, action_type, status, message, performed_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      auditLog.id, 
+      auditLog.new_hire_id, 
+      auditLog.action_type, 
+      auditLog.status, 
+      auditLog.message, 
+      auditLog.performed_by, 
+      auditLog.timestamp
+    ]);
+    
+    // Set headers for inline PDF viewing
+    const fileExtension = path.extname(hire.srf_document_name).toLowerCase();
+    if (fileExtension === '.pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${hire.srf_document_name}"`);
+    } else {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${hire.srf_document_name}"`);
+    }
+    
+    // Send file for preview
+    res.sendFile(path.resolve(hire.srf_document_path), (err) => {
+      if (err) {
+        logger.api.error('Error sending SRF document for preview:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to preview SRF document' });
+        }
+      } else {
+        logger.api.info(`SRF document previewed successfully: ${hire.srf_document_name}`);
+      }
+    });
+    
+  } catch (error) {
+    logger.api.error('Error previewing SRF document:', error);
+    res.status(500).json({ 
+      error: 'Failed to preview SRF document', 
+      message: error.message 
+    });
+  }
+});
+
 // Helper function to convert various boolean string representations to actual boolean
 function convertToBoolean(value) {
   if (typeof value === 'boolean') return value;

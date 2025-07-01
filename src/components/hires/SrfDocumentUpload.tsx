@@ -1,14 +1,14 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Upload, Download, Trash2, FileText, AlertCircle } from "lucide-react";
+import { Upload, Download, Trash2, FileText, AlertCircle, Eye } from "lucide-react";
 import { srfService } from "@/services/srf-service";
 import { NewHire } from "@/types/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
+import { SrfDocumentPreview } from "./SrfDocumentPreview";
 
 interface SrfDocumentUploadProps {
   hire: NewHire;
@@ -17,7 +17,10 @@ interface SrfDocumentUploadProps {
 export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -136,7 +139,56 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
     }
   };
 
+  const handlePreview = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (!hire.id || !hire.srf_document_name) return;
+
+    // Check if file is PDF
+    const fileExtension = hire.srf_document_name.split('.').pop()?.toLowerCase();
+    if (fileExtension !== 'pdf') {
+      toast({
+        title: "Preview not available",
+        description: "Preview is only available for PDF files. Please download to view this document.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPreviewing(true);
+
+    try {
+      const blobUrl = await srfService.previewSrfDocument(hire.id);
+      setPreviewUrl(blobUrl);
+      setShowPreview(true);
+      
+      toast({
+        title: "Document loaded",
+        description: "SRF document is ready for preview",
+      });
+    } catch (error) {
+      console.error("Error previewing SRF document:", error);
+      toast({
+        title: "Preview failed",
+        description: "Failed to load SRF document for preview",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setShowPreview(false);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  };
+
   const hasDocument = hire.srf_document_path && hire.srf_document_name;
+  const isPdfDocument = hasDocument && hire.srf_document_name?.split('.').pop()?.toLowerCase() === 'pdf';
 
   return (
     <Card>
@@ -160,6 +212,19 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
                 </div>
               </div>
               <div className="flex gap-2">
+                {isPdfDocument && (
+                  <Button
+                    type="button"
+                    onClick={handlePreview}
+                    size="sm"
+                    variant="outline"
+                    disabled={isPreviewing}
+                    className="flex items-center gap-1"
+                  >
+                    <Eye className="h-3 w-3" />
+                    {isPreviewing ? "Loading..." : "View"}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   onClick={handleDownload}
@@ -182,6 +247,13 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
                 </Button>
               </div>
             </div>
+            
+            {!isPdfDocument && (
+              <div className="flex items-center gap-2 text-amber-600 text-xs">
+                <AlertCircle className="h-3 w-3" />
+                <span>Preview is only available for PDF files</span>
+              </div>
+            )}
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Replace Document</label>
@@ -255,6 +327,13 @@ export function SrfDocumentUpload({ hire }: SrfDocumentUploadProps) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <SrfDocumentPreview
+          isOpen={showPreview}
+          onClose={handleClosePreview}
+          pdfUrl={previewUrl}
+          documentName={hire.srf_document_name || ""}
+        />
       </CardContent>
     </Card>
   );

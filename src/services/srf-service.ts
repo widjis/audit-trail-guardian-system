@@ -17,6 +17,17 @@ export const srfService = {
     return response.data;
   },
 
+  // Preview SRF document (for inline viewing)
+  previewSrfDocument: async (hireId: string): Promise<string> => {
+    const response = await apiClient.get(`/hires/${hireId}/srf-preview`, {
+      responseType: 'blob',
+    });
+
+    // Create a blob URL for the PDF preview
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+  },
+
   // Download SRF document
   downloadSrfDocument: async (hireId: string, filename: string): Promise<Blob> => {
     const response = await apiClient.get(`/hires/${hireId}/srf-download`, {
