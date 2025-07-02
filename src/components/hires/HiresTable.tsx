@@ -20,6 +20,7 @@ import { ExcelReportDialog } from "./ExcelReportDialog";
 import { calculateProgressPercentage } from "@/utils/progressCalculator";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { useResponsive } from "@/hooks/use-responsive";
+import { HireDetailModal } from "./HireDetailModal";
 
 export function HiresTable() {
   const [hires, setHires] = useState<NewHire[]>([]);
@@ -32,6 +33,9 @@ export function HiresTable() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [licenseTypes, setLicenseTypes] = useState<string[]>([]);
+  // Add state for detail modal
+  const [selectedHireId, setSelectedHireId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   // Add sort state
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -175,6 +179,27 @@ export function HiresTable() {
     } finally {
       setIsBulkUpdating(false);
     }
+  };
+
+  // Add new handlers for row click
+  const handleRowClick = (hireId: string, event: React.MouseEvent) => {
+    // Prevent row click when clicking on interactive elements
+    const target = event.target as HTMLElement;
+    if (
+      target.closest('button') || 
+      target.closest('[role="checkbox"]') || 
+      target.closest('input[type="checkbox"]')
+    ) {
+      return;
+    }
+    
+    setSelectedHireId(hireId);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedHireId(null);
   };
 
   // Helper to check if a filter is active for a specific column
@@ -602,7 +627,11 @@ export function HiresTable() {
                     const progressPercentage = calculateProgressPercentage(hire);
                     
                     return (
-                      <TableRow key={hire.id}>
+                      <TableRow 
+                        key={hire.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={(e) => handleRowClick(hire.id, e)}
+                      >
                         <TableCell>
                           <Checkbox 
                             checked={isSelected(hire.id)}
@@ -653,14 +682,20 @@ export function HiresTable() {
                           <Button 
                             variant="ghost" 
                             size={isMobile ? "sm" : "icon"}
-                            onClick={() => navigate(`/hires/${hire.id}`)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/hires/${hire.id}`);
+                            }}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size={isMobile ? "sm" : "icon"}
-                            onClick={() => handleDelete(hire.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(hire.id);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -707,6 +742,13 @@ export function HiresTable() {
         isOpen={showExcelReportDialog}
         onClose={() => setShowExcelReportDialog(false)}
         selectedHires={getSelectedHireDetails()}
+      />
+
+      {/* Add the new detail modal */}
+      <HireDetailModal
+        isOpen={showDetailModal}
+        onClose={handleCloseDetailModal}
+        hireId={selectedHireId}
       />
     </div>
   );
