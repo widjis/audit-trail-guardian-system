@@ -82,7 +82,7 @@ export function HireDetailModal({ isOpen, onClose, hireId }: HireDetailModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 gap-0">
+        <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 gap-0 flex flex-col">
           <DialogHeader className="p-6 border-b bg-white relative z-10 flex-shrink-0">
             <DialogTitle className="flex items-center justify-between pr-8">
               <div className="flex items-center gap-4">
@@ -118,38 +118,40 @@ export function HireDetailModal({ isOpen, onClose, hireId }: HireDetailModalProp
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">Loading hire details...</p>
-                </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center flex-1">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading hire details...</p>
               </div>
-            ) : hire ? (
-              <Tabs defaultValue="general" className="h-full flex flex-col">
-                <div className="px-6 pt-4 border-b">
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="general" className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      General
-                    </TabsTrigger>
-                    <TabsTrigger value="progress" className="flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      Progress
-                    </TabsTrigger>
-                    <TabsTrigger value="documents" className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Documents
-                    </TabsTrigger>
-                    <TabsTrigger value="audit" className="flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      Audit Logs
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
+            </div>
+          ) : hire ? (
+            <Tabs defaultValue="general" className="flex flex-col flex-1 overflow-hidden">
+              {/* Fixed Tab Navigation */}
+              <div className="px-6 pt-4 pb-2 border-b bg-white flex-shrink-0 sticky top-0 z-10">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="general" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    General
+                  </TabsTrigger>
+                  <TabsTrigger value="progress" className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Progress
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Documents
+                  </TabsTrigger>
+                  <TabsTrigger value="audit" className="flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    Audit Logs
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
-                <div className="flex-1 overflow-auto p-6">
+              {/* Scrollable Tab Content */}
+              <div className="flex-1 overflow-auto">
+                <div className="p-6">
                   <TabsContent value="general" className="mt-0 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Card>
@@ -330,59 +332,59 @@ export function HireDetailModal({ isOpen, onClose, hireId }: HireDetailModalProp
                     <AuditLogsList hireId={hire.id!} />
                   </TabsContent>
                 </div>
-
-                {/* Action Buttons Footer */}
-                <div className="border-t bg-gray-50 p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      {isADEnabled && !isAccountActive && (
-                        <Button 
-                          onClick={() => setIsADDialogOpen(true)} 
-                          className="flex items-center gap-2"
-                          variant="outline"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          Create AD Account
-                        </Button>
-                      )}
-                      {showSyncButton && (
-                        <Button 
-                          onClick={() => setIsSyncDLDialogOpen(true)} 
-                          className="flex items-center gap-2"
-                          variant="outline"
-                        >
-                          <Mail className="h-4 w-4" />
-                          {distributionListSyncStatus === "Partial" ? "Re-sync to O365" : "Sync to O365"}
-                        </Button>
-                      )}
-                      {isFullySynced && (
-                        <Button 
-                          variant="outline"
-                          className="flex items-center gap-2 text-green-600 border-green-500 cursor-default"
-                          disabled
-                        >
-                          <Mail className="h-4 w-4" />
-                          Synced ✓
-                        </Button>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      onClick={() => setIsWhatsAppDialogOpen(true)} 
-                      className="flex items-center gap-2"
-                    >
-                      <Send className="h-4 w-4" />
-                      Send via WhatsApp
-                    </Button>
-                  </div>
-                </div>
-              </Tabs>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Hire not found</p>
               </div>
-            )}
-          </div>
+
+              {/* Fixed Action Buttons Footer */}
+              <div className="border-t bg-gray-50 p-4 flex-shrink-0">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    {isADEnabled && !isAccountActive && (
+                      <Button 
+                        onClick={() => setIsADDialogOpen(true)} 
+                        className="flex items-center gap-2"
+                        variant="outline"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Create AD Account
+                      </Button>
+                    )}
+                    {showSyncButton && (
+                      <Button 
+                        onClick={() => setIsSyncDLDialogOpen(true)} 
+                        className="flex items-center gap-2"
+                        variant="outline"
+                      >
+                        <Mail className="h-4 w-4" />
+                        {distributionListSyncStatus === "Partial" ? "Re-sync to O365" : "Sync to O365"}
+                      </Button>
+                    )}
+                    {isFullySynced && (
+                      <Button 
+                        variant="outline"
+                        className="flex items-center gap-2 text-green-600 border-green-500 cursor-default"
+                        disabled
+                      >
+                        <Mail className="h-4 w-4" />
+                        Synced ✓
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    onClick={() => setIsWhatsAppDialogOpen(true)} 
+                    className="flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    Send via WhatsApp
+                  </Button>
+                </div>
+              </div>
+            </Tabs>
+          ) : (
+            <div className="flex items-center justify-center flex-1">
+              <p className="text-muted-foreground">Hire not found</p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
