@@ -321,7 +321,7 @@ export function HireDetailModal({ isOpen, onClose, hireId }: HireDetailModalProp
                         <CardTitle className="text-lg">SRF Document</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <SrfDocumentUpload hireId={hire.id!} />
+                        <SrfDocumentUpload hire={hire} />
                       </CardContent>
                     </Card>
                   </TabsContent>
