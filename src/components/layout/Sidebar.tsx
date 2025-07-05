@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Mail,
 } from "lucide-react";
 
 export function Sidebar() {
@@ -47,6 +48,11 @@ export function Sidebar() {
       label: "Import Data",
       path: "/import",
       icon: <Upload className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: "Onboard Welcome Email",
+      path: "/onboard-email",
+      icon: <Mail className="mr-2 h-4 w-4" />,
     },
   ];
   
