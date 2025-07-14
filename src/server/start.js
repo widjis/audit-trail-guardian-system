@@ -1,7 +1,7 @@
 
 // Using ES module import instead of CommonJS require
 import app from './index.js';
-import { initDbConnection } from './utils/dbConnection.js';
+import { initDbConnection, getDbPool } from './utils/dbConnection.js';
 import { initializeSchema } from './utils/schemaInit.js';
 import logger from './utils/logger.js';
 import fs from 'fs';
@@ -86,6 +86,10 @@ async function startServer() {
   try {
     // Initialize database connection
     await initDbConnection();
+    
+    // Set database pool in app locals for routes to access
+    app.locals.dbPool = getDbPool();
+    logger.api.info('Database pool set in app locals');
     
     // Initialize database schema
     logger.api.info('Initializing database schema...');

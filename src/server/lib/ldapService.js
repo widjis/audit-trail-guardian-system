@@ -1,24 +1,38 @@
 // src/server/services/ldapService.js
 
-import fs from 'fs';
-import path from 'path';
 import ldap from 'ldapjs';
-
+import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
+import SystemConfigService from '../services/system-config-service.js';
+import { getDbPool } from '../utils/dbConnection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const { Change, Attribute } = ldap;
+
 /**
- * Load settings.json from server/data
+ * Get Active Directory settings from database
  */
-function loadSettings() {
-  const settingsPath = path.join(__dirname, '../data/settings.json');
-  if (!fs.existsSync(settingsPath)) {
-    throw new Error(`settings.json not found at ${settingsPath}`);
+async function getActiveDirectorySettings() {
+  try {
+    const dbPool = getDbPool();
+    if (!dbPool) {
+      throw new Error('Database pool not available');
+    }
+    
+    const systemConfigService = new SystemConfigService(dbPool);
+    const adConfig = await systemConfigService.getActiveDirectoryConfig();
+    
+    if (!adConfig) {
+      throw new Error('Active Directory configuration not found in database');
+    }
+    
+    return adConfig;
+  } catch (error) {
+    console.error('[LDAP Service] Failed to get AD configuration from database:', error);
+    throw error;
   }
-  return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
 /**
@@ -37,7 +51,7 @@ function formatBindCredential(settings, username) {
  * Create and bind an LDAP client (accept self-signed)
  */
 export async function getClient() {
-  const { activeDirectorySettings: ad } = loadSettings();
+  const ad = await getActiveDirectorySettings();
   const protocol = ad.protocol || 'ldap';
   const port = protocol === 'ldaps' ? 636 : 389;
   const url = `${protocol}://${ad.server}:${port}`;
@@ -123,7 +137,7 @@ export async function search(baseDN, filter, attributes) {
  * Lookup DN by employeeID
  */
 export async function getDnFromEmployeeId(employeeID) {
-  const { activeDirectorySettings: ad } = loadSettings();
+  const ad = await getActiveDirectorySettings();
   const filter = `(&(objectClass=user)(employeeID=${employeeID}))`;
   const entries = await search(ad.baseDN, filter, ['distinguishedName']);
   return entries[0]?.distinguishedName || null;

@@ -55,6 +55,7 @@ import hrisSyncRoutes from './routes/hris-sync.js';
 import distributionListsRoutes from './routes/distribution-lists.js';
 import userPreferencesRoutes from './routes/user-preferences.js';
 import testPreferencesRoutes from './routes/test-preferences.js';
+import systemConfigRoutes from './routes/system-config.js';
 
 // Test route before other routes
 app.get('/api/test-get', (req, res) => {
@@ -73,6 +74,7 @@ app.use('/api/hris-sync', hrisSyncRoutes);
 app.use('/api/distribution-lists', distributionListsRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/test-preferences', testPreferencesRoutes);
+app.use('/api/system-config', systemConfigRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

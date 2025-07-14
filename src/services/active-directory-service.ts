@@ -57,7 +57,7 @@ interface ADUserSearchResult {
 }
 
 // The API client already includes /api in its baseURL
-const AD_ENDPOINT = "/active-directory";
+const AD_ENDPOINT = "/system-config/active-directory";
 
 // Add in-memory cache for sensitive information that shouldn't be in localStorage
 const memoryCache = {
@@ -108,7 +108,7 @@ export const activeDirectoryService = {
       }
       
       const response = await apiClient.post<{ success: boolean; message: string }>(
-        `${AD_ENDPOINT}/test`,
+        `${AD_ENDPOINT}/test-connection`,
         testSettings
       );
       logger.api.info('Active Directory connection test successful:', response.data.message);

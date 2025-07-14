@@ -7,6 +7,7 @@ import ldap from 'ldapjs';
 import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
 import { search, escapeFilter } from '../lib/ldapService.js';
+import SystemConfigService from '../services/system-config-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +23,19 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Helper functions for reading/writing settings
+// Helper function to get Active Directory settings from system config
+const getActiveDirectorySettings = async (req) => {
+  try {
+    const systemConfigService = new SystemConfigService(req.app.locals.dbPool);
+    const adConfig = await systemConfigService.getActiveDirectoryConfig();
+    return adConfig;
+  } catch (err) {
+    logger.api.error('Error reading Active Directory settings:', err);
+    throw err;
+  }
+};
+
+// Legacy function for backward compatibility (deprecated)
 const getSettings = () => {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
@@ -422,8 +435,8 @@ router.post('/create-user/:id', async (req, res) => {
     logger.api.debug(`Password provided: ${userData.password ? 'Yes' : 'No'}, Length: ${userData.password?.length || 0}`);
     
     // First, check if AD integration is enabled
-    const settings = getSettings();
-    if (!settings.activeDirectorySettings || !settings.activeDirectorySettings.enabled) {
+    const adSettings = await getActiveDirectorySettings(req);
+    if (!adSettings || !adSettings.enabled) {
       return res.status(400).json({ 
         success: false, 
         error: "Active Directory integration is not enabled" 
@@ -449,7 +462,7 @@ router.post('/create-user/:id', async (req, res) => {
     }
     
     // Create user in AD using ldapjs (now handles existing users)
-    const result = await createLdapUser(settings.activeDirectorySettings, userData);
+    const result = await createLdapUser(adSettings, userData);
     
     // If successful (either created or updated existing), update the hire record
     if (result.success) {
@@ -951,8 +964,8 @@ router.get('/search-users', async (req, res) => {
     logger.api.debug(`Searching AD for users matching: ${query}`);
     
     // Get AD settings
-    const settings = getSettings();
-    if (!settings.activeDirectorySettings || !settings.activeDirectorySettings.enabled) {
+    const adSettings = await getActiveDirectorySettings(req);
+    if (!adSettings || !adSettings.enabled) {
       return res.status(400).json({ 
         success: false, 
         error: "Active Directory integration is not enabled" 
@@ -960,7 +973,7 @@ router.get('/search-users', async (req, res) => {
     }
     
     // Search for users
-    const users = await searchAdUsers(settings.activeDirectorySettings, query);
+    const users = await searchAdUsers(adSettings, query);
     
     res.json({
       success: true,
