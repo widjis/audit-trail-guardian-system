@@ -60,7 +60,7 @@ const saveSettings = (settings) => {
 // Get all settings
 router.get('/', async (req, res) => {
   try {
-    // Get settings from JSON for non-department settings
+    // Get settings from JSON for non-migrated settings
     const settings = getSettings();
     
     // Get departments from database
@@ -75,6 +75,44 @@ router.get('/', async (req, res) => {
       }
     }
     
+    // Get account statuses from database with fallback to JSON
+    try {
+      const accountStatuses = await executeQuery('SELECT name FROM account_statuses WHERE is_active = 1 ORDER BY sort_order, name');
+      if (accountStatuses && accountStatuses.length > 0) {
+        settings.accountStatuses = accountStatuses.map(status => status.name);
+      }
+    } catch (dbError) {
+      console.error('Error fetching account statuses from database, using JSON fallback:', dbError);
+      // Keep existing JSON data as fallback
+    }
+    
+    // Get position grades from database with fallback to JSON
+    try {
+      const positionGrades = await executeQuery('SELECT name FROM position_grades WHERE is_active = 1 ORDER BY sort_order, name');
+      if (positionGrades && positionGrades.length > 0) {
+        settings.positionGrades = positionGrades.map(grade => grade.name);
+      }
+    } catch (dbError) {
+      console.error('Error fetching position grades from database, using JSON fallback:', dbError);
+      // Keep existing JSON data as fallback
+    }
+    
+    // Get mailing lists from database with fallback to JSON
+    try {
+      const mailingLists = await executeQuery('SELECT name, email, type FROM mailing_lists WHERE is_active = 1 ORDER BY type, sort_order, name');
+      if (mailingLists && mailingLists.length > 0) {
+        const dbMailingLists = {
+          mandatory: mailingLists.filter(ml => ml.type === 'mandatory').map(ml => ({ name: ml.name, email: ml.email })),
+          optional: mailingLists.filter(ml => ml.type === 'optional').map(ml => ({ name: ml.name, email: ml.email })),
+          roleBased: mailingLists.filter(ml => ml.type === 'role-based').map(ml => ({ name: ml.name, email: ml.email }))
+        };
+        settings.mailingLists = dbMailingLists;
+      }
+    } catch (dbError) {
+      console.error('Error fetching mailing lists from database, using JSON fallback:', dbError);
+      // Keep existing JSON data as fallback
+    }
+    
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get settings', message: err.message });
@@ -82,7 +120,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update account statuses
-router.put('/account-statuses', (req, res) => {
+router.put('/account-statuses', async (req, res) => {
   try {
     const { statuses } = req.body;
     
@@ -90,37 +128,74 @@ router.put('/account-statuses', (req, res) => {
       return res.status(400).json({ error: 'Invalid format. Expected an array of statuses.' });
     }
     
-    const settings = getSettings();
-    settings.accountStatuses = statuses;
-    
-    saveSettings(settings);
-    
-    res.json({ success: true, message: 'Account statuses updated successfully' });
+    try {
+      // Update database first
+      // Get existing statuses
+      const existingStatuses = await executeQuery('SELECT id, name FROM account_statuses');
+      const existingNames = existingStatuses.map(status => status.name);
+      
+      // Process each status
+      for (let i = 0; i < statuses.length; i++) {
+        const statusName = statuses[i];
+        if (existingNames.includes(statusName)) {
+          // Update sort order for existing status
+          await executeQuery(
+            'UPDATE account_statuses SET sort_order = ?, is_active = 1 WHERE name = ?',
+            [i, statusName]
+          );
+        } else {
+          // Insert new status
+          const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          await executeQuery(
+            'INSERT INTO account_statuses (id, name, sort_order, is_active) VALUES (?, ?, ?, 1)',
+            [id, statusName, i]
+          );
+        }
+      }
+      
+      // Deactivate statuses not in the new list
+      const statusesToDeactivate = existingNames.filter(name => !statuses.includes(name));
+      for (const statusName of statusesToDeactivate) {
+        await executeQuery(
+          'UPDATE account_statuses SET is_active = 0 WHERE name = ?',
+          [statusName]
+        );
+      }
+      
+      res.json({ success: true, message: 'Account statuses updated successfully in database' });
+    } catch (dbError) {
+      console.error('Database error updating account statuses, falling back to JSON:', dbError);
+      
+      // Fallback to JSON file
+      const settings = getSettings();
+      settings.accountStatuses = statuses;
+      saveSettings(settings);
+      
+      res.json({ 
+        success: true, 
+        message: 'Account statuses updated in file storage due to database error',
+        warning: dbError.message
+      });
+    }
   } catch (err) {
     res.status(500).json({ error: 'Failed to update account statuses', message: err.message });
   }
 });
 
-// Update mailing lists - now supports new structure
-router.put('/mailing-lists', (req, res) => {
+// Update mailing lists - now supports new structure and database storage
+router.put('/mailing-lists', async (req, res) => {
   try {
     const { mailingLists, displayAsDropdown } = req.body;
+    let structuredMailingLists;
     
     // Support both old array format and new structured format
     if (Array.isArray(mailingLists)) {
       // Old format - convert to new structure
-      const settings = getSettings();
-      settings.mailingLists = {
+      structuredMailingLists = {
         mandatory: [],
         optional: mailingLists,
         roleBased: []
       };
-      
-      if (displayAsDropdown !== undefined) {
-        settings.mailingListDisplayAsDropdown = displayAsDropdown;
-      }
-      
-      saveSettings(settings);
     } else if (mailingLists && typeof mailingLists === 'object') {
       // New structured format
       const { mandatory, optional, roleBased } = mailingLists;
@@ -129,21 +204,152 @@ router.put('/mailing-lists', (req, res) => {
         return res.status(400).json({ error: 'Invalid format. Expected structured mailing lists with mandatory, optional, and roleBased arrays.' });
       }
       
+      structuredMailingLists = { mandatory, optional, roleBased };
+    } else {
+      return res.status(400).json({ error: 'Invalid format. Expected mailing lists data.' });
+    }
+    
+    try {
+      // Update database first
+      // Get existing mailing lists
+      const existingLists = await executeQuery('SELECT id, name, email, type FROM mailing_lists');
+      
+      // Process each type of mailing list
+      const types = [
+        { key: 'mandatory', dbType: 'mandatory' },
+        { key: 'optional', dbType: 'optional' },
+        { key: 'roleBased', dbType: 'role-based' }
+      ];
+      
+      for (const typeInfo of types) {
+        const lists = structuredMailingLists[typeInfo.key] || [];
+        
+        for (let i = 0; i < lists.length; i++) {
+          const list = lists[i];
+          const existing = existingLists.find(el => el.name === list.name && el.type === typeInfo.dbType);
+          
+          if (existing) {
+            // Update existing list
+            await executeQuery(
+              'UPDATE mailing_lists SET email = ?, sort_order = ?, is_active = 1 WHERE id = ?',
+              [list.email, i, existing.id]
+            );
+          } else {
+            // Insert new list
+            const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            await executeQuery(
+              'INSERT INTO mailing_lists (id, name, email, type, sort_order, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+              [id, list.name, list.email, typeInfo.dbType, i]
+            );
+          }
+        }
+        
+        // Deactivate lists of this type that are no longer in the new data
+        const currentNames = lists.map(l => l.name);
+        const listsToDeactivate = existingLists.filter(el => 
+          el.type === typeInfo.dbType && !currentNames.includes(el.name)
+        );
+        
+        for (const listToDeactivate of listsToDeactivate) {
+          await executeQuery(
+            'UPDATE mailing_lists SET is_active = 0 WHERE id = ?',
+            [listToDeactivate.id]
+          );
+        }
+      }
+      
+      // Update displayAsDropdown setting in JSON (this stays in JSON for now)
+      if (displayAsDropdown !== undefined) {
+        const settings = getSettings();
+        settings.mailingListDisplayAsDropdown = displayAsDropdown;
+        saveSettings(settings);
+      }
+      
+      res.json({ success: true, message: 'Mailing lists updated successfully in database' });
+    } catch (dbError) {
+      console.error('Database error updating mailing lists, falling back to JSON:', dbError);
+      
+      // Fallback to JSON file
       const settings = getSettings();
-      settings.mailingLists = { mandatory, optional, roleBased };
+      settings.mailingLists = structuredMailingLists;
       
       if (displayAsDropdown !== undefined) {
         settings.mailingListDisplayAsDropdown = displayAsDropdown;
       }
       
       saveSettings(settings);
-    } else {
-      return res.status(400).json({ error: 'Invalid format. Expected mailing lists data.' });
+      
+      res.json({ 
+        success: true, 
+        message: 'Mailing lists updated in file storage due to database error',
+        warning: dbError.message
+      });
     }
-    
-    res.json({ success: true, message: 'Mailing lists updated successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update mailing lists', message: err.message });
+  }
+});
+
+// Update position grades
+router.put('/position-grades', async (req, res) => {
+  try {
+    const { grades } = req.body;
+    
+    if (!Array.isArray(grades)) {
+      return res.status(400).json({ error: 'Invalid format. Expected an array of position grades.' });
+    }
+    
+    try {
+      // Update database first
+      // Get existing grades
+      const existingGrades = await executeQuery('SELECT id, name FROM position_grades');
+      const existingNames = existingGrades.map(grade => grade.name);
+      
+      // Process each grade
+      for (let i = 0; i < grades.length; i++) {
+        const gradeName = grades[i];
+        if (existingNames.includes(gradeName)) {
+          // Update sort order for existing grade
+          await executeQuery(
+            'UPDATE position_grades SET sort_order = ?, is_active = 1 WHERE name = ?',
+            [i, gradeName]
+          );
+        } else {
+          // Insert new grade
+          const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          await executeQuery(
+            'INSERT INTO position_grades (id, name, sort_order, is_active) VALUES (?, ?, ?, 1)',
+            [id, gradeName, i]
+          );
+        }
+      }
+      
+      // Deactivate grades not in the new list
+      const gradesToDeactivate = existingNames.filter(name => !grades.includes(name));
+      for (const gradeName of gradesToDeactivate) {
+        await executeQuery(
+          'UPDATE position_grades SET is_active = 0 WHERE name = ?',
+          [gradeName]
+        );
+      }
+      
+      res.json({ success: true, message: 'Position grades updated successfully in database' });
+    } catch (dbError) {
+      console.error('Database error updating position grades, falling back to JSON:', dbError);
+      
+      // Fallback to JSON file
+      const settings = getSettings();
+      settings.positionGrades = grades;
+      saveSettings(settings);
+      
+      res.json({ 
+        success: true, 
+        message: 'Position grades updated in file storage due to database error',
+        warning: dbError.message
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update position grades', message: err.message });
   }
 });
 

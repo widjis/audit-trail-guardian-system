@@ -117,3 +117,67 @@ IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hire
 BEGIN
     ALTER TABLE hires ADD srf_document_uploaded_at DATETIME DEFAULT NULL;
 END
+
+-- Check if the user_preferences table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_preferences' AND xtype='U')
+BEGIN
+    -- Create the user_preferences table
+    CREATE TABLE user_preferences (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
+      preference_key VARCHAR(255) NOT NULL,
+      preference_value TEXT,
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE(),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, preference_key)
+    );
+END
+
+-- Check if the account_statuses table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='account_statuses' AND xtype='U')
+BEGIN
+    -- Create the account_statuses table
+    CREATE TABLE account_statuses (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      description TEXT,
+      is_active BIT DEFAULT 1,
+      sort_order INT DEFAULT 0,
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE()
+    );
+END
+
+-- Check if the position_grades table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='position_grades' AND xtype='U')
+BEGIN
+    -- Create the position_grades table
+    CREATE TABLE position_grades (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      description TEXT,
+      is_active BIT DEFAULT 1,
+      sort_order INT DEFAULT 0,
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE()
+    );
+END
+
+-- Check if the mailing_lists table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='mailing_lists' AND xtype='U')
+BEGIN
+    -- Create the mailing_lists table
+    CREATE TABLE mailing_lists (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      type VARCHAR(50) NOT NULL, -- 'mandatory', 'optional', 'role-based'
+      description TEXT,
+      is_active BIT DEFAULT 1,
+      sort_order INT DEFAULT 0,
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE(),
+      UNIQUE(name, type)
+    );
+END

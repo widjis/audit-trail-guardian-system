@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -32,17 +31,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(extractUser);
 app.use(getCurrentUser);
 
-// User preferences are handled by the dedicated route file
-
-// Basic test routes
-app.get('/', (req, res) => {
-  res.send('API is running....');
-});
-
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'API test successful' });
-});
-
 // Import routes
 import authRoutes from './routes/auth.js';
 import hiresRoutes from './routes/hires.js';
@@ -54,12 +42,6 @@ import activeDirectoryRoutes from './routes/active-directory.js';
 import hrisSyncRoutes from './routes/hris-sync.js';
 import distributionListsRoutes from './routes/distribution-lists.js';
 import userPreferencesRoutes from './routes/user-preferences.js';
-import testPreferencesRoutes from './routes/test-preferences.js';
-
-// Test route before other routes
-app.get('/api/test-get', (req, res) => {
-  res.json({ message: 'Test GET route works' });
-});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -72,7 +54,6 @@ app.use('/api/active-directory', activeDirectoryRoutes);
 app.use('/api/hris-sync', hrisSyncRoutes);
 app.use('/api/distribution-lists', distributionListsRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
-app.use('/api/test-preferences', testPreferencesRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
@@ -84,7 +65,6 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.resolve(__dirname, '../client/dist/index.html'))
   );
 } else {
-  const __dirname = path.resolve();
   app.get('/', (req, res) => {
     res.send('API is running....');
   });
@@ -93,7 +73,5 @@ if (process.env.NODE_ENV === 'production') {
 // Custom error handling middleware
 app.use(notFound);
 app.use(errorHandler);
-
-// Server listening is handled by start.js
 
 export default app;

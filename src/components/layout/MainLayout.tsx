@@ -1,6 +1,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/services/auth-service";
+import { useUserPreferences } from "@/services/user-preferences-service";
 import { useNavigate } from "react-router-dom";
 import { Box, AppBar, Toolbar, IconButton, Typography, Drawer, useMediaQuery, useTheme, CircularProgress } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -12,9 +13,11 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isAuthenticated } = useAuth();
+  const { getPreference } = useUserPreferences();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -30,6 +33,20 @@ export function MainLayout({ children }: MainLayoutProps) {
     checkAuth();
   }, [isAuthenticated, navigate]);
 
+  // Load sidebar preference on component mount
+  useEffect(() => {
+    const loadSidebarPreference = async () => {
+      try {
+        const savedCollapsed = await getPreference('sidebarCollapsed', false);
+        setSidebarCollapsed(savedCollapsed);
+      } catch (error) {
+        console.error('Failed to load sidebar preference in MainLayout:', error);
+      }
+    };
+    
+    loadSidebarPreference();
+  }, [getPreference]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -38,7 +55,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     return <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>;
   }
 
-  const drawerWidth = 240;
+  const drawerWidth = sidebarCollapsed ? 60 : 240;
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
@@ -58,10 +75,15 @@ export function MainLayout({ children }: MainLayoutProps) {
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box' },
+          transition: 'width 0.2s',
+          '& .MuiDrawer-paper': { 
+            width: drawerWidth, 
+            boxSizing: 'border-box',
+            transition: 'width 0.2s'
+          },
         }}
       >
-        <Sidebar onClose={handleDrawerToggle} />
+        <Sidebar onClose={isMobile ? handleDrawerToggle : undefined} onCollapseChange={setSidebarCollapsed} collapsed={sidebarCollapsed} />
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: 'auto', mt: { xs: 8, md: 0 } }}>
         {children}

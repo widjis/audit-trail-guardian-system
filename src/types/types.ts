@@ -124,3 +124,24 @@ export interface SrfUploadResponse {
   uploadedAt?: string;
   error?: string;
 }
+
+// Add type for user preferences
+export interface UserPreference {
+  id: string;
+  user_id: string;
+  preference_key: string;
+  preference_value: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Add type for user preferences request/response
+export interface UserPreferencesRequest {
+  preferences: Record<string, any>;
+}
+
+export interface UserPreferencesResponse {
+  success: boolean;
+  preferences: Record<string, any>;
+  message?: string;
+}
