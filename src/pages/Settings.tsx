@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, Tab } from '@mui/material';
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
 import { MailingListSettings } from "@/components/settings/MailingListSettings";
 import { DepartmentListSettings } from "@/components/settings/DepartmentListSettings";
@@ -11,107 +11,55 @@ import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
 import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySettings";
 import { ExchangeOnlineSettings } from "@/components/settings/ExchangeOnlineSettings";
 import { MicrosoftGraphSettings } from "@/components/settings/MicrosoftGraphSettings";
-import { Database, MessageSquare, Users, Server, BadgeCheck, Mail, Network } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import StorageIcon from '@mui/icons-material/Storage';
+import MessageIcon from '@mui/icons-material/Message';
+import GroupIcon from '@mui/icons-material/Group';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
+import AccountBoxIcon from '@mui/icons-material/AccountBox';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import DirectoryIcon from '@mui/icons-material/Folder';
+import EmailIcon from '@mui/icons-material/Email';
+import GraphIcon from '@mui/icons-material/ShowChart';
+import { useMediaQuery, useTheme, Box, Typography } from '@mui/material';
 
 export default function Settings() {
-  const isMobile = useIsMobile();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [activeTab, setActiveTab] = useState("account-status");
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your system settings and configurations.
-          </p>
-        </div>
-        
-        <Tabs 
-          defaultValue="account-status" 
-          className="space-y-4"
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>Settings</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Manage your system settings and configurations.</Typography>
+        <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          orientation={isMobile ? 'vertical' : 'horizontal'}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
         >
-          <div className={`${isMobile ? 'overflow-x-auto pb-2' : ''}`}>
-            <TabsList className={`${isMobile ? 'inline-flex w-max' : 'flex flex-wrap'} bg-slate-100`}>
-              <TabsTrigger value="account-status" className="flex items-center gap-1">
-                <BadgeCheck className="h-4 w-4" />
-                <span>Account Status</span>
-              </TabsTrigger>
-              <TabsTrigger value="mailing-list" className="flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" />
-                <span>Mailing List</span>
-              </TabsTrigger>
-              <TabsTrigger value="departments" className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                <span>Departments</span>
-              </TabsTrigger>
-              <TabsTrigger value="whatsapp" className="flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" />
-                <span>WhatsApp</span>
-              </TabsTrigger>
-              <TabsTrigger value="active-directory" className="flex items-center gap-1">
-                <Server className="h-4 w-4" />
-                <span>Active Directory</span>
-              </TabsTrigger>
-              <TabsTrigger value="exchange-online" className="flex items-center gap-1">
-                <Mail className="h-4 w-4" />
-                <span>Exchange Online</span>
-              </TabsTrigger>
-              <TabsTrigger value="microsoft-graph" className="flex items-center gap-1">
-                <Network className="h-4 w-4" />
-                <span>Microsoft Graph</span>
-              </TabsTrigger>
-              <TabsTrigger value="database" className="flex items-center gap-1">
-                <Database className="h-4 w-4" />
-                <span>Databases</span>
-              </TabsTrigger>
-              <TabsTrigger value="account-management" className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                <span>ICT Support</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
-          
-          <TabsContent value="account-status" className="space-y-4">
-            <AccountStatusSettings />
-          </TabsContent>
-          
-          <TabsContent value="mailing-list" className="space-y-4">
-            <MailingListSettings />
-          </TabsContent>
-          
-          <TabsContent value="departments" className="space-y-4">
-            <DepartmentListSettings />
-          </TabsContent>
-          
-          <TabsContent value="whatsapp" className="space-y-4">
-            <WhatsAppSettings />
-          </TabsContent>
-          
-          <TabsContent value="active-directory" className="space-y-4">
-            <ActiveDirectorySettings />
-          </TabsContent>
-          
-          <TabsContent value="exchange-online" className="space-y-4">
-            <ExchangeOnlineSettings />
-          </TabsContent>
-          
-          <TabsContent value="microsoft-graph" className="space-y-4">
-            <MicrosoftGraphSettings />
-          </TabsContent>
-          
-          <TabsContent value="database" className="space-y-4">
-            <DatabaseConfigSettings />
-          </TabsContent>
-          
-          <TabsContent value="account-management" className="space-y-4">
-            <AccountManagementSettings />
-          </TabsContent>
+          <Tab label="Account Status" value="account-status" icon={<AccountBoxIcon />} iconPosition="start" />
+          <Tab label="Mailing List" value="mailing-list" icon={<MessageIcon />} iconPosition="start" />
+          <Tab label="Departments" value="departments" icon={<GroupIcon />} iconPosition="start" />
+          <Tab label="WhatsApp" value="whatsapp" icon={<WhatsAppIcon />} iconPosition="start" />
+          <Tab label="Active Directory" value="active-directory" icon={<DirectoryIcon />} iconPosition="start" />
+          <Tab label="Exchange Online" value="exchange-online" icon={<EmailIcon />} iconPosition="start" />
+          <Tab label="Microsoft Graph" value="microsoft-graph" icon={<GraphIcon />} iconPosition="start" />
+          <Tab label="Databases" value="database" icon={<StorageIcon />} iconPosition="start" />
+          <Tab label="ICT Support" value="account-management" icon={<SettingsApplicationsIcon />} iconPosition="start" />
         </Tabs>
-      </div>
+        {activeTab === "account-status" && <AccountStatusSettings />}
+        {activeTab === "mailing-list" && <MailingListSettings />}
+        {activeTab === "departments" && <DepartmentListSettings />}
+        {activeTab === "whatsapp" && <WhatsAppSettings />}
+        {activeTab === "active-directory" && <ActiveDirectorySettings />}
+        {activeTab === "exchange-online" && <ExchangeOnlineSettings />}
+        {activeTab === "microsoft-graph" && <MicrosoftGraphSettings />}
+        {activeTab === "database" && <DatabaseConfigSettings />}
+        {activeTab === "account-management" && <AccountManagementSettings />}
+      </Box>
     </MainLayout>
   );
 }

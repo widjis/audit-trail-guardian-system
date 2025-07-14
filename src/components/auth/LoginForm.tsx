@@ -1,11 +1,9 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/services/auth-service";
 import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardActions, Typography, TextField, Button, CircularProgress } from '@mui/material';
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -34,48 +32,38 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-[350px]">
-      <CardHeader>
-        <CardTitle className="text-2xl">Login</CardTitle>
-        <CardDescription>
-          Enter your credentials to access the audit system
-        </CardDescription>
-      </CardHeader>
+    <Card sx={{ width: '100%', maxWidth: 350 }}>
+      <CardHeader
+        title={<Typography variant="h6">Login</Typography>}
+        subheader={<Typography variant="body2" color="text.secondary">Enter your credentials to access the audit system</Typography>}
+      />
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="username" className="text-sm font-medium">
-              Username
-            </label>
-            <Input
-              id="username"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-          </div>
+        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Username"
+            variant="outlined"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={isLoading}
+            fullWidth
+          />
+          <TextField
+            label="Password"
+            type="password"
+            variant="outlined"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            fullWidth
+          />
         </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Login"}
+        <CardActions>
+          <Button type="submit" variant="contained" disabled={isLoading} fullWidth>
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : "Login"}
           </Button>
-        </CardFooter>
+        </CardActions>
       </form>
     </Card>
   );

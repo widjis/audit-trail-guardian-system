@@ -1,8 +1,9 @@
 
 import { useEffect, useState } from "react";
-import { LoginForm } from "@/components/auth/LoginForm";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/services/auth-service";
+import { Box, Card, CardContent, Typography, CircularProgress } from '@mui/material';
+import { LoginForm } from "@/components/auth/LoginForm";
 
 export default function Login() {
   const { isAuthenticated } = useAuth();
@@ -22,27 +23,35 @@ export default function Login() {
   }, [isAuthenticated, navigate]);
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center bg-audit-gray">
-      <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent"></div>
-    </div>;
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.100' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-audit-gray">
-      <div>
-        <div className="mb-8 text-center">
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.100', px: { xs: 2, sm: 0 } }}>
+      <Box sx={{ maxWidth: 400, width: '100%' }}>
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
           <img
             src="/MTI-removebg-preview.png"
             alt="MTI Logo"
-            className="mx-auto mb-4 h-20 w-auto"
+            style={{ height: '80px', width: 'auto', margin: '0 auto 16px' }}
           />
-          <h1 className="text-3xl font-bold text-audit-blue">MTI User Onboarding System</h1>
-          <p className="mt-2 text-sm text-gray-600">Streamlined User Onboarding & Audit Management</p>
-        </div>
-        <div className="max-w-md w-full space-y-8 p-4 mx-auto">
-          <LoginForm />
-        </div>
-      </div>
-    </div>
+          <Typography variant="h4" component="h1" gutterBottom sx={{ color: 'primary.main' }}>
+            MTI User Onboarding System
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Streamlined User Onboarding & Audit Management
+          </Typography>
+        </Box>
+        <Card sx={{ maxWidth: 350, mx: 'auto' }}>
+          <CardContent>
+            <LoginForm />
+          </CardContent>
+        </Card>
+      </Box>
+    </Box>
   );
 }

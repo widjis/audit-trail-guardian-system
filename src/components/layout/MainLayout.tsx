@@ -1,8 +1,10 @@
 
 import { ReactNode, useEffect, useState } from "react";
-import { Sidebar } from "./Sidebar";
 import { useAuth } from "@/services/auth-service";
 import { useNavigate } from "react-router-dom";
+import { Box, AppBar, Toolbar, IconButton, Typography, Drawer, useMediaQuery, useTheme, CircularProgress } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import { Sidebar } from "./Sidebar";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -12,6 +14,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -25,20 +30,42 @@ export function MainLayout({ children }: MainLayoutProps) {
     checkAuth();
   }, [isAuthenticated, navigate]);
 
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
   if (isLoading) {
-    return <div className="h-screen flex items-center justify-center">
-      <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent"></div>
-    </div>;
+    return <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>;
   }
 
+  const drawerWidth = 240;
+
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="container mx-auto py-6 px-4 max-w-full">
-          {children}
-        </div>
-      </main>
-    </div>
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1, display: { md: 'none' } }}>
+        <Toolbar>
+          <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}>
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6">MTI Onboarding</Typography>
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        variant={isMobile ? 'temporary' : 'permanent'}
+        open={isMobile ? mobileOpen : true}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box' },
+        }}
+      >
+        <Sidebar onClose={handleDrawerToggle} />
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: 'auto', mt: { xs: 8, md: 0 } }}>
+        {children}
+      </Box>
+    </Box>
   );
 }

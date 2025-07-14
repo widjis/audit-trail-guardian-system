@@ -1,164 +1,95 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/services/auth-service";
-import {
-  UserCircle,
-  LayoutDashboard,
-  Upload,
-  Users,
-  LogOut,
-  Settings,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  Mail,
-} from "lucide-react";
+import { Box, List, ListItemButton, ListItemIcon, ListItemText, Divider, IconButton, Typography, Collapse as MuiCollapse } from '@mui/material';
+import PersonIcon from '@mui/icons-material/Person';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import GroupIcon from '@mui/icons-material/Group';
+import LogoutIcon from '@mui/icons-material/Logout';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SyncIcon from '@mui/icons-material/Sync';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import MailIcon from '@mui/icons-material/Mail';
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const location = useLocation();
   const { logout, getCurrentUser } = useAuth();
   const user = getCurrentUser();
   const isAdmin = user?.role === "admin";
   const isAdminOrSupport = ["admin", "support"].includes(user?.role || "");
 
-  // Collapse state
   const [collapsed, setCollapsed] = useState(false);
   const toggleSidebar = () => setCollapsed((v) => !v);
 
-  // Navigation items
   interface NavItem {
     label: string;
     path: string;
     icon: React.ReactNode;
   }
   const commonNavItems: NavItem[] = [
-    {
-      label: "Dashboard",
-      path: "/dashboard",
-      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
-    },
-    {
-      label: "New Hires",
-      path: "/hires",
-      icon: <Users className="mr-2 h-4 w-4" />,
-    },
-    {
-      label: "Import Data",
-      path: "/import",
-      icon: <Upload className="mr-2 h-4 w-4" />,
-    },
-    {
-      label: "Onboard Welcome Email",
-      path: "/onboard-email",
-      icon: <Mail className="mr-2 h-4 w-4" />,
-    },
+    { label: "Dashboard", path: "/dashboard", icon: <DashboardIcon /> },
+    { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
+    { label: "Import Data", path: "/import", icon: <CloudUploadIcon /> },
+    { label: "Onboard Welcome Email", path: "/onboard-email", icon: <MailIcon /> },
   ];
-  
   const adminOrSupportNavItems: NavItem[] = [
-    {
-      label: "HRIS Sync",
-      path: "/hris-sync",
-      icon: <RefreshCw className="mr-2 h-4 w-4" />,
-    },
+    { label: "HRIS Sync", path: "/hris-sync", icon: <SyncIcon /> },
   ];
-  
   const adminOnlyNavItems: NavItem[] = [
-    {
-      label: "Settings",
-      path: "/settings",
-      icon: <Settings className="mr-2 h-4 w-4" />,
-    },
+    { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
   ];
 
   let navItems = [...commonNavItems];
-  if (isAdminOrSupport) {
-    navItems = [...navItems, ...adminOrSupportNavItems];
-  }
-  if (isAdmin) {
-    navItems = [...navItems, ...adminOnlyNavItems];
-  }
+  if (isAdminOrSupport) navItems = [...navItems, ...adminOrSupportNavItems];
+  if (isAdmin) navItems = [...navItems, ...adminOnlyNavItems];
 
-  // Active route detection
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   return (
-    <div
-      className={`
-        h-full min-h-screen flex flex-col bg-audit-blue text-white
-        transition-all duration-200
-        ${collapsed ? "w-16" : "w-64"}
-      `}
-    >
-      {/* Header + Toggle */}
-      <div className="flex items-center justify-between px-3 py-4">
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'primary.main', color: 'primary.contrastText', width: collapsed ? 60 : 240, transition: 'width 0.2s' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', px: 2, py: 2 }}>
         {!collapsed && (
-          <div>
-            <h1 className="text-2xl font-bold">MTI Onboarding</h1>
-            <p className="text-sm opacity-75">New Hire Management</p>
-          </div>
+          <Box>
+            <Typography variant="h6" fontWeight="bold">MTI Onboarding</Typography>
+            <Typography variant="body2" sx={{ opacity: 0.75 }}>New Hire Management</Typography>
+          </Box>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="p-2"
-        >
-          {collapsed ? <ChevronRight /> : <ChevronLeft />}
-        </Button>
-      </div>
-
-      {/* Nav Links */}
-      <div className="flex-1 overflow-hidden">
-        <nav className="space-y-1 px-2">
-          {navItems.map((item) => (
-            <Link to={item.path} key={item.path}>
-              <Button
-                variant={isActive(item.path) ? "secondary" : "ghost"}
-                className={`
-                  w-full justify-start
-                  ${isActive(item.path)
-                    ? "bg-audit-lightBlue text-white"
-                    : "text-white hover:bg-audit-lightBlue hover:text-white"}
-                `}
-                aria-current={isActive(item.path) ? "page" : undefined}
-              >
-                {item.icon}
-                {!collapsed && item.label}
-              </Button>
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {/* Footer */}
-      <div
-        className={`
-          border-t border-audit-lightBlue pt-4 px-4
-          transition-opacity duration-200
-          ${collapsed ? "opacity-0 pointer-events-none" : "opacity-100"}
-        `}
-      >
-        <div className="flex items-center mb-4 px-2">
-          <UserCircle className="h-6 w-6 min-w-6 mr-2" />
-          <div className="overflow-hidden">
-            <p className="font-medium truncate">
-              {user?.username || "User"}
-            </p>
-            <p className="text-xs opacity-75">{user?.role || "Role"}</p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-white hover:bg-audit-lightBlue hover:text-white"
-          onClick={logout}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
-      </div>
-    </div>
+        <IconButton onClick={toggleSidebar} size="small" sx={{ color: 'inherit' }}>
+          {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton>
+      </Box>
+      <List sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+        {navItems.map((item) => (
+          <ListItemButton
+            key={item.path}
+            component={Link}
+            to={item.path}
+            selected={isActive(item.path)}
+            onClick={onClose}
+            sx={{ borderRadius: 1, justifyContent: collapsed ? 'center' : 'initial' }}
+          >
+            <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40, color: 'inherit' }}>{item.icon}</ListItemIcon>
+            {!collapsed && <ListItemText primary={item.label} />}
+          </ListItemButton>
+        ))}
+      </List>
+      <Divider sx={{ bgcolor: 'primary.light' }} />
+      <Box sx={{ p: 2, display: collapsed ? 'none' : 'block' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <PersonIcon sx={{ mr: 1 }} />
+          <Box>
+            <Typography variant="body1" fontWeight="medium" noWrap>{user?.username || "User"}</Typography>
+            <Typography variant="body2" sx={{ opacity: 0.75 }}>{user?.role || "Role"}</Typography>
+          </Box>
+        </Box>
+        <ListItemButton onClick={logout} sx={{ borderRadius: 1 }}>
+          <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}><LogoutIcon /></ListItemIcon>
+          <ListItemText primary="Logout" />
+        </ListItemButton>
+      </Box>
+    </Box>
   );
 }
