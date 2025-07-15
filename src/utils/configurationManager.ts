@@ -326,7 +326,7 @@ export class ConfigurationManager {
         
         if (typeof obj1[key] === 'object' && typeof obj2[key] === 'object' && 
             obj1[key] !== null && obj2[key] !== null) {
-          compareObjects(obj1[key], obj2[key], currentPath);
+          compareObjects(obj1[key] as Record<string, unknown>, obj2[key] as Record<string, unknown>, currentPath);
         } else if (obj1[key] !== obj2[key]) {
           diff.push({
             path: currentPath,
@@ -349,7 +349,7 @@ export class ConfigurationManager {
       }
     };
     
-    compareObjects(config1, config2);
+    compareObjects(config1 as unknown as Record<string, unknown>, config2 as unknown as Record<string, unknown>);
     return diff;
   }
 
@@ -499,32 +499,40 @@ export const configurationMigrations: ConfigurationMigration[] = [
   {
     version: '1.1.0',
     description: 'Add bottleneck detection thresholds',
-    migrate: (config: unknown) => ({
-      ...config,
-      thresholds: {
-        ...config.thresholds,
-        bottleneckDetection: {
-          critical: 50,
-          warning: 70
+    migrate: (config: unknown) => {
+      const typedConfig = config as DashboardConfig;
+      return {
+        ...typedConfig,
+        thresholds: {
+          ...typedConfig.thresholds,
+          bottleneckDetection: {
+            critical: 50,
+            warning: 70
+          }
         }
-      }
-    }),
+      };
+    },
     validate: (config: unknown) => !(config as DashboardConfig).thresholds?.bottleneckDetection
   },
   {
     version: '1.2.0',
     description: 'Add feature flags for new capabilities',
-    migrate: (config: unknown) => ({
-      ...config,
-      features: {
-        ...config.features,
-        enablePredictiveInsights: false,
-        enableExportFunctionality: true
-      }
-    }),
-    validate: (config: unknown) => 
-      config.features?.enablePredictiveInsights === undefined ||
-      config.features?.enableExportFunctionality === undefined
+    migrate: (config: unknown) => {
+      const typedConfig = config as DashboardConfig;
+      return {
+        ...typedConfig,
+        features: {
+          ...typedConfig.features,
+          enablePredictiveInsights: false,
+          enableExportFunctionality: true
+        }
+      };
+    },
+    validate: (config: unknown) => {
+      const typedConfig = config as DashboardConfig;
+      return typedConfig.features?.enablePredictiveInsights === undefined ||
+             typedConfig.features?.enableExportFunctionality === undefined;
+    }
   }
 ];
 

@@ -81,8 +81,8 @@ const sanitizeForLog = (obj: unknown): unknown => {
         if (obj[key]) {
           obj[key] = '[REDACTED]';
         }
-      } else if (typeof obj[key] === 'object') {
-        sanitizeObj(obj[key]);
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        sanitizeObj(obj[key] as Record<string, unknown>);
       }
     });
   };
@@ -174,14 +174,15 @@ export const logger = {
     // Add enhanced error reporting for LDAP operations
     errorDetail: (err: Error | unknown) => {
       if (config.enableLdap && shouldLog('error')) {
-        console.error(`[${getTimestamp()}] [LDAP] [ERROR-DETAIL] ${err.name || 'Error'}: ${err.message}`);
+        const errorObj = err as any;
+        console.error(`[${getTimestamp()}] [LDAP] [ERROR-DETAIL] ${errorObj.name || 'Error'}: ${errorObj.message}`);
         
         // Interpret LDAP error codes if available
-        if (err.code) {
+        if (errorObj.code) {
           let interpretation = "Unknown error code";
           
           // Common LDAP error codes and their meanings
-          switch (err.code) {
+          switch ((err as { code?: number }).code) {
             case 0: interpretation = "Success"; break;
             case 1: interpretation = "Operations error"; break;
             case 2: interpretation = "Protocol error"; break;
@@ -224,7 +225,7 @@ export const logger = {
             case 80: interpretation = "Other"; break;
           }
           
-          console.error(`[${getTimestamp()}] [LDAP] [ERROR-CODE] Code ${err.code}: ${interpretation}`);
+          console.error(`[${getTimestamp()}] [LDAP] [ERROR-CODE] Code ${errorObj.code}: ${interpretation}`);
         }
       }
     }
@@ -255,13 +256,14 @@ export const logger = {
     // Add SQL error details logging
     sqlError: (err: Error | unknown) => {
       if (config.enableDb && shouldLog('error')) {
-        console.error(`[${getTimestamp()}] [DATABASE] [SQL-ERROR] ${err.message}`);
-        if (err.code) {
-          console.error(`[${getTimestamp()}] [DATABASE] [SQL-CODE] ${err.code}`);
+        const errorObj = err as any;
+        console.error(`[${getTimestamp()}] [DATABASE] [SQL-ERROR] ${errorObj.message}`);
+        if (errorObj.code) {
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-CODE] ${errorObj.code}`);
         }
-        if (err.originalError?.info) {
-          console.error(`[${getTimestamp()}] [DATABASE] [SQL-DETAILS] Number: ${err.originalError.info.number}, State: ${err.originalError.info.state}`);
-          console.error(`[${getTimestamp()}] [DATABASE] [SQL-MESSAGE] ${err.originalError.info.message}`);
+        if (errorObj.originalError?.info) {
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-DETAILS] Number: ${errorObj.originalError.info.number}, State: ${errorObj.originalError.info.state}`);
+          console.error(`[${getTimestamp()}] [DATABASE] [SQL-MESSAGE] ${errorObj.originalError.info.message}`);
         }
       }
     }

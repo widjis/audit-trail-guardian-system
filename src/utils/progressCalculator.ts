@@ -1,6 +1,6 @@
 
 import { NewHire } from "@/types/types";
-import { isLicenseAssigned, isAccountActive, isLaptopReady, hasM365License } from "@/utils/dataValidators";
+import { isLicenseAssigned, isAccountActive, isLaptopReady, hasM365License, AccountStatus } from "@/utils/dataValidators";
 import { getDashboardConfig } from '@/config/dashboardConfig';
 
 // Distribution List Progress Logic
@@ -16,7 +16,7 @@ export function calculateProgressPercentage(hire: NewHire): number {
   let progress = 0;
 
   // Account Creation Status
-  if (isAccountActive(hire.account_creation_status)) {
+  if (isAccountActive(hire.account_creation_status as AccountStatus)) {
     progress += weights.accountCreation;
   }
 
