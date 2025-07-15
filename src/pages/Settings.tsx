@@ -1,7 +1,21 @@
 
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Tabs, Tab } from '@mui/material';
+import { 
+  Box, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemButton, 
+  ListItemIcon, 
+  ListItemText,
+  Paper,
+  Drawer,
+  IconButton,
+  useMediaQuery,
+  useTheme,
+  Divider
+} from '@mui/material';
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
 import { MailingListSettings } from "@/components/settings/MailingListSettings";
 import { DepartmentListSettings } from "@/components/settings/DepartmentListSettings";
@@ -20,45 +34,193 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import DirectoryIcon from '@mui/icons-material/Folder';
 import EmailIcon from '@mui/icons-material/Email';
 import GraphIcon from '@mui/icons-material/ShowChart';
-import { useMediaQuery, useTheme, Box, Typography } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
+
+const menuItems = [
+  { id: "account-status", label: "Account Status", icon: <AccountBoxIcon />, component: AccountStatusSettings },
+  { id: "mailing-list", label: "Mailing List", icon: <MessageIcon />, component: MailingListSettings },
+  { id: "departments", label: "Departments", icon: <GroupIcon />, component: DepartmentListSettings },
+  { id: "whatsapp", label: "WhatsApp", icon: <WhatsAppIcon />, component: WhatsAppSettings },
+  { id: "active-directory", label: "Active Directory", icon: <DirectoryIcon />, component: ActiveDirectorySettings },
+  { id: "exchange-online", label: "Exchange Online", icon: <EmailIcon />, component: ExchangeOnlineSettings },
+  { id: "microsoft-graph", label: "Microsoft Graph", icon: <GraphIcon />, component: MicrosoftGraphSettings },
+  { id: "database", label: "Databases", icon: <StorageIcon />, component: DatabaseConfigSettings },
+  { id: "account-management", label: "ICT Support", icon: <SettingsApplicationsIcon />, component: AccountManagementSettings },
+];
 
 export default function Settings() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [activeTab, setActiveTab] = useState("account-status");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const activeMenuItem = menuItems.find(item => item.id === activeTab);
+  const ActiveComponent = activeMenuItem?.component;
+
+  const handleMenuItemClick = (itemId: string) => {
+    setActiveTab(itemId);
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  };
+
+  const renderMenuItems = () => (
+    <List sx={{ width: '100%', maxWidth: 280, bgcolor: 'background.paper' }}>
+      {menuItems.map((item) => (
+        <ListItem key={item.id} disablePadding>
+          <ListItemButton
+            selected={activeTab === item.id}
+            onClick={() => handleMenuItemClick(item.id)}
+            sx={{
+              minHeight: 48,
+              px: 2.5,
+              '&.Mui-selected': {
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                },
+                '& .MuiListItemIcon-root': {
+                  color: 'primary.contrastText',
+                },
+              },
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: 0,
+                mr: 3,
+                justifyContent: 'center',
+              }}
+            >
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText 
+              primary={item.label} 
+              primaryTypographyProps={{
+                fontSize: '0.875rem',
+                fontWeight: activeTab === item.id ? 600 : 400,
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+      ))}
+    </List>
+  );
 
   return (
     <MainLayout>
-      <Box sx={{ p: { xs: 2, md: 4 } }}>
-        <Typography variant="h5" fontWeight="bold" gutterBottom>Settings</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Manage your system settings and configurations.</Typography>
-        <Tabs
-          value={activeTab}
-          onChange={(e, newValue) => setActiveTab(newValue)}
-          orientation={isMobile ? 'vertical' : 'horizontal'}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
-        >
-          <Tab label="Account Status" value="account-status" icon={<AccountBoxIcon />} iconPosition="start" />
-          <Tab label="Mailing List" value="mailing-list" icon={<MessageIcon />} iconPosition="start" />
-          <Tab label="Departments" value="departments" icon={<GroupIcon />} iconPosition="start" />
-          <Tab label="WhatsApp" value="whatsapp" icon={<WhatsAppIcon />} iconPosition="start" />
-          <Tab label="Active Directory" value="active-directory" icon={<DirectoryIcon />} iconPosition="start" />
-          <Tab label="Exchange Online" value="exchange-online" icon={<EmailIcon />} iconPosition="start" />
-          <Tab label="Microsoft Graph" value="microsoft-graph" icon={<GraphIcon />} iconPosition="start" />
-          <Tab label="Databases" value="database" icon={<StorageIcon />} iconPosition="start" />
-          <Tab label="ICT Support" value="account-management" icon={<SettingsApplicationsIcon />} iconPosition="start" />
-        </Tabs>
-        {activeTab === "account-status" && <AccountStatusSettings />}
-        {activeTab === "mailing-list" && <MailingListSettings />}
-        {activeTab === "departments" && <DepartmentListSettings />}
-        {activeTab === "whatsapp" && <WhatsAppSettings />}
-        {activeTab === "active-directory" && <ActiveDirectorySettings />}
-        {activeTab === "exchange-online" && <ExchangeOnlineSettings />}
-        {activeTab === "microsoft-graph" && <MicrosoftGraphSettings />}
-        {activeTab === "database" && <DatabaseConfigSettings />}
-        {activeTab === "account-management" && <AccountManagementSettings />}
+      <Box sx={{ display: 'flex', height: '100vh' }}>
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <Paper 
+            elevation={1} 
+            sx={{ 
+              width: 280, 
+              flexShrink: 0,
+              borderRadius: 0,
+              borderRight: 1,
+              borderColor: 'divider'
+            }}
+          >
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="h6" fontWeight="bold">Settings</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Manage your system settings
+              </Typography>
+            </Box>
+            {renderMenuItems()}
+          </Paper>
+        )}
+
+        {/* Mobile Drawer */}
+        {isMobile && (
+          <Drawer
+            anchor="left"
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            ModalProps={{
+              keepMounted: true, // Better open performance on mobile
+            }}
+          >
+            <Box sx={{ width: 280 }}>
+              <Box sx={{ 
+                p: 2, 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <Box>
+                  <Typography variant="h6" fontWeight="bold">Settings</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manage your system settings
+                  </Typography>
+                </Box>
+                <IconButton onClick={() => setMobileMenuOpen(false)}>
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+              {renderMenuItems()}
+            </Box>
+          </Drawer>
+        )}
+
+        {/* Main Content */}
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Mobile Header */}
+          {isMobile && (
+            <Paper 
+              elevation={1} 
+              sx={{ 
+                p: 2, 
+                borderRadius: 0,
+                borderBottom: 1,
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2
+              }}
+            >
+              <IconButton onClick={() => setMobileMenuOpen(true)}>
+                <MenuIcon />
+              </IconButton>
+              <Box>
+                <Typography variant="h6" fontWeight="bold">
+                  {activeMenuItem?.label || 'Settings'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage your system settings and configurations
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+
+          {/* Content Area */}
+          <Box sx={{ 
+            flexGrow: 1, 
+            p: { xs: 2, md: 4 },
+            overflow: 'auto'
+          }}>
+            {!isMobile && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>
+                  {activeMenuItem?.label}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage your system settings and configurations
+                </Typography>
+                <Divider sx={{ mt: 2 }} />
+              </Box>
+            )}
+            {ActiveComponent && <ActiveComponent />}
+          </Box>
+        </Box>
       </Box>
     </MainLayout>
   );

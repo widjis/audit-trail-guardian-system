@@ -510,16 +510,16 @@ router.put('/departments', async (req, res) => {
 });
 
 // Add this to your existing routes
-router.get('/whatsapp', (req, res) => {
+router.get('/whatsapp', async (req, res) => {
   try {
-    // Read the settings file
-    const settingsPath = path.join(DATA_DIR, 'settings.json');
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    // Get WhatsApp settings from database
+    const whatsappSettings = await getSystemConfigService().getWhatsAppConfig();
     
-    // Return WhatsApp settings or default values
-    const whatsappSettings = settings.whatsappSettings || {
-      apiUrl: '',
-      defaultMessage: `Welcome aboard to PT. Merdeka Tsingshan Indonesia. 
+    if (!whatsappSettings) {
+      // Return default values if no settings found
+      const defaultSettings = {
+        apiUrl: '',
+        defaultMessage: `Welcome aboard to PT. Merdeka Tsingshan Indonesia. 
 By this message, we inform you regarding your account information for the email address: {{email}}
 Name: {{name}}
 Title: {{title}}
@@ -528,8 +528,23 @@ Email: {{email}}
 Password: {{password}}
 
 Please don't hesitate to contact IT for any question.`,
-      defaultRecipient: 'userNumber'
-    };
+        defaultRecipient: 'userNumber',
+        newHireNotificationEnabled: false,
+        newHireNotificationTemplate: `🎉 New Hire Alert!
+
+A new employee is joining us:
+
+Name: {{name}}
+Title: {{title}}
+Department: {{department}}
+Start Date: {{startDate}}
+Email: {{email}}
+
+License request has been successfully sent to the IT team.`,
+        newHireNotificationRecipients: []
+      };
+      return res.json(defaultSettings);
+    }
     
     res.json(whatsappSettings);
   } catch (error) {
@@ -538,25 +553,45 @@ Please don't hesitate to contact IT for any question.`,
   }
 });
 
-router.put('/whatsapp', (req, res) => {
+router.put('/whatsapp', async (req, res) => {
   try {
-    const { apiUrl, defaultMessage, defaultRecipient } = req.body;
+    const { 
+      apiUrl, 
+      defaultMessage, 
+      defaultRecipient,
+      newHireNotificationEnabled,
+      newHireNotificationTemplate,
+      newHireNotificationRecipients
+    } = req.body;
     
-    // Read current settings
-    const settingsPath = path.join(DATA_DIR, 'settings.json');
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const systemConfigService = getSystemConfigService();
     
-    // Update WhatsApp settings
-    settings.whatsappSettings = {
+    // Update each WhatsApp configuration item
+    const configUpdates = [
+      { key: 'whatsapp.api_url', value: apiUrl || '' },
+      { key: 'whatsapp.default_message', value: defaultMessage || '' },
+      { key: 'whatsapp.default_recipient', value: defaultRecipient || 'userNumber' },
+      { key: 'whatsapp.new_hire_notification_enabled', value: newHireNotificationEnabled || false },
+      { key: 'whatsapp.new_hire_notification_template', value: newHireNotificationTemplate || '' },
+      { key: 'whatsapp.new_hire_notification_recipients', value: JSON.stringify(newHireNotificationRecipients || []) }
+    ];
+    
+    // Update all configurations
+    for (const update of configUpdates) {
+      await systemConfigService.updateConfig(update.key, update.value, 'settings_api');
+    }
+    
+    // Return the updated settings
+    const updatedSettings = {
       apiUrl,
       defaultMessage,
-      defaultRecipient: defaultRecipient || 'userNumber'
+      defaultRecipient: defaultRecipient || 'userNumber',
+      newHireNotificationEnabled: newHireNotificationEnabled || false,
+      newHireNotificationTemplate,
+      newHireNotificationRecipients: newHireNotificationRecipients || []
     };
     
-    // Write updated settings back to file
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
-    
-    res.json(settings.whatsappSettings);
+    res.json(updatedSettings);
   } catch (error) {
     console.error('Error updating WhatsApp settings:', error);
     res.status(500).json({ error: 'Failed to update WhatsApp settings' });
@@ -925,9 +960,18 @@ router.post('/microsoft-graph/test-connection', async (req, res) => {
 router.post('/microsoft-graph/send-license-request', async (req, res) => {
   try {
     const { recipients, ccRecipients, bccRecipients, hires, includeAttachments } = req.body;
-    const settings = await getSettings();
-    const graphSettings = settings.microsoftGraphSettings;
-    const adSettings = settings.activeDirectorySettings;
+    
+    // Get Microsoft Graph settings from database instead of JSON file
+    const configService = getSystemConfigService();
+    const graphSettings = configService ? await configService.getMicrosoftGraphConfig() : null;
+    const adSettings = configService ? await configService.getActiveDirectoryConfig() : null;
+    
+    if (!graphSettings) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to load Microsoft Graph configuration from database'
+      });
+    }
     let signature = '';
 
     if (req.user?.username && adSettings?.enabled) {
@@ -1168,9 +1212,18 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
 router.post('/microsoft-graph/email-template-preview', async (req, res) => {
   try {
     const { hires } = req.body;
-    const settings = await getSettings();
-    const graphSettings = settings.microsoftGraphSettings;
-    const adSettings = settings.activeDirectorySettings;
+    
+    // Get Microsoft Graph settings from database instead of JSON file
+    const configService = getSystemConfigService();
+    const graphSettings = configService ? await configService.getMicrosoftGraphConfig() : null;
+    const adSettings = configService ? await configService.getActiveDirectoryConfig() : null;
+    
+    if (!graphSettings) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to load Microsoft Graph configuration from database'
+      });
+    }
 
     let signature = '';
     if (req.user?.username && adSettings?.enabled) {

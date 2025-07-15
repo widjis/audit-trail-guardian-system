@@ -69,8 +69,17 @@ Thank you for your assistance.
   const loadSettings = async () => {
     try {
       const data = await settingsService.getMicrosoftGraphSettings();
-      setSettings(data);
-      setTestEmailRecipient(data.defaultToRecipients?.[0] || '');
+      // Ensure scope is always an array
+      const normalizedData = {
+        ...data,
+        scope: Array.isArray(data.scope) ? data.scope : 
+               (typeof data.scope === 'string' ? [data.scope] : ["https://graph.microsoft.com/.default"]),
+        defaultToRecipients: Array.isArray(data.defaultToRecipients) ? data.defaultToRecipients : [],
+        defaultCcRecipients: Array.isArray(data.defaultCcRecipients) ? data.defaultCcRecipients : [],
+        defaultBccRecipients: Array.isArray(data.defaultBccRecipients) ? data.defaultBccRecipients : []
+      };
+      setSettings(normalizedData);
+      setTestEmailRecipient(normalizedData.defaultToRecipients?.[0] || '');
     } catch (error) {
       console.error('Error loading Microsoft Graph settings:', error);
       toast.error("Failed to load Microsoft Graph settings");
@@ -243,7 +252,7 @@ Thank you for your assistance.
             <Label htmlFor="scope">API Scopes (one per line)</Label>
             <Textarea
               id="scope"
-              value={settings.scope.join('\n')}
+              value={Array.isArray(settings.scope) ? settings.scope.join('\n') : (settings.scope || '')}
               onChange={(e) => {
                 const scopes = e.target.value.split('\n').filter(scope => scope.trim() !== '');
                 setSettings({ ...settings, scope: scopes });

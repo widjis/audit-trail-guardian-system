@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
+import { calculateProgressPercentage } from "@/utils/progressCalculator";
 
 interface StatsCardProps {
   title: string;
@@ -126,13 +127,13 @@ export function DashboardOverview() {
   const exportToCSV = () => {
     try {
       const csvData = hires.map(hire => ({
-        'Employee Name': hire.employeeName,
+        'Employee Name': hire.name,
         'Department': hire.department,
-        'Start Date': hire.startDate,
-        'Progress': `${Math.round(hire.progressPercentage || 0)}%`,
-        'Account Status': hire.accountStatus,
-        'Laptop Status': hire.laptopStatus,
-        'License Status': hire.licenseStatus
+        'Start Date': hire.start_date || hire.on_site_date,
+        'Progress': `${Math.round(calculateProgressPercentage(hire))}%`,
+        'Account Status': hire.account_creation_status,
+        'Laptop Status': hire.laptop_ready,
+        'License Status': hire.license_assigned ? 'Assigned' : 'Pending'
       }));
       
       const csvContent = [

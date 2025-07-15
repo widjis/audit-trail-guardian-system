@@ -309,14 +309,21 @@ class SystemConfigService {
         
         let value = config.value;
         
-        // Parse JSON arrays for recipient lists
-        if (['defaultToRecipients', 'defaultCcRecipients', 'defaultBccRecipients'].includes(configKey)) {
+        // Parse JSON arrays for recipient lists and scope
+        if (['defaultToRecipients', 'defaultCcRecipients', 'defaultBccRecipients', 'scope'].includes(configKey)) {
           try {
             if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
               value = JSON.parse(value);
+            } else if (typeof value === 'string' && configKey === 'scope') {
+              // Handle scope as comma-separated string or single value
+              value = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
             }
           } catch (e) {
             console.warn(`Failed to parse JSON for ${configKey}:`, e.message);
+            // Fallback for scope - ensure it's always an array
+            if (configKey === 'scope') {
+              value = typeof value === 'string' ? [value] : ['https://graph.microsoft.com/.default'];
+            }
           }
         }
         
@@ -333,6 +340,68 @@ class SystemConfigService {
       
     } catch (error) {
       console.error('Failed to get Microsoft Graph configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get WhatsApp configuration
+   * @returns {Promise<Object>} WhatsApp configuration object
+   */
+  async getWhatsAppConfig() {
+    try {
+      const configs = await this.getConfigsByCategory('whatsapp');
+      
+      if (!configs || configs.length === 0) {
+        console.warn('No WhatsApp configuration found in database');
+        return null;
+      }
+      
+      // Reconstruct WhatsApp config object
+      const whatsappConfig = {};
+      
+      for (const config of configs) {
+        const key = config.config_key.replace('whatsapp.', '');
+        
+        // Convert key names to match original format
+        let configKey = key;
+        if (key === 'api_url') configKey = 'apiUrl';
+        if (key === 'default_message') configKey = 'defaultMessage';
+        if (key === 'default_recipient') configKey = 'defaultRecipient';
+        if (key === 'new_hire_notification_enabled') configKey = 'newHireNotificationEnabled';
+        if (key === 'new_hire_notification_template') configKey = 'newHireNotificationTemplate';
+        if (key === 'new_hire_notification_recipients') configKey = 'newHireNotificationRecipients';
+        
+        let value = config.value;
+        
+        // Parse JSON arrays for recipient lists
+        if (['newHireNotificationRecipients'].includes(configKey)) {
+          try {
+            if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+              value = JSON.parse(value);
+            } else if (typeof value === 'string') {
+              // Handle as comma-separated string
+              value = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            }
+          } catch (e) {
+            console.warn(`Failed to parse JSON for ${configKey}:`, e.message);
+            value = [];
+          }
+        }
+        
+        // Convert boolean values
+        if (['newHireNotificationEnabled'].includes(configKey)) {
+          value = value === 'true' || value === true;
+        }
+        
+        whatsappConfig[configKey] = value;
+      }
+      
+      console.log('WhatsApp configuration retrieved from database');
+      return whatsappConfig;
+      
+    } catch (error) {
+      console.error('Failed to get WhatsApp configuration:', error);
       throw error;
     }
   }

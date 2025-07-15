@@ -16,6 +16,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useResponsive } from "@/hooks/use-responsive";
 
 interface ActiveDirectorySettings {
   server: string;
@@ -30,6 +32,8 @@ interface ActiveDirectorySettings {
 
 export function ActiveDirectorySettings() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const { screenSize } = useResponsive();
   const [isLoading, setIsLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -164,18 +168,18 @@ export function ActiveDirectorySettings() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5" />
+    <Card className="w-full">
+      <CardHeader className={`${isMobile ? 'px-4 py-4' : 'px-6 py-6'}`}>
+        <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+          <Server className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
           Active Directory Settings
         </CardTitle>
-        <CardDescription>
+        <CardDescription className={`${isMobile ? 'text-sm' : ''}`}>
           Configure connection to your Active Directory server for account creation
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
+        <CardContent className={`${isMobile ? 'px-4 space-y-4' : 'px-6 space-y-6'}`}>
           <Alert className="bg-amber-50 text-amber-800 border-amber-200">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Important</AlertTitle>
@@ -200,7 +204,7 @@ export function ActiveDirectorySettings() {
               <RadioGroup 
                 value={settings.protocol} 
                 onValueChange={(value) => handleChange("protocol", value as "ldap" | "ldaps")}
-                className="flex space-x-4"
+                className={`flex ${isMobile ? 'flex-col space-y-3' : 'flex-row space-x-4'}`}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="ldap" id="ldap" />
@@ -244,7 +248,7 @@ export function ActiveDirectorySettings() {
               <RadioGroup 
                 value={settings.authFormat} 
                 onValueChange={(value) => handleChange("authFormat", value as "upn" | "dn")}
-                className="flex space-x-4"
+                className={`flex ${isMobile ? 'flex-col space-y-3' : 'flex-row space-x-4'}`}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="upn" id="upn" />
@@ -266,7 +270,7 @@ export function ActiveDirectorySettings() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : screenSize === 'tablet' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
               <div className="space-y-2">
                 <Label htmlFor="server">AD Server Address</Label>
                 <Input 
@@ -302,19 +306,19 @@ export function ActiveDirectorySettings() {
             </div>
           </div>
 
-          <Collapsible open={isOpen} onOpenChange={setIsOpen} className="space-y-2 border p-2 rounded-md">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold flex items-center">
+          <Collapsible open={isOpen} onOpenChange={setIsOpen} className={`space-y-2 border rounded-md ${isMobile ? 'p-3' : 'p-4'}`}>
+            <div className={`flex items-center justify-between ${isMobile ? 'flex-col space-y-2' : ''}`}>
+              <h4 className={`${isMobile ? 'text-sm' : 'text-sm'} font-semibold flex items-center`}>
                 <ShieldCheck className="h-4 w-4 mr-2" />
                 Service Account Credentials
               </h4>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size={isMobile ? "sm" : "sm"} className={isMobile ? 'w-full' : ''}>
                   {isOpen ? "Hide" : "Show"} Credentials
                 </Button>
               </CollapsibleTrigger>
             </div>
-            <CollapsibleContent className="space-y-4">
+            <CollapsibleContent className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
               <div className="space-y-2">
                 <Label htmlFor="username">Service Account Username</Label>
                 <Input 
@@ -347,15 +351,15 @@ export function ActiveDirectorySettings() {
 
           {/* Display last test error if any */}
           {lastTestError && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Connection Error</AlertTitle>
+            <Alert variant="destructive" className={`mt-2 ${isMobile ? 'text-sm' : ''}`}>
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <AlertTitle className={isMobile ? 'text-sm' : ''}>Connection Error</AlertTitle>
               <AlertDescription className="whitespace-normal break-words">
                 {lastTestError}
                 {lastTestError.includes('Invalid Credentials') && (
-                  <div className="mt-2 text-xs">
+                  <div className={`mt-2 ${isMobile ? 'text-xs' : 'text-xs'}`}>
                     <p>Troubleshooting tips:</p>
-                    <ul className="list-disc pl-4 mt-1 space-y-1">
+                    <ul className={`list-disc mt-1 space-y-1 ${isMobile ? 'pl-3' : 'pl-4'}`}>
                       <li>Verify username and password are correct</li>
                       <li>Try switching between UPN and DN format</li>
                       <li>Check if the account is locked or expired</li>
@@ -371,7 +375,7 @@ export function ActiveDirectorySettings() {
           <Button 
             type="button" 
             variant="outline" 
-            className="mt-2"
+            className={`mt-2 ${isMobile ? 'w-full' : ''}`}
             onClick={testConnection}
             disabled={testingConnection || isLoading || !settings.enabled || !settings.server || !settings.username || (!settings.password && !actualPassword)}
           >
@@ -379,10 +383,11 @@ export function ActiveDirectorySettings() {
           </Button>
         </CardContent>
         
-        <CardFooter>
+        <CardFooter className={`${isMobile ? 'px-4 py-4' : 'px-6 py-6'}`}>
           <Button 
             type="submit" 
             disabled={isLoading || !settings.enabled}
+            className={`${isMobile ? 'w-full' : ''}`}
           >
             {isLoading ? "Saving..." : "Save Settings"}
           </Button>
