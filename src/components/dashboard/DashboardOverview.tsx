@@ -12,10 +12,11 @@ import {
 import { 
   BarChart as BarChartIcon, Users, CheckCircle, Clock, CalendarDays, 
   TrendingUp, TrendingDown, AlertTriangle, Target, Zap, Award,
-  Download, Filter, RefreshCw, Eye, EyeOff
+  Download, Filter, RefreshCw, Eye, EyeOff, ChevronDown
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import { useToast } from "@/hooks/use-toast";
 
 interface StatsCardProps {
   title: string;
@@ -62,25 +63,140 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0
 export function DashboardOverview() {
   const [hires, setHires] = useState<NewHire[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const { toast } = useToast();
+
+  const fetchData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
+    try {
+      const data = await hiresApi.getAll();
+      setHires(data);
+      setLastUpdated(new Date());
+      if (isRefresh) {
+        toast({
+          title: "Data Refreshed",
+          description: `Updated ${data.length} records successfully.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch dashboard data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      if (isRefresh) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const data = await hiresApi.getAll();
-        setHires(data);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setIsLoading(false);
+    fetchData();
+  }, []);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showExportMenu) {
+        setShowExportMenu(false);
       }
     };
 
-    fetchData();
-  }, []);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showExportMenu]);
+
+  // Export functionality
+  const exportToCSV = () => {
+    try {
+      const csvData = hires.map(hire => ({
+        'Employee Name': hire.employeeName,
+        'Department': hire.department,
+        'Start Date': hire.startDate,
+        'Progress': `${Math.round(hire.progressPercentage || 0)}%`,
+        'Account Status': hire.accountStatus,
+        'Laptop Status': hire.laptopStatus,
+        'License Status': hire.licenseStatus
+      }));
+      
+      const csvContent = [
+        Object.keys(csvData[0] || {}).join(','),
+        ...csvData.map(row => Object.values(row).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dashboard-data-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setShowExportMenu(false);
+      
+      toast({
+        title: "Export Successful",
+        description: `CSV file with ${hires.length} records downloaded.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export CSV file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToJSON = () => {
+    try {
+      const jsonData = {
+        exportDate: new Date().toISOString(),
+        totalHires: hires.length,
+        summary: {
+          completedSetups,
+          pendingSetups,
+          averageProgress,
+          departmentBreakdown: departmentData
+        },
+        data: hires
+      };
+      
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dashboard-data-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setShowExportMenu(false);
+      
+      toast({
+        title: "Export Successful",
+        description: `JSON file with ${hires.length} records and analytics downloaded.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export JSON file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Use centralized dashboard metrics hook
   const metrics = useDashboardMetrics(hires);
@@ -124,6 +240,9 @@ export function DashboardOverview() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard Overview</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Monitor onboarding progress and hiring analytics</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Last updated: {lastUpdated.toLocaleString()}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -154,19 +273,41 @@ export function DashboardOverview() {
           <Button 
             variant="outline" 
             className="h-8"
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
             aria-label="Refresh data"
           >
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline ml-1">Refresh</span>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline ml-1">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </Button>
-          <Button 
-            variant="outline" 
-            className="h-8"
-            aria-label="Export data"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline ml-1">Export</span>
-          </Button>
+          <div className="relative">
+            <Button 
+              variant="outline" 
+              className="h-8"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              aria-label="Export data"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Export</span>
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-10 bg-white border rounded-lg shadow-lg z-10 min-w-[120px]">
+                <button
+                  onClick={exportToCSV}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 rounded-t-lg"
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={exportToJSON}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 rounded-b-lg"
+                >
+                  Export JSON
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -205,44 +346,87 @@ export function DashboardOverview() {
         </Card>
       )}
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <StatsCard
-          title="Total New Hires"
-          value={totalHires}
-          description="Total records in audit log"
-          icon={<Users className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="Setup Complete"
-          value={completedSetups}
-          description="Accounts and equipment ready"
-          icon={<CheckCircle className="h-5 w-5" />}
-          trend={{ value: percentComplete, label: "completion rate" }}
-        />
-        <StatsCard
-          title="Waiting Completion"
-          value={pendingSetups}
-          description="Awaiting completion"
-          icon={<Clock className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="Average Progress"
-          value={`${averageProgress}%`}
-          description="Across all new hires"
-          icon={<BarChartIcon className="h-5 w-5" />}
-          trend={{ value: averageProgress >= 70 ? averageProgress - 60 : averageProgress - 70, label: "vs target" }}
-        />
-        <StatsCard
-          title="Upcoming Onboarding"
-          value={upcomingOnboarding}
-          description="Starting within 7 days"
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-      </div>
+      {/* Stats Cards - Different layouts for Overview vs Detailed */}
+      {viewMode === 'overview' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total New Hires"
+            value={totalHires}
+            description="Total records in audit log"
+            icon={<Users className="h-5 w-5" />}
+          />
+          <StatsCard
+            title="Setup Complete"
+            value={completedSetups}
+            description="Accounts and equipment ready"
+            icon={<CheckCircle className="h-5 w-5" />}
+            trend={{ value: percentComplete, label: "completion rate" }}
+          />
+          <StatsCard
+            title="Waiting Completion"
+            value={pendingSetups}
+            description="Awaiting completion"
+            icon={<Clock className="h-5 w-5" />}
+          />
+          <StatsCard
+            title="Average Progress"
+            value={`${averageProgress}%`}
+            description="Across all new hires"
+            icon={<BarChartIcon className="h-5 w-5" />}
+            trend={{ value: averageProgress >= 70 ? averageProgress - 60 : averageProgress - 70, label: "vs target" }}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <StatsCard
+            title="Total New Hires"
+            value={totalHires}
+            description="Total records in audit log"
+            icon={<Users className="h-5 w-5" />}
+          />
+          <StatsCard
+            title="Setup Complete"
+            value={completedSetups}
+            description="Accounts and equipment ready"
+            icon={<CheckCircle className="h-5 w-5" />}
+            trend={{ value: percentComplete, label: "completion rate" }}
+          />
+          <StatsCard
+            title="Waiting Completion"
+            value={pendingSetups}
+            description="Awaiting completion"
+            icon={<Clock className="h-5 w-5" />}
+          />
+          <StatsCard
+            title="Average Progress"
+            value={`${averageProgress}%`}
+            description="Across all new hires"
+            icon={<BarChartIcon className="h-5 w-5" />}
+            trend={{ value: averageProgress >= 70 ? averageProgress - 60 : averageProgress - 70, label: "vs target" }}
+          />
+          <StatsCard
+            title="Upcoming Onboarding"
+            value={upcomingOnboarding}
+            description="Starting within 7 days"
+            icon={<CalendarDays className="h-5 w-5" />}
+          />
+          <StatsCard
+            title="Accounts Created"
+            value={accountsCreated}
+            description="Active user accounts"
+            icon={<Users className="h-5 w-5" />}
+          />
+        </div>
+      )}
 
 
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Content Grid - Different layouts for Overview vs Detailed */}
+      <div className={`grid gap-6 ${
+        viewMode === 'overview' 
+          ? 'grid-cols-1 lg:grid-cols-3' 
+          : 'grid-cols-1 xl:grid-cols-4'
+      }`}>
 
         {/* Enhanced Onboarding Progress */}
         <Card className="lg:col-span-2">
@@ -463,140 +647,145 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
-      {/* Enhanced Department Analytics - Full Width */}
+      {/* Department Progress Bars - Standalone Section */}
       <Card className="w-full">
-
-          <CardHeader>
-            <CardTitle>Department Analytics</CardTitle>
-            <CardDescription>Hiring distribution and completion rates by department</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topDepartments.length > 0 ? (
-              <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 w-full">
-                {/* Left side: Donut Chart with Legend */}
-                <div className="lg:w-1/2 w-full">
-                  <div className="bg-gray-50 p-4 sm:p-6 lg:p-8 rounded-lg h-full">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-center">Department Distribution</h3>
-                    <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 lg:gap-8">
-                      {/* Donut Chart */}
-                      <div className="h-48 w-48 sm:h-64 sm:w-64 lg:h-80 lg:w-80 flex-shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={topDepartments.map((data, index) => ({
-                                name: data.name,
-                                value: data.count,
-                                completed: data.completed,
-                                pending: data.pending,
-                                color: CHART_COLORS[index % CHART_COLORS.length]
-                              }))}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={100}
-                              dataKey="value"
-                              label={false}
-                            >
-                              {topDepartments.map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number, name: string, props: { payload: { completed: number; pending: number } }) => [
-                              `${value} hires (${props.payload.completed} completed, ${props.payload.pending} pending)`, name
-                            ]} />
-                          </PieChart>
-                        </ResponsiveContainer>
+        <CardHeader>
+          <CardTitle>Department Progress</CardTitle>
+          <CardDescription>Completion rates and progress tracking by department</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {departmentData.length > 0 ? (
+            <div className="space-y-4 sm:space-y-6">
+              {departmentData.slice(0, 5).map((data, index) => {
+                const completionRate = data.count > 0 ? Math.round((data.completed / data.count) * 100) : 0;
+                return (
+                  <div key={data.name} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-4 h-4 rounded-full" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                        />
+                        <span className="font-medium text-sm">{data.name}</span>
                       </div>
-                      
-                      {/* Legend */}
-                      <div className="flex flex-col space-y-3 w-full">
-                        {topDepartments.slice(0, 5).map((data, index) => {
-                          const percentage = totalHires > 0 ? Math.round((data.count / totalHires) * 100) : 0;
-                          return (
-                            <div key={data.name} className="flex items-center gap-3">
-                              <div 
-                                className="w-4 h-4 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{data.name}</div>
-                                <div className="text-xs text-gray-600">{data.count} hires ({percentage}%)</div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="text-right">
+                        <div className="text-sm font-medium">{data.count} hires</div>
+                        <div className={`text-xs font-medium ${
+                          completionRate >= 90 ? 'text-green-600' :
+                          completionRate >= 70 ? 'text-blue-600' : 'text-orange-600'
+                        }`}>
+                          {completionRate}% complete
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="relative">
+                      <div className="w-full bg-gray-100 rounded-full h-8 sm:h-10 overflow-hidden">
+                        <div 
+                          className="h-full transition-all duration-300 ease-in-out rounded-full"
+                          style={{ 
+                            width: `${completionRate}%`,
+                            backgroundColor: CHART_COLORS[index % CHART_COLORS.length]
+                          }}
+                        />
+                      </div>
+                      {/* Centered text within progress bar */}
+                      <div className="absolute inset-0 flex items-center justify-center text-sm font-medium">
+                        {completionRate > 15 ? (
+                          <span className="text-white drop-shadow-md font-semibold">
+                            {data.completed} Done / {data.pending} Pending
+                          </span>
+                        ) : (
+                          <span className="text-gray-700 font-semibold">
+                            {data.completed} Done / {data.pending} Pending
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <BarChartIcon className="mx-auto h-8 w-8 mb-2 opacity-50" />
+              <p>No department data available</p>
+              <p className="text-sm mt-1">Import data to see statistics</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Department Analytics - Distribution Chart */}
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Department Analytics</CardTitle>
+          <CardDescription>Hiring distribution by department</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {topDepartments.length > 0 ? (
+            <div className="bg-gray-50 p-4 sm:p-6 lg:p-8 rounded-lg h-full">
+              <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-center">Department Distribution</h3>
+              <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 lg:gap-8">
+                {/* Donut Chart */}
+                <div className="h-48 w-48 sm:h-64 sm:w-64 lg:h-80 lg:w-80 flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={topDepartments.map((data, index) => ({
+                          name: data.name,
+                          value: data.count,
+                          completed: data.completed,
+                          pending: data.pending,
+                          color: CHART_COLORS[index % CHART_COLORS.length]
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={100}
+                        dataKey="value"
+                        label={false}
+                      >
+                        {topDepartments.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number, name: string, props: { payload: { completed: number; pending: number } }) => [
+                        `${value} hires (${props.payload.completed} completed, ${props.payload.pending} pending)`, name
+                      ]} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
                 
-                {/* Right side: Department Progress Bars */}
-                <div className="lg:w-1/2 w-full">
-                  <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-lg border h-full">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">Department Progress</h3>
-                    <div className="space-y-4 sm:space-y-6">
-                      {departmentData.slice(0, 5).map((data, index) => {
-                        const completionRate = data.count > 0 ? Math.round((data.completed / data.count) * 100) : 0;
-                        return (
-                          <div key={data.name} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div 
-                                  className="w-4 h-4 rounded-full" 
-                                  style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                                />
-                                <span className="font-medium text-sm">{data.name}</span>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-sm font-medium">{data.count} hires</div>
-                                <div className={`text-xs font-medium ${
-                                  completionRate >= 90 ? 'text-green-600' :
-                                  completionRate >= 70 ? 'text-blue-600' : 'text-orange-600'
-                                }`}>
-                                  {completionRate}% complete
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="relative">
-                              <div className="w-full bg-gray-100 rounded-full h-8 sm:h-10 overflow-hidden">
-                                <div 
-                                  className="h-full transition-all duration-300 ease-in-out rounded-full"
-                                  style={{ 
-                                    width: `${completionRate}%`,
-                                    backgroundColor: CHART_COLORS[index % CHART_COLORS.length]
-                                  }}
-                                />
-                              </div>
-                              {/* Centered text within progress bar */}
-                              <div className="absolute inset-0 flex items-center justify-center text-sm font-medium">
-                                {completionRate > 15 ? (
-                                  <span className="text-white drop-shadow-md font-semibold">
-                                    {data.completed} Done / {data.pending} Pending
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-700 font-semibold">
-                                    {data.completed} Done / {data.pending} Pending
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                {/* Legend */}
+                <div className="flex flex-col space-y-3 w-full">
+                  {topDepartments.slice(0, 5).map((data, index) => {
+                    const percentage = totalHires > 0 ? Math.round((data.count / totalHires) * 100) : 0;
+                    return (
+                      <div key={data.name} className="flex items-center gap-3">
+                        <div 
+                          className="w-4 h-4 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{data.name}</div>
+                          <div className="text-xs text-gray-600">{data.count} hires ({percentage}%)</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ) : (
-              <div className="py-8 text-center text-muted-foreground">
-                <BarChartIcon className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p>No department data available</p>
-                <p className="text-sm mt-1">Import data to see statistics</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <BarChartIcon className="mx-auto h-8 w-8 mb-2 opacity-50" />
+              <p>No department data available</p>
+              <p className="text-sm mt-1">Import data to see statistics</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       </div>
 
       {/* Enhanced Recent Hires Table */}
