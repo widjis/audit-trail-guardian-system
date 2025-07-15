@@ -1,11 +1,62 @@
 
 import { Client } from '@microsoft/microsoft-graph-client';
 import { ConfidentialClientApplication } from '@azure/msal-node';
+import SystemConfigService from './system-config-service.js';
+import { getDbPool } from '../utils/dbConnection.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize system config service with lazy loading
+let systemConfigService = null;
+
+const getSystemConfigService = () => {
+  if (!systemConfigService) {
+    const pool = getDbPool();
+    if (pool) {
+      systemConfigService = new SystemConfigService(pool);
+    }
+  }
+  return systemConfigService;
+};
+const settingsPath = path.join(process.cwd(), 'src', 'server', 'data', 'settings.json');
 
 class MicrosoftGraphService {
   constructor() {
     this.msalClient = null;
     this.graphClient = null;
+  }
+
+  // Get Microsoft Graph settings from database with fallback to JSON
+  async getSettings() {
+    try {
+      console.log('Attempting to load Microsoft Graph settings from database...');
+      const configService = getSystemConfigService();
+      const dbSettings = configService ? await configService.getMicrosoftGraphConfig() : null;
+      
+      if (dbSettings && Object.keys(dbSettings).length > 0) {
+        console.log('Successfully loaded Microsoft Graph settings from database');
+        return dbSettings;
+      }
+      
+      console.log('No Microsoft Graph settings found in database, falling back to JSON file...');
+    } catch (error) {
+      console.error('Error loading Microsoft Graph settings from database, falling back to JSON:', error);
+    }
+    
+    // Fallback to JSON file
+    try {
+      const settingsData = await fs.readFile(settingsPath, 'utf8');
+      const settings = JSON.parse(settingsData);
+      console.log('Successfully loaded Microsoft Graph settings from JSON file');
+      return settings.microsoftGraphSettings || {};
+    } catch (error) {
+      console.error('Error loading settings from JSON file:', error);
+      return {};
+    }
   }
 
   // Initialize MSAL client with settings
@@ -90,6 +141,12 @@ class MicrosoftGraphService {
   // Send email using Microsoft Graph API
   async sendEmail(settings, emailData) {
     try {
+      // If no settings provided, load from database/file
+      if (!settings || Object.keys(settings).length === 0) {
+        console.log('No settings provided, loading from database/file...');
+        settings = await this.getSettings();
+      }
+      
       console.log('Initializing Microsoft Graph client...');
       const graphClient = await this.initializeGraphClient(settings);
 
@@ -231,6 +288,12 @@ class MicrosoftGraphService {
   // Test connection to Microsoft Graph
   async testConnection(settings) {
     try {
+      // If no settings provided, load from database/file
+      if (!settings || Object.keys(settings).length === 0) {
+        console.log('No settings provided for test, loading from database/file...');
+        settings = await this.getSettings();
+      }
+      
       console.log('Testing Microsoft Graph connection...');
       const graphClient = await this.initializeGraphClient(settings);
       

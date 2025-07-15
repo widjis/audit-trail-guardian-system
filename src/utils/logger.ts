@@ -63,7 +63,7 @@ const getTimestamp = (): string => {
 };
 
 // Helper to sanitize sensitive data from logs
-const sanitizeForLog = (obj: any): any => {
+const sanitizeForLog = (obj: unknown): unknown => {
   if (!obj || typeof obj !== 'object') return obj;
   
   // Create a deep copy to avoid modifying the original
@@ -73,7 +73,7 @@ const sanitizeForLog = (obj: any): any => {
   const sensitiveFields = ['password', 'pwd', 'secret', 'token', 'key', 'unicodePwd'];
   
   // Recursively sanitize the object
-  const sanitizeObj = (obj: any): void => {
+  const sanitizeObj = (obj: Record<string, unknown>): void => {
     if (!obj || typeof obj !== 'object') return;
     
     Object.keys(obj).forEach(key => {
@@ -95,22 +95,22 @@ const sanitizeForLog = (obj: any): any => {
 export const logger = {
   // API related logs
   api: {
-    debug: (message: string, ...args: any[]) => {
+    debug: (message: string, ...args: unknown[]) => {
       if (config.enableApi && shouldLog('debug')) {
         console.debug(`[${getTimestamp()}] [API] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    info: (message: string, ...args: any[]) => {
+    info: (message: string, ...args: unknown[]) => {
       if (config.enableApi && shouldLog('info')) {
         console.info(`[${getTimestamp()}] [API] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    warn: (message: string, ...args: any[]) => {
+    warn: (message: string, ...args: unknown[]) => {
       if (config.enableApi && shouldLog('warn')) {
         console.warn(`[${getTimestamp()}] [API] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    error: (message: string, ...args: any[]) => {
+    error: (message: string, ...args: unknown[]) => {
       if (config.enableApi && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [API] [ERROR] ${message}`, ...args.map(sanitizeForLog));
       }
@@ -119,22 +119,22 @@ export const logger = {
 
   // UI component logs
   ui: {
-    debug: (component: string, message: string, ...args: any[]) => {
+    debug: (component: string, message: string, ...args: unknown[]) => {
       if (config.enableUi && shouldLog('debug')) {
         console.debug(`[${getTimestamp()}] [${component}] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    info: (component: string, message: string, ...args: any[]) => {
+    info: (component: string, message: string, ...args: unknown[]) => {
       if (config.enableUi && shouldLog('info')) {
         console.info(`[${getTimestamp()}] [${component}] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    warn: (component: string, message: string, ...args: any[]) => {
+    warn: (component: string, message: string, ...args: unknown[]) => {
       if (config.enableUi && shouldLog('warn')) {
         console.warn(`[${getTimestamp()}] [${component}] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    error: (component: string, message: string, ...args: any[]) => {
+    error: (component: string, message: string, ...args: unknown[]) => {
       if (config.enableUi && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [${component}] [ERROR] ${message}`, ...args.map(sanitizeForLog));
       }
@@ -143,27 +143,27 @@ export const logger = {
   
   // LDAP/Active Directory specific logs (client-side)
   ldap: {
-    debug: (message: string, ...args: any[]) => {
+    debug: (message: string, ...args: unknown[]) => {
       if (config.enableLdap && shouldLog('debug')) {
         console.debug(`[${getTimestamp()}] [LDAP] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    info: (message: string, ...args: any[]) => {
+    info: (message: string, ...args: unknown[]) => {
       if (config.enableLdap && shouldLog('info')) {
         console.info(`[${getTimestamp()}] [LDAP] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    warn: (message: string, ...args: any[]) => {
+    warn: (message: string, ...args: unknown[]) => {
       if (config.enableLdap && shouldLog('warn')) {
         console.warn(`[${getTimestamp()}] [LDAP] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    error: (message: string, ...args: any[]) => {
+    error: (message: string, ...args: unknown[]) => {
       if (config.enableLdap && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [LDAP] [ERROR] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    operation: (operation: string, details: any = null) => {
+    operation: (operation: string, details: unknown = null) => {
       if (config.enableLdap && shouldLog('debug')) {
         console.debug(`[${getTimestamp()}] [LDAP] [OPERATION] ${operation}`);
         if (details) {
@@ -172,7 +172,7 @@ export const logger = {
       }
     },
     // Add enhanced error reporting for LDAP operations
-    errorDetail: (err: any) => {
+    errorDetail: (err: Error | unknown) => {
       if (config.enableLdap && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [LDAP] [ERROR-DETAIL] ${err.name || 'Error'}: ${err.message}`);
         
@@ -232,28 +232,28 @@ export const logger = {
 
   // Database related logs
   db: {
-    debug: (message: string, ...args: any[]) => {
+    debug: (message: string, ...args: unknown[]) => {
       if (config.enableDb && shouldLog('debug')) {
         console.debug(`[${getTimestamp()}] [DATABASE] [DEBUG] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    info: (message: string, ...args: any[]) => {
+    info: (message: string, ...args: unknown[]) => {
       if (config.enableDb && shouldLog('info')) {
         console.info(`[${getTimestamp()}] [DATABASE] [INFO] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    warn: (message: string, ...args: any[]) => {
+    warn: (message: string, ...args: unknown[]) => {
       if (config.enableDb && shouldLog('warn')) {
         console.warn(`[${getTimestamp()}] [DATABASE] [WARN] ${message}`, ...args.map(sanitizeForLog));
       }
     },
-    error: (message: string, ...args: any[]) => {
+    error: (message: string, ...args: unknown[]) => {
       if (config.enableDb && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [DATABASE] [ERROR] ${message}`, ...args.map(sanitizeForLog));
       }
     },
     // Add SQL error details logging
-    sqlError: (err: any) => {
+    sqlError: (err: Error | unknown) => {
       if (config.enableDb && shouldLog('error')) {
         console.error(`[${getTimestamp()}] [DATABASE] [SQL-ERROR] ${err.message}`);
         if (err.code) {

@@ -59,7 +59,7 @@ Please don't hesitate to contact IT for any question.`,
   },
 
   // Send WhatsApp message - UPDATED to use our proxy endpoint
-  sendMessage: async (phoneNumber: string, message: string): Promise<any> => {
+  sendMessage: async (phoneNumber: string, message: string): Promise<unknown> => {
     logger.ui.info("WhatsApp Service", "Sending WhatsApp message to:", phoneNumber);
     
     try {

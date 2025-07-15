@@ -8,7 +8,7 @@ export const userPreferencesService = {
   /**
    * Get all preferences for the current user
    */
-  getPreferences: async (): Promise<Record<string, any>> => {
+  getPreferences: async (): Promise<Record<string, unknown>> => {
     const response = await apiClient.get('/user-preferences');
     return response.data.preferences;
   },
@@ -16,7 +16,7 @@ export const userPreferencesService = {
   /**
    * Save multiple preferences for the current user
    */
-  savePreferences: async (preferences: Record<string, any>): Promise<UserPreferencesResponse> => {
+  savePreferences: async (preferences: Record<string, unknown>): Promise<UserPreferencesResponse> => {
     const response = await apiClient.post('/user-preferences', { preferences });
     return response.data;
   },
@@ -42,7 +42,7 @@ export const userPreferencesService = {
  * React hook for managing user preferences
  */
 export const useUserPreferences = () => {
-  const getPreference = async (key: string, defaultValue: any = null) => {
+  const getPreference = async (key: string, defaultValue: unknown = null) => {
     try {
       // Check if user is authenticated
       const token = localStorage.getItem('token');
@@ -63,7 +63,7 @@ export const useUserPreferences = () => {
     }
   };
 
-  const savePreference = async (key: string, value: any) => {
+  const savePreference = async (key: string, value: unknown) => {
     try {
       // Check if user is authenticated
       const token = localStorage.getItem('token');
@@ -84,7 +84,7 @@ export const useUserPreferences = () => {
     }
   };
 
-  const saveMultiplePreferences = async (preferences: Record<string, any>) => {
+  const saveMultiplePreferences = async (preferences: Record<string, unknown>) => {
     try {
       await userPreferencesService.savePreferences(preferences);
     } catch (error) {

@@ -1,5 +1,7 @@
 
 import { NewHire } from "@/types/types";
+import { isLicenseAssigned, isAccountActive, isLaptopReady, hasM365License } from "@/utils/dataValidators";
+import { getDashboardConfig } from '@/config/dashboardConfig';
 
 // Distribution List Progress Logic
 function getDistributionListProgress(status: NewHire['distribution_list_sync_status']): number {
@@ -9,61 +11,71 @@ function getDistributionListProgress(status: NewHire['distribution_list_sync_sta
 }
 
 export function calculateProgressPercentage(hire: NewHire): number {
+  const config = getDashboardConfig();
+  const weights = config.progressWeights;
   let progress = 0;
 
-  // Account Creation Status = Active (20%)
-  if (hire.account_creation_status === "Active") {
-    progress += 20;
+  // Account Creation Status
+  if (isAccountActive(hire.account_creation_status)) {
+    progress += weights.accountCreation;
   }
 
-  // Laptop Status (25% total, divided by 4 stages)
+  // Laptop Status
   const laptopStatus = hire.laptop_ready?.toLowerCase();
   switch (laptopStatus) {
     case "pending":
       progress += 0;
       break;
     case "in progress":
-      progress += 6.25;
+      progress += weights.laptopStatus * 0.25;
       break;
     case "ready":
-      progress += 12.5;
+      progress += weights.laptopStatus * 0.5;
       break;
     case "done":
-      progress += 25;
+      progress += weights.laptopStatus;
       break;
     default:
       progress += 0;
   }
 
-  // License Assigned (15%)
-  if (hire.license_assigned) {
-    progress += 15;
+  // License Assigned
+  if (isLicenseAssigned(hire.license_assigned)) {
+    progress += weights.licenseAssignment;
   }
 
-  // SRF Status (15%)
+  // SRF Status
   if (hire.status_srf) {
-    progress += 15;
+    progress += weights.srfStatus;
   }
 
-  // Microsoft 365 License (10%)
-  if (hire.microsoft_365_license && hire.microsoft_365_license !== "None" && hire.microsoft_365_license !== "") {
-    progress += 15;
+  // Microsoft 365 License
+  if (hasM365License(hire.microsoft_365_license)) {
+    progress += weights.microsoft365License;
   }
 
-  // Distribution List Sync (10%)
-  progress += getDistributionListProgress(hire.distribution_list_sync_status);
+  // Distribution List Sync
+  progress += getDistributionListProgress(hire.distribution_list_sync_status) * (weights.distributionListSync / 10);
 
-  return Math.round(progress);
+  return Math.round(Math.min(progress, 100));
 }
 
 export function getProgressColor(percentage: number): string {
-  if (percentage < 50) return "bg-red-500";
-  if (percentage < 75) return "bg-yellow-500";
-  return "bg-green-500";
+  const config = getDashboardConfig();
+  const thresholds = config.thresholds.completionRate;
+  
+  if (percentage >= thresholds.excellent) return "bg-green-500";
+  if (percentage >= thresholds.good) return "bg-blue-500";
+  if (percentage >= thresholds.warning) return "bg-yellow-500";
+  return "bg-red-500";
 }
 
 export function getProgressTextColor(percentage: number): string {
-  if (percentage < 50) return "text-red-700";
-  if (percentage < 75) return "text-yellow-700";
-  return "text-green-700";
+  const config = getDashboardConfig();
+  const thresholds = config.thresholds.completionRate;
+  
+  if (percentage >= thresholds.excellent) return "text-green-700";
+  if (percentage >= thresholds.good) return "text-blue-700";
+  if (percentage >= thresholds.warning) return "text-yellow-700";
+  return "text-red-700";
 }

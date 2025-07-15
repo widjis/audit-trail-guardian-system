@@ -237,17 +237,17 @@ export function DatabaseConfigSettings() {
         variant: result.success ? "default" : "destructive",
       });
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Connection test error:", error);
       setMainTestResult({
         success: false,
         message: "Request failed",
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       
       toast({
         title: "Error",
-        description: error.message || "Test connection request failed",
+        description: (error instanceof Error ? error.message : "Test connection request failed"),
         variant: "destructive",
       });
     } finally {

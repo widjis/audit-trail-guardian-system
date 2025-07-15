@@ -26,7 +26,12 @@ if (!fs.existsSync(DATA_DIR)) {
 // Helper function to get Active Directory settings from system config
 const getActiveDirectorySettings = async (req) => {
   try {
-    const systemConfigService = new SystemConfigService(req.app.locals.dbPool);
+    const dbPool = req.app.locals.dbPool;
+    if (!dbPool) {
+      throw new Error('Database connection not available');
+    }
+    
+    const systemConfigService = new SystemConfigService(dbPool);
     const adConfig = await systemConfigService.getActiveDirectoryConfig();
     return adConfig;
   } catch (err) {

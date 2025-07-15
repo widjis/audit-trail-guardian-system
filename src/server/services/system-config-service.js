@@ -276,6 +276,68 @@ class SystemConfigService {
   }
 
   /**
+   * Get Microsoft Graph configuration
+   * @returns {Promise<Object>} Microsoft Graph configuration object
+   */
+  async getMicrosoftGraphConfig() {
+    try {
+      const configs = await this.getConfigsByCategory('microsoft_graph');
+      
+      if (!configs || configs.length === 0) {
+        console.warn('No Microsoft Graph configuration found in database');
+        return null;
+      }
+      
+      // Reconstruct Microsoft Graph config object
+      const graphConfig = {};
+      
+      for (const config of configs) {
+        const key = config.config_key.replace('msgraph.', '');
+        
+        // Convert key names to match original format
+        let configKey = key;
+        if (key === 'tenant_id') configKey = 'tenantId';
+        if (key === 'client_id') configKey = 'clientId';
+        if (key === 'client_secret') configKey = 'clientSecret';
+        if (key === 'default_to_recipients') configKey = 'defaultToRecipients';
+        if (key === 'default_cc_recipients') configKey = 'defaultCcRecipients';
+        if (key === 'default_bcc_recipients') configKey = 'defaultBccRecipients';
+        if (key === 'sender_email') configKey = 'senderEmail';
+        if (key === 'use_ad_sender') configKey = 'useAdSender';
+        if (key === 'email_subject_template') configKey = 'emailSubjectTemplate';
+        if (key === 'email_body_template') configKey = 'emailBodyTemplate';
+        
+        let value = config.value;
+        
+        // Parse JSON arrays for recipient lists
+        if (['defaultToRecipients', 'defaultCcRecipients', 'defaultBccRecipients'].includes(configKey)) {
+          try {
+            if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+              value = JSON.parse(value);
+            }
+          } catch (e) {
+            console.warn(`Failed to parse JSON for ${configKey}:`, e.message);
+          }
+        }
+        
+        // Convert boolean values
+        if (['enabled', 'useAdSender'].includes(configKey)) {
+          value = value === 'true' || value === true;
+        }
+        
+        graphConfig[configKey] = value;
+      }
+      
+      console.log('Microsoft Graph configuration retrieved from database');
+      return graphConfig;
+      
+    } catch (error) {
+      console.error('Failed to get Microsoft Graph configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update configuration value
    * @param {string} configKey - Configuration key
    * @param {any} value - New value

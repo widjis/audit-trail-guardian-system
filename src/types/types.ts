@@ -32,6 +32,7 @@ export interface NewHire {
   username: string;
   password: string;
   on_site_date: string;
+  start_date?: string;   // Added for dashboard metrics
   microsoft_365_license: string;
   laptop_ready: string;
   note: string;
@@ -83,7 +84,7 @@ export interface ImportResponse {
 export interface ImportError {
   row: number;
   error: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 // Add missing type for user account
@@ -110,10 +111,10 @@ export interface ExchangeOnlineSettings {
 export interface Settings {
   activeDirectorySettings?: {
     enabled: boolean;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   exchangeOnlineSettings?: ExchangeOnlineSettings;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Add type for SRF document upload response
@@ -137,11 +138,24 @@ export interface UserPreference {
 
 // Add type for user preferences request/response
 export interface UserPreferencesRequest {
-  preferences: Record<string, any>;
+  preferences: Record<string, unknown>;
 }
 
 export interface UserPreferencesResponse {
   success: boolean;
-  preferences: Record<string, any>;
+  preferences: Record<string, unknown>;
   message?: string;
+}
+
+// Add type for HRIS sync results
+export interface HrisSyncResult {
+  employeeID: string;
+  displayName: string;
+  diffs: {
+    department?: string;
+    title?: string;
+    manager?: string;
+    mobile?: string;
+    [key: string]: string | undefined;
+  };
 }

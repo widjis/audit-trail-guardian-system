@@ -3,8 +3,8 @@ import { toast } from "../components/ui/use-toast";
 import apiClient from './api-client';
 
 // Mock database
-let newHires: NewHire[] = [];
-let users = [
+const newHires: NewHire[] = [];
+const users = [
   {
     id: "1",
     username: "admin",
@@ -13,7 +13,7 @@ let users = [
     role: "admin",
   },
 ];
-let auditLogs: AuditLog[] = [];
+const auditLogs: AuditLog[] = [];
 
 // Helper to generate UUID
 const generateId = () => {

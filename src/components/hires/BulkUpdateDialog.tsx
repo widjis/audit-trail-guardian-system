@@ -21,7 +21,7 @@ import { MultiEmailInput } from "@/components/ui/multi-email-input";
 interface BulkUpdateDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (updateData: Record<string, any>) => Promise<void>;
+  onUpdate: (updateData: Record<string, unknown>) => Promise<void>;
   selectedCount: number;
   onExcelReport?: () => void;
   selectedHires?: NewHire[];

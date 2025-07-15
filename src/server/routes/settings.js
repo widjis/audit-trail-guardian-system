@@ -7,12 +7,26 @@ import sql from 'mssql';
 import { microsoftGraphService } from '../services/microsoftGraphService.js';
 import { getAdUserInfo } from './active-directory.js';
 import { resolveSenderEmail } from '../utils/emailUtils.js';
+import SystemConfigService from '../services/system-config-service.js';
+import { getDbPool } from '../utils/dbConnection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
+// Initialize system config service with lazy loading
+let systemConfigService = null;
+
+const getSystemConfigService = () => {
+  if (!systemConfigService) {
+    const pool = getDbPool();
+    if (pool) {
+      systemConfigService = new SystemConfigService(pool);
+    }
+  }
+  return systemConfigService;
+};
 
 // Data storage paths
 const DATA_DIR = path.join(__dirname, '../data');
@@ -733,21 +747,40 @@ router.put('/exchange-online', (req, res) => {
 // Microsoft Graph settings routes
 router.get('/microsoft-graph', async (req, res) => {
   try {
-    const settings = await getSettings();
-    const microsoftGraphSettings = settings.microsoftGraphSettings || {
-      enabled: false,
-      clientId: '',
-      clientSecret: '',
-      tenantId: '',
-      authority: '',
-      scope: ["https://graph.microsoft.com/.default"],
-      defaultToRecipients: [],
-      defaultCcRecipients: [],
-      defaultBccRecipients: [],
-      senderEmail: '',
-      useLoggedInUserAsSender: false,
-      emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
-      emailBodyTemplate: `Dear IT Team,
+    let microsoftGraphSettings;
+    
+    try {
+      // Try to get from database first
+      const configService = getSystemConfigService();
+      if (configService) {
+        microsoftGraphSettings = await configService.getMicrosoftGraphConfig();
+        console.log('Microsoft Graph settings retrieved from database');
+      } else {
+        console.warn('Database connection not available, using JSON fallback');
+        microsoftGraphSettings = null;
+      }
+    } catch (dbError) {
+      console.error('Error getting Microsoft Graph settings from database, falling back to JSON:', dbError);
+      microsoftGraphSettings = null;
+    }
+    
+    // Fallback to JSON file if database fails or no config found
+    if (!microsoftGraphSettings) {
+      const settings = await getSettings();
+      microsoftGraphSettings = settings.microsoftGraphSettings || {
+        enabled: false,
+        clientId: '',
+        clientSecret: '',
+        tenantId: '',
+        authority: '',
+        scope: ["https://graph.microsoft.com/.default"],
+        defaultToRecipients: [],
+        defaultCcRecipients: [],
+        defaultBccRecipients: [],
+        senderEmail: '',
+        useAdSender: false,
+        emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
+        emailBodyTemplate: `Dear IT Team,
 
 I hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:
 
@@ -759,7 +792,9 @@ Thank you for your assistance.
 
 Best regards,
 HR Department`
-    };
+      };
+      console.log('Microsoft Graph settings retrieved from JSON fallback');
+    }
     
     res.json(microsoftGraphSettings);
   } catch (error) {
@@ -770,14 +805,67 @@ HR Department`
 
 router.put('/microsoft-graph', async (req, res) => {
   try {
-    const settings = await getSettings();
-    settings.microsoftGraphSettings = req.body;
-    await saveSettings(settings);
+    const graphSettings = req.body;
+    const updatedBy = req.user?.username || 'system';
     
-    res.json(req.body);
+    // Map of frontend keys to database keys
+    const configMapping = {
+      enabled: 'msgraph.enabled',
+      tenantId: 'msgraph.tenant_id',
+      clientId: 'msgraph.client_id',
+      clientSecret: 'msgraph.client_secret',
+      scope: 'msgraph.scope',
+      defaultToRecipients: 'msgraph.default_to_recipients',
+      defaultCcRecipients: 'msgraph.default_cc_recipients',
+      defaultBccRecipients: 'msgraph.default_bcc_recipients',
+      senderEmail: 'msgraph.sender_email',
+      useAdSender: 'msgraph.use_ad_sender',
+      emailSubjectTemplate: 'msgraph.email_subject_template',
+      emailBodyTemplate: 'msgraph.email_body_template'
+    };
+    
+    try {
+      const configService = getSystemConfigService();
+      if (!configService) {
+        throw new Error('Database connection not available');
+      }
+      
+      // Update each configuration in the database
+      for (const [frontendKey, dbKey] of Object.entries(configMapping)) {
+        if (graphSettings.hasOwnProperty(frontendKey)) {
+          let value = graphSettings[frontendKey];
+          
+          // Convert arrays to JSON strings for storage
+          if (Array.isArray(value)) {
+            value = JSON.stringify(value);
+          }
+          
+          await configService.updateConfig(dbKey, value, updatedBy);
+        }
+      }
+      
+      console.log('Microsoft Graph settings updated in database');
+      res.json({ success: true, message: 'Microsoft Graph settings updated successfully', data: graphSettings });
+      
+    } catch (dbError) {
+      console.error('Database error updating Microsoft Graph settings, falling back to JSON:', dbError);
+      
+      // Fallback to JSON file
+      const settings = await getSettings();
+      settings.microsoftGraphSettings = graphSettings;
+      await saveSettings(settings);
+      
+      res.json({ 
+        success: true, 
+        message: 'Microsoft Graph settings updated in file storage due to database error',
+        warning: dbError.message,
+        data: graphSettings
+      });
+    }
+    
   } catch (error) {
     console.error('Error updating Microsoft Graph settings:', error);
-    res.status(500).json({ error: 'Failed to update Microsoft Graph settings' });
+    res.status(500).json({ error: 'Failed to update Microsoft Graph settings', message: error.message });
   }
 });
 
@@ -797,12 +885,30 @@ router.post('/microsoft-graph/test-connection', async (req, res) => {
     
     // Update last connection test timestamp if successful
     if (result.success) {
-      const currentSettings = getSettings();
-      currentSettings.microsoftGraphSettings = {
-        ...currentSettings.microsoftGraphSettings,
-        lastConnectionTest: new Date().toISOString()
-      };
-      saveSettings(currentSettings);
+      try {
+        // Try to update in database first
+        const configService = getSystemConfigService();
+        if (configService) {
+          await configService.updateConfig(
+            'msgraph.last_connection_test', 
+            new Date().toISOString(),
+            req.user?.username || 'system'
+          );
+          console.log('Updated last connection test timestamp in database');
+        } else {
+          throw new Error('Database connection not available');
+        }
+      } catch (dbError) {
+        console.error('Failed to update last connection test in database, falling back to JSON:', dbError);
+        
+        // Fallback to JSON file
+        const currentSettings = getSettings();
+        currentSettings.microsoftGraphSettings = {
+          ...currentSettings.microsoftGraphSettings,
+          lastConnectionTest: new Date().toISOString()
+        };
+        saveSettings(currentSettings);
+      }
     }
     
     res.json(result);

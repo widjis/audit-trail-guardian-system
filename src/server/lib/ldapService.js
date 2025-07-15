@@ -11,18 +11,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const { Change, Attribute } = ldap;
 
+// Initialize system config service with lazy loading
+let systemConfigService = null;
+
+const getSystemConfigService = () => {
+  if (!systemConfigService) {
+    const dbPool = getDbPool();
+    if (dbPool) {
+      systemConfigService = new SystemConfigService(dbPool);
+    }
+  }
+  return systemConfigService;
+};
+
 /**
  * Get Active Directory settings from database
  */
 async function getActiveDirectorySettings() {
   try {
-    const dbPool = getDbPool();
-    if (!dbPool) {
-      throw new Error('Database pool not available');
+    const configService = getSystemConfigService();
+    if (!configService) {
+      throw new Error('Database connection not available');
     }
     
-    const systemConfigService = new SystemConfigService(dbPool);
-    const adConfig = await systemConfigService.getActiveDirectoryConfig();
+    const adConfig = await configService.getActiveDirectoryConfig();
     
     if (!adConfig) {
       throw new Error('Active Directory configuration not found in database');

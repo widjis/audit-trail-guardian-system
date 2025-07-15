@@ -1,7 +1,43 @@
 
-# MTI Onboarding Workflow
+# Audit Trail Guardian System
 
-This is an application for managing new hire onboarding workflow.
+A comprehensive dashboard system for tracking and managing employee onboarding progress with real-time analytics and audit trail capabilities.
+
+## 🚀 Features
+
+- **Real-time Dashboard**: Interactive overview of onboarding progress
+- **Department Analytics**: Detailed insights by department with progress tracking
+- **Responsive Design**: Material UI components optimized for desktop and mobile
+- **Type Safety**: Full TypeScript implementation with strict type checking
+- **Testing Suite**: Comprehensive Jest testing with 51+ test cases
+- **Code Quality**: ESLint and Prettier configuration for consistent code standards
+- **Audit Trail**: Complete tracking of all system changes and user actions
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **React 18** - Modern React with hooks and concurrent features
+- **TypeScript** - Strict type safety and enhanced developer experience
+- **Material UI (MUI)** - Comprehensive component library with theming
+- **Recharts** - Responsive chart library for data visualization
+- **Vite** - Fast build tool and development server
+
+### Testing & Quality
+- **Jest** - Testing framework with TypeScript support
+- **ESLint** - Code linting with React, TypeScript, and accessibility rules
+- **Prettier** - Code formatting for consistent style
+- **ts-jest** - TypeScript preprocessor for Jest
+
+### Development Tools
+- **ES Modules** - Modern module system with tree-shaking
+- **Path Mapping** - Clean imports with `@/` aliases
+- **Hot Module Replacement** - Fast development with instant updates
+
+## 📋 Prerequisites
+
+- **Node.js** 18.0.0 or higher
+- **npm** 8.0.0 or higher
+- **TypeScript** 4.9.0 or higher
 
 ## Getting Started
 

@@ -315,7 +315,6 @@
     "defaultMessage": "*📢 Welcome to PT. Merdeka Tsingshan Indonesia!* 🎉\n\nBy this message, we inform you regarding your account information for the email address:\n\n*Your Account Information:*\n*Name:* {{name}}\n*Title:* {{title}}\n*Department:* {{department}}\n*Email:* {{email}}\n*Password:* `{{password}}`\n\n_Please contact ICT Support at mti.icthelpdesk@merdekabattery.com if you have any questions._",
     "defaultRecipient": "userNumber"
   },
-
   "hrisDbConfig": {
     "server": "10.1.1.75",
     "port": "1433",
@@ -348,7 +347,7 @@
     "senderEmail": "widji.santoso@merdekabattery.com",
     "useLoggedInUserAsSender": true,
     "emailSubjectTemplate": "REQUEST PROSES LICENSE FOR {{hireCount}} NEW HIRE MTI - {{hireDate}}",
-    "emailBodyTemplate": "Dear IT Team,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\n{{signature}}",
+    "emailBodyTemplate": "Dear ICT Team 123,\n\nI hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:\n\n{{hireDetails}}\n\nPlease process these license assignments at your earliest convenience. If you need any additional information or have questions regarding these requests, please don't hesitate to contact me.\n\nThank you for your assistance.\n\n{{signature}}",
     "lastConnectionTest": "2025-06-18T15:01:47.882Z"
   }
 }

@@ -27,7 +27,12 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
   const [result, setResult] = useState<{
     success?: boolean;
     message?: string;
-    details?: any;
+    details?: {
+      samAccountName?: string;
+      displayName?: string;
+      distinguishedName?: string;
+      groups?: string[];
+    };
     warning?: string;
     error?: string;
   } | null>(null);
@@ -42,7 +47,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
     // Get password from hire record or manual input
     const password = manualPassword || hire.password || '';
     
-    let department = hire.department || '';
+    const department = hire.department || '';
     let ou = department 
       ? `OU=${department},OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com`
       : 'OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com';
@@ -222,7 +227,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                     <div className="flex items-center gap-1">
                       <span>{result.details.samAccountName}</span>
                       <button 
-                        onClick={() => copyToClipboard(result.details.samAccountName)}
+                        onClick={() => copyToClipboard(result.details.samAccountName || '')}
                         className="text-gray-500 hover:text-gray-700"
                       >
                         <Copy className="h-4 w-4" />
@@ -245,7 +250,7 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
                   <div>
                     <span className="font-medium">Groups:</span>
                     <ul className="list-disc list-inside ml-2 mt-1">
-                      {result.details.groups.map((group: string) => (
+                      {result.details.groups?.map((group: string) => (
                         <li key={group}>{group}</li>
                       ))}
                     </ul>

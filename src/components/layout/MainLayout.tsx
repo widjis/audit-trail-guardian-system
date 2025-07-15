@@ -38,7 +38,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     const loadSidebarPreference = async () => {
       try {
         const savedCollapsed = await getPreference('sidebarCollapsed', false);
-        setSidebarCollapsed(savedCollapsed);
+        setSidebarCollapsed(Boolean(savedCollapsed));
       } catch (error) {
         console.error('Failed to load sidebar preference in MainLayout:', error);
       }

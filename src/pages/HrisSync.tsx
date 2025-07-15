@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
+import { HrisSyncResult } from "@/types/types";
 
 export default function HrisSync() {
   // — State hooks
@@ -22,7 +23,7 @@ export default function HrisSync() {
   const [testStatus, setTestStatus] = useState<"idle"|"loading"|"success"|"error">("idle");
   const [manualSyncStatus, setManualSyncStatus] = useState<"idle"|"loading"|"success"|"error">("idle");
   const [exportStatus, setExportStatus] = useState<"idle"|"loading"|"success"|"error">("idle");
-  const [syncResults, setSyncResults] = useState<any[]>([]);
+  const [syncResults, setSyncResults] = useState<HrisSyncResult[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
@@ -30,7 +31,7 @@ export default function HrisSync() {
   const { toast } = useToast();
 
   // — Only rows that have at least one diff
-  const changedResults = syncResults.filter(row =>
+  const changedResults = syncResults.filter((row: HrisSyncResult) =>
     Object.values(row.diffs).some(v => v !== undefined && v !== null)
   );
 

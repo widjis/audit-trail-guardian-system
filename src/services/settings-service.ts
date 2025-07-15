@@ -215,7 +215,7 @@ export const settingsService = {
   },
 
   // New Microsoft Graph email methods
-  sendLicenseRequestEmail: async (emailData: { recipient: string; hires: any[] }) => {
+  sendLicenseRequestEmail: async (emailData: { recipient: string; hires: unknown[] }) => {
     const response = await apiClient.post<{ success: boolean; message: string; sentCount?: number }>(
       `${SETTINGS_ENDPOINT}/microsoft-graph/send-license-request`,
       emailData
@@ -231,7 +231,7 @@ export const settingsService = {
     return response.data;
   },
 
-  getEmailTemplatePreview: async (hires: any[]) => {
+  getEmailTemplatePreview: async (hires: unknown[]) => {
     const response = await apiClient.post<{ subject: string; body: string }>(
       `${SETTINGS_ENDPOINT}/microsoft-graph/email-template-preview`,
       { hires }

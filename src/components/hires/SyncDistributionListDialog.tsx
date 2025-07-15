@@ -26,7 +26,12 @@ export function SyncDistributionListDialog({
   onSuccess 
 }: SyncDistributionListDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [syncResults, setSyncResults] = useState<any>(null);
+  const [syncResults, setSyncResults] = useState<{
+    success: boolean;
+    message: string;
+    results?: Array<{ distributionGroup: string }>;
+    errors?: Array<{ distributionGroup: string; error: string }>;
+  } | null>(null);
   const { toast } = useToast();
 
   // Get mailing lists from hire data
@@ -69,11 +74,11 @@ export function SyncDistributionListDialog({
           variant: "destructive"
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error syncing to distribution lists:', error);
       toast({
         title: "Sync Failed",
-        description: error.message || "An unexpected error occurred",
+        description: (error instanceof Error ? error.message : "An unexpected error occurred"),
         variant: "destructive"
       });
     } finally {
@@ -131,12 +136,12 @@ export function SyncDistributionListDialog({
                 <span className="text-sm">{list}</span>
                 {syncResults && (
                   <div className="flex items-center gap-2">
-                    {syncResults.results?.find((r: any) => r.distributionGroup === list) ? (
+                    {syncResults.results?.find((r) => r.distributionGroup === list) ? (
                       <Badge variant="outline" className="text-green-600">
                         <CheckCircle className="w-3 h-3 mr-1" />
                         Synced
                       </Badge>
-                    ) : syncResults.errors?.find((e: any) => e.distributionGroup === list) ? (
+                    ) : syncResults.errors?.find((e) => e.distributionGroup === list) ? (
                       <Badge variant="outline" className="text-red-600">
                         <XCircle className="w-3 h-3 mr-1" />
                         Failed
@@ -162,7 +167,7 @@ export function SyncDistributionListDialog({
             {syncResults.errors && syncResults.errors.length > 0 && (
               <div className="mt-2">
                 <p className="text-sm font-medium text-red-600 mb-1">Errors:</p>
-                {syncResults.errors.map((error: any, index: number) => (
+                {syncResults.errors.map((error, index: number) => (
                   <p key={index} className="text-xs text-red-600">
                     {error.distributionGroup}: {error.error}
                   </p>

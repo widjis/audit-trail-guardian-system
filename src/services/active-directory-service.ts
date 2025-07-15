@@ -1,6 +1,7 @@
 
 import apiClient from "./api-client";
 import logger from "@/utils/logger";
+import { AxiosError } from 'axios';
 
 interface ActiveDirectorySettings {
   server: string;
@@ -113,22 +114,24 @@ export const activeDirectoryService = {
       );
       logger.api.info('Active Directory connection test successful:', response.data.message);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.api.error('AD connection test failed:', error);
       
+      const axiosError = error as AxiosError<{ ldapError?: any; error?: string }>;
+      
       // Use the enhanced LDAP error logging if available
-      if (error.response?.data?.ldapError) {
-        logger.ldap.errorDetail(error.response.data.ldapError);
+      if (axiosError.response?.data?.ldapError) {
+        logger.ldap.errorDetail(axiosError.response.data.ldapError);
       }
       
       // Extract error message from response if available and provide more context
       let errorMessage = "Connection test failed";
       
       // Check if we have a more specific error from the server
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (axiosError.response?.data?.error) {
+        errorMessage = axiosError.response.data.error;
+      } else if (axiosError.message) {
+        errorMessage = axiosError.message;
       }
       
       // Throw a clear error to be handled by the UI
@@ -189,21 +192,23 @@ export const activeDirectoryService = {
       });
       
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.api.error('Failed to create AD user:', error);
       
+      const axiosError = error as AxiosError<{ sqlError?: any; ldapError?: any; error?: string }>;
+      
       // Log database errors with detail if available
-      if (error.response?.data?.sqlError) {
-        logger.db.sqlError(error.response.data.sqlError);
+      if (axiosError.response?.data?.sqlError) {
+        logger.db.sqlError(axiosError.response.data.sqlError);
       }
       
       // Log LDAP errors with detail if available
-      if (error.response?.data?.ldapError) {
-        logger.ldap.errorDetail(error.response.data.ldapError);
+      if (axiosError.response?.data?.ldapError) {
+        logger.ldap.errorDetail(axiosError.response.data.ldapError);
       }
       
-      if (error.response?.data?.error) {
-        throw new Error(error.response.data.error);
+      if (axiosError.response?.data?.error) {
+        throw new Error(axiosError.response.data.error);
       }
       throw error;
     }
@@ -251,22 +256,24 @@ export const activeDirectoryService = {
         success: true,
         users: users
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.api.error('Failed to search AD users:', error);
       
+      const axiosError = error as AxiosError<{ error?: string }>;
+      
       // Check for specific error messages from the server
-      if (error.response?.data?.error) {
+      if (axiosError.response?.data?.error) {
         return { 
           success: false, 
           users: [], 
-          error: error.response.data.error 
+          error: axiosError.response.data.error 
         };
       }
       
       return { 
         success: false, 
         users: [], 
-        error: error.message || 'Failed to search Active Directory users' 
+        error: axiosError.message || 'Failed to search Active Directory users' 
       };
     }
   }
