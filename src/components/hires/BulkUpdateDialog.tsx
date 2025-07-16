@@ -146,6 +146,17 @@ export function BulkUpdateDialog({
           title: "License Request Email Sent",
           description: `Successfully sent license request for ${selectedHires.length} users to ${totalRecipients} recipient(s)${includeAttachments ? ' with attachments' : ''}`,
         });
+        
+        // Send WhatsApp notifications for new hires after successful license email
+        try {
+          const { whatsappService } = await import('@/services/whatsapp-service');
+          // Send consolidated notification for all hires
+          await whatsappService.sendNewHireNotification(selectedHires);
+        } catch (whatsappError) {
+          console.error('Error sending WhatsApp notifications:', whatsappError);
+          // Don't show error to user as the main operation (license email) was successful
+        }
+        
         onClose();
       } else {
         toast({

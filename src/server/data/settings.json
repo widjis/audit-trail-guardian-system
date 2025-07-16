@@ -313,9 +313,16 @@
   "whatsappSettings": {
     "apiUrl": "http://10.60.10.46:8192",
     "defaultMessage": "*📢 Welcome to PT. Merdeka Tsingshan Indonesia!* 🎉\n\nBy this message, we inform you regarding your account information for the email address:\n\n*Your Account Information:*\n*Name:* {{name}}\n*Title:* {{title}}\n*Department:* {{department}}\n*Email:* {{email}}\n*Password:* `{{password}}`\n\n_Please contact ICT Support at mti.icthelpdesk@merdekabattery.com if you have any questions._",
-    "defaultRecipient": "userNumber"
-  },
-  "hrisDbConfig": {
+    "defaultRecipient": "userNumber",
+    "newHireNotificationEnabled": false,
+    "newHireNotificationTemplate": "🎉 New Hire Alert!\n\nA new employee is joining us:\n\nName: {{name}}\nTitle: {{title}}\nDepartment: {{department}}\nStart Date: {{startDate}}\nEmail: {{email}}\n\nLicense request has been successfully sent to the IT team.",
+    "newHireNotificationRecipients": [],
+    "groupNotificationEnabled": false,
+    "groupId": "",
+    "groupName": "",
+    "groupMentions": []
+   },
+   "hrisDbConfig": {
     "server": "10.1.1.75",
     "port": "1433",
     "database": "ORANGE-PROD",

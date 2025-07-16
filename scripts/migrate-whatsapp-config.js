@@ -12,13 +12,13 @@ dotenv.config();
 
 // Database configuration
 const dbConfig = {
-  server: process.env.DB_SERVER || 'localhost',
+  server: process.env.DB_HOST || process.env.DB_SERVER || 'localhost',
   port: parseInt(process.env.DB_PORT) || 1433,
   database: process.env.DB_NAME || 'audit_trail_guardian',
   user: process.env.DB_USER || 'sa',
   password: process.env.DB_PASSWORD || 'YourPassword123!',
   options: {
-    encrypt: true,
+    encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: true,
     connectTimeout: 30000,
     requestTimeout: 30000
@@ -280,6 +280,34 @@ License request has been successfully sent to the IT team.`,
       name: 'New Hire Notification Recipients',
       description: 'List of phone numbers to receive new hire notifications',
       value: Array.isArray(whatsappConfig.newHireNotificationRecipients) ? JSON.stringify(whatsappConfig.newHireNotificationRecipients) : '[]',
+      sensitive: false
+    },
+    {
+      key: 'whatsapp.group_notification_enabled',
+      name: 'Group Notification Enabled',
+      description: 'Enable or disable WhatsApp group notifications for new hires',
+      value: whatsappConfig.groupNotificationEnabled || false,
+      sensitive: false
+    },
+    {
+      key: 'whatsapp.group_id',
+      name: 'WhatsApp Group ID',
+      description: 'The ID of the WhatsApp group for notifications',
+      value: whatsappConfig.groupId || '',
+      sensitive: false
+    },
+    {
+      key: 'whatsapp.group_name',
+      name: 'WhatsApp Group Name',
+      description: 'The name of the WhatsApp group for notifications',
+      value: whatsappConfig.groupName || '',
+      sensitive: false
+    },
+    {
+      key: 'whatsapp.group_mentions',
+      name: 'WhatsApp Group Mentions',
+      description: 'List of phone numbers to mention in group notifications',
+      value: Array.isArray(whatsappConfig.groupMentions) ? JSON.stringify(whatsappConfig.groupMentions) : '[]',
       sensitive: false
     }
   ];

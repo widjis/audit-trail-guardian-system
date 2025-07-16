@@ -561,7 +561,11 @@ router.put('/whatsapp', async (req, res) => {
       defaultRecipient,
       newHireNotificationEnabled,
       newHireNotificationTemplate,
-      newHireNotificationRecipients
+      newHireNotificationRecipients,
+      groupNotificationEnabled,
+      groupId,
+      groupName,
+      groupMentions
     } = req.body;
     
     const systemConfigService = getSystemConfigService();
@@ -573,7 +577,11 @@ router.put('/whatsapp', async (req, res) => {
       { key: 'whatsapp.default_recipient', value: defaultRecipient || 'userNumber' },
       { key: 'whatsapp.new_hire_notification_enabled', value: newHireNotificationEnabled || false },
       { key: 'whatsapp.new_hire_notification_template', value: newHireNotificationTemplate || '' },
-      { key: 'whatsapp.new_hire_notification_recipients', value: JSON.stringify(newHireNotificationRecipients || []) }
+      { key: 'whatsapp.new_hire_notification_recipients', value: JSON.stringify(newHireNotificationRecipients || []) },
+      { key: 'whatsapp.group_notification_enabled', value: groupNotificationEnabled || false },
+      { key: 'whatsapp.group_id', value: groupId || '' },
+      { key: 'whatsapp.group_name', value: groupName || '' },
+      { key: 'whatsapp.group_mentions', value: JSON.stringify(groupMentions || []) }
     ];
     
     // Update all configurations
@@ -588,7 +596,11 @@ router.put('/whatsapp', async (req, res) => {
       defaultRecipient: defaultRecipient || 'userNumber',
       newHireNotificationEnabled: newHireNotificationEnabled || false,
       newHireNotificationTemplate,
-      newHireNotificationRecipients: newHireNotificationRecipients || []
+      newHireNotificationRecipients: newHireNotificationRecipients || [],
+      groupNotificationEnabled: groupNotificationEnabled || false,
+      groupId: groupId || '',
+      groupName: groupName || '',
+      groupMentions: groupMentions || []
     };
     
     res.json(updatedSettings);

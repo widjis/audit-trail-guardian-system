@@ -371,11 +371,15 @@ class SystemConfigService {
         if (key === 'new_hire_notification_enabled') configKey = 'newHireNotificationEnabled';
         if (key === 'new_hire_notification_template') configKey = 'newHireNotificationTemplate';
         if (key === 'new_hire_notification_recipients') configKey = 'newHireNotificationRecipients';
+        if (key === 'group_notification_enabled') configKey = 'groupNotificationEnabled';
+        if (key === 'group_id') configKey = 'groupId';
+        if (key === 'group_name') configKey = 'groupName';
+        if (key === 'group_mentions') configKey = 'groupMentions';
         
         let value = config.value;
         
         // Parse JSON arrays for recipient lists
-        if (['newHireNotificationRecipients'].includes(configKey)) {
+        if (['newHireNotificationRecipients', 'groupMentions'].includes(configKey)) {
           try {
             if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
               value = JSON.parse(value);
@@ -390,7 +394,7 @@ class SystemConfigService {
         }
         
         // Convert boolean values
-        if (['newHireNotificationEnabled'].includes(configKey)) {
+        if (['newHireNotificationEnabled', 'groupNotificationEnabled'].includes(configKey)) {
           value = value === 'true' || value === true;
         }
         
