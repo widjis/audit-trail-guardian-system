@@ -182,6 +182,79 @@ router.put('/schema', (req, res) => {
   }
 });
 
+//
+// ─── EXECUTE MIGRATION SCRIPT ─────────────────────────────────────────────────
+//
+router.post('/execute-migration', async (req, res) => {
+  try {
+    const { scriptName } = req.body;
+    
+    if (!scriptName) {
+      return res.status(400).json({ error: 'Script name is required' });
+    }
+    
+    const scriptPath = path.join(__dirname, '../data', scriptName);
+    
+    // Check if script file exists
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ error: `Migration script '${scriptName}' not found` });
+    }
+    
+    // Read script content
+    const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+    
+    // Execute script based on database type
+    if (process.env.DB_TYPE === 'mssql') {
+      const mssql = await import('mssql');
+      
+      // Build connection config
+      let server = process.env.DB_HOST;
+      if (process.env.DB_INSTANCE) {
+        server = `${process.env.DB_HOST}\\${process.env.DB_INSTANCE}`;
+      }
+      
+      const config = {
+        server,
+        port: parseInt(process.env.DB_PORT),
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        options: {
+          encrypt: process.env.DB_ENCRYPT === 'true',
+          trustServerCertificate: true,
+          connectTimeout: 30000
+        }
+      };
+      
+      const pool = new mssql.default.ConnectionPool(config);
+      await pool.connect();
+      
+      try {
+        const result = await pool.request().batch(scriptContent);
+        await pool.close();
+        
+        res.json({ 
+          success: true, 
+          message: `Migration script '${scriptName}' executed successfully`,
+          result: result.recordset || []
+        });
+      } catch (execError) {
+        await pool.close();
+        throw execError;
+      }
+    } else {
+      return res.status(400).json({ error: 'Migration execution only supported for MSSQL currently' });
+    }
+    
+  } catch (error) {
+    console.error('Error executing migration script:', error);
+    res.status(500).json({ 
+      error: 'Failed to execute migration script', 
+      details: error.message 
+    });
+  }
+});
+
 export default router;
 
 
