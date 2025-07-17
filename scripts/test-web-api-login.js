@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 
 async function testWebApiLogin() {
-  const baseUrl = 'http://localhost:3000'; // Backend server URL
+  const baseUrl = 'http://localhost:8080'; // Frontend server URL with proxy
   
   console.log('🌐 Testing Web API Login Endpoint...\n');
   

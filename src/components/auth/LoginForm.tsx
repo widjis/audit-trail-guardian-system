@@ -5,24 +5,27 @@ import { useAuth } from "@/services/auth-service";
 import { authService } from "@/services/auth-service";
 import { useNavigate } from "react-router-dom";
 import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardActions, 
   Typography, 
   TextField, 
   Button, 
   CircularProgress,
   FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
+  InputLabel,
+  Select,
+  MenuItem,
   Box,
+  InputAdornment,
   Divider,
-  Chip
+  Alert
 } from '@mui/material';
-import { Computer, Domain, VpnKey } from '@mui/icons-material';
+import { 
+  Computer, 
+  Domain, 
+  VpnKey, 
+  Email, 
+  Lock,
+  AutoAwesome
+} from '@mui/icons-material';
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -92,6 +95,8 @@ export function LoginForm() {
         return <Computer fontSize="small" />;
       case 'ldap':
         return <Domain fontSize="small" />;
+      case 'auto':
+        return <AutoAwesome fontSize="small" />;
       default:
         return <VpnKey fontSize="small" />;
     }
@@ -117,7 +122,7 @@ export function LoginForm() {
       case 'ldap':
         return 'Use your domain/LDAP credentials';
       case 'auto':
-        return 'System will determine the best method';
+        return 'System will determine the best method automatically';
       default:
         return '';
     }
@@ -125,124 +130,272 @@ export function LoginForm() {
 
   if (configLoading) {
     return (
-      <Card sx={{ width: '100%', maxWidth: 350 }}>
-        <CardContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-          <CircularProgress />
-        </CardContent>
-      </Card>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
   const showAuthMethodSelection = authConfig?.authMode === 'hybrid';
 
   return (
-    <Card sx={{ width: '100%', maxWidth: 400 }}>
-      <CardHeader
-        title={<Typography variant="h6">Login</Typography>}
-        subheader={<Typography variant="body2" color="text.secondary">Enter your credentials to access the audit system</Typography>}
+    <Box component="form" onSubmit={handleSubmit} sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: { xs: 2.5, sm: 3 },
+      width: '100%'
+    }}>
+      {/* Authentication Method Dropdown */}
+      {showAuthMethodSelection && (
+        <>
+          <FormControl fullWidth>
+            <InputLabel 
+              id="auth-method-label"
+              sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+            >
+              Login Method
+            </InputLabel>
+            <Select
+              labelId="auth-method-label"
+              value={authMethod}
+              label="Login Method"
+              onChange={(e) => setAuthMethod(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  {getAuthMethodIcon(authMethod)}
+                </InputAdornment>
+              }
+              sx={{
+                '& .MuiSelect-select': {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  fontSize: { xs: '0.875rem', sm: '1rem' },
+                  py: { xs: 1.5, sm: 2 }
+                },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
+              }}
+            >
+              <MenuItem value="auto">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                  <AutoAwesome fontSize="small" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      fontWeight="medium"
+                      sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                    >
+                      Auto-detect
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      display="block"
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                    >
+                      Recommended - System chooses best method
+                    </Typography>
+                  </Box>
+                </Box>
+              </MenuItem>
+              <MenuItem value="local">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                  <Computer fontSize="small" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      fontWeight="medium"
+                      sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                    >
+                      Local Account
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      display="block"
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                    >
+                      Use your local system credentials
+                    </Typography>
+                  </Box>
+                </Box>
+              </MenuItem>
+              <MenuItem value="ldap">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                  <Domain fontSize="small" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      fontWeight="medium"
+                      sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                    >
+                      Active Directory
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      display="block"
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                    >
+                      Use your domain/LDAP credentials
+                    </Typography>
+                  </Box>
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Method Description */}
+          <Alert 
+            severity="info" 
+            icon={getAuthMethodIcon(authMethod)}
+            sx={{ 
+              bgcolor: 'primary.50',
+              border: 1,
+              borderColor: 'primary.200',
+              borderRadius: 2,
+              '& .MuiAlert-icon': {
+                color: 'primary.main'
+              },
+              '& .MuiAlert-message': {
+                fontSize: { xs: '0.8rem', sm: '0.875rem' }
+              }
+            }}
+          >
+            <Typography 
+              variant="body2"
+              sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+            >
+              {getAuthMethodDescription(authMethod)}
+            </Typography>
+          </Alert>
+
+          <Divider />
+        </>
+      )}
+      
+      {/* Email/Username Field */}
+      <TextField
+        label={authMethod === 'ldap' ? "Domain Username" : "Email"}
+        variant="outlined"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        required
+        disabled={isLoading}
+        fullWidth
+        placeholder={
+          authMethod === 'ldap' 
+            ? "john.doe@merdekabattery.com" 
+            : "mti.user@merdekabattery.com"
+        }
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Email color="action" fontSize="small" />
+            </InputAdornment>
+          ),
+          sx: {
+            fontSize: { xs: '0.875rem', sm: '1rem' },
+            py: { xs: 0.5, sm: 0 }
+          }
+        }}
+        InputLabelProps={{
+          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } }
+        }}
+        helperText={
+          authMethod === 'ldap' 
+            ? "Use your domain username (e.g., john.doe or DOMAIN\\john.doe)"
+            : "Enter your email address"
+        }
+        FormHelperTextProps={{
+          sx: { fontSize: { xs: '0.7rem', sm: '0.75rem' } }
+        }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          }
+        }}
       />
-      <form onSubmit={handleSubmit}>
-        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {showAuthMethodSelection && (
-            <>
-              <FormControl component="fieldset">
-                <FormLabel component="legend" sx={{ mb: 1 }}>
-                  <Typography variant="subtitle2">Authentication Method</Typography>
-                </FormLabel>
-                <RadioGroup
-                  value={authMethod}
-                  onChange={(e) => setAuthMethod(e.target.value)}
-                  sx={{ gap: 1 }}
-                >
-                  <FormControlLabel
-                    value="auto"
-                    control={<Radio size="small" />}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getAuthMethodIcon('auto')}
-                        <Box>
-                          <Typography variant="body2" fontWeight="medium">
-                            {getAuthMethodLabel('auto')}
-                            <Chip label="Recommended" size="small" color="primary" sx={{ ml: 1, height: 16 }} />
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {getAuthMethodDescription('auto')}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    }
-                  />
-                  <FormControlLabel
-                    value="local"
-                    control={<Radio size="small" />}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getAuthMethodIcon('local')}
-                        <Box>
-                          <Typography variant="body2" fontWeight="medium">
-                            {getAuthMethodLabel('local')}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {getAuthMethodDescription('local')}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    }
-                  />
-                  <FormControlLabel
-                    value="ldap"
-                    control={<Radio size="small" />}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getAuthMethodIcon('ldap')}
-                        <Box>
-                          <Typography variant="body2" fontWeight="medium">
-                            {getAuthMethodLabel('ldap')}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {getAuthMethodDescription('ldap')}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    }
-                  />
-                </RadioGroup>
-              </FormControl>
-              <Divider />
-            </>
-          )}
-          
-          <TextField
-            label="Username"
-            variant="outlined"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            disabled={isLoading}
-            fullWidth
-            helperText={
-              authMethod === 'ldap' 
-                ? "Use your domain username (e.g., john.doe or DOMAIN\\john.doe)"
-                : "Enter your username"
-            }
-          />
-          <TextField
-            label="Password"
-            type="password"
-            variant="outlined"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-            fullWidth
-          />
-        </CardContent>
-        <CardActions>
-          <Button type="submit" variant="contained" disabled={isLoading} fullWidth>
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : "Login"}
-          </Button>
-        </CardActions>
-      </form>
-    </Card>
+
+      {/* Password Field */}
+      <TextField
+        label="Password"
+        type="password"
+        variant="outlined"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        disabled={isLoading}
+        fullWidth
+        placeholder="At least 8 characters"
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Lock color="action" fontSize="small" />
+            </InputAdornment>
+          ),
+          sx: {
+            fontSize: { xs: '0.875rem', sm: '1rem' },
+            py: { xs: 0.5, sm: 0 }
+          }
+        }}
+        InputLabelProps={{
+          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } }
+        }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          }
+        }}
+      />
+
+      {/* Forgot Password Link */}
+      <Box sx={{ textAlign: 'right' }}>
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: 'primary.main', 
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            '&:hover': { color: 'primary.dark' },
+            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+          }}
+        >
+          Forgot Password?
+        </Typography>
+      </Box>
+
+      {/* Login Button */}
+      <Button 
+        type="submit" 
+        variant="contained" 
+        disabled={isLoading} 
+        fullWidth
+        size="large"
+        sx={{
+          py: { xs: 1.25, sm: 1.5 },
+          borderRadius: 2,
+          textTransform: 'none',
+          fontSize: { xs: '0.9rem', sm: '1rem' },
+          fontWeight: 600,
+          boxShadow: 2,
+          '&:hover': {
+            boxShadow: 4,
+          },
+          minHeight: { xs: '48px', sm: '56px' }
+        }}
+      >
+        {isLoading ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} color="inherit" />
+            <span>Signing in...</span>
+          </Box>
+        ) : (
+          "Log In"
+        )}
+      </Button>
+    </Box>
   );
 }
