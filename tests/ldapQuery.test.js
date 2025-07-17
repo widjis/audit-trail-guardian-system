@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAdUserInfo } from '../src/server/routes/active-directory.ts';
+import { getAdUserInfo } from '../dist/server/routes/active-directory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

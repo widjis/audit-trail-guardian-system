@@ -3,7 +3,7 @@ import { Client } from 'ldapts';
 import logger from '../utils/logger.js';
 import { executeQuery } from '../utils/dbConnection.js';
 import SystemConfigService from '../services/system-config-service.js';
-import * as ldapService from '../lib/ldapService';
+import * as ldapService from '../lib/ldapService.js';
 
 const router = express.Router();
 

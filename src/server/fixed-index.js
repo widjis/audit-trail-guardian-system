@@ -38,7 +38,7 @@ import settingsRoutes from './routes/settings.js';
 import databaseRoutes from './routes/database.js';
 import usersRoutes from './routes/users.js';
 import whatsappRoutes from './routes/whatsapp.js';
-import activeDirectoryRoutes from './routes/active-directory.ts';
+import activeDirectoryRoutes from '../../dist/server/routes/active-directory.js';
 import hrisSyncRoutes from './routes/hris-sync.js';
 import distributionListsRoutes from './routes/distribution-lists.js';
 import userPreferencesRoutes from './routes/user-preferences.js';
