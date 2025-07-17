@@ -262,10 +262,10 @@ async function migrateMicrosoftGraphConfig(settings) {
       sensitive: false
     },
     {
-      key: 'msgraph.use_ad_sender',
-      name: 'Microsoft Graph Use AD Sender',
-      description: 'Use Active Directory user email as sender when available',
-      value: graphConfig.useAdSender,
+      key: 'msgraph.use_logged_in_user_as_sender',
+      name: 'Microsoft Graph Use Logged-in User as Sender',
+      description: 'Use logged-in user email as sender when available',
+      value: graphConfig.useLoggedInUserAsSender,
       sensitive: false
     },
     {
