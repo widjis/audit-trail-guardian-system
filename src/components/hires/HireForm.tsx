@@ -562,6 +562,15 @@ export function HireForm({ currentUser }: HireFormProps) {
     }));
   };
 
+  // Handle AD user selection for new hire
+  const handleADUserSelect = (value: string) => {
+    // Set the name field
+    handleSelectChange("name", value);
+    
+    // If we have AD user data, we could potentially auto-fill other fields
+    // This would require extending the ADUserLookup component to return the full user object
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -580,15 +589,23 @@ export function HireForm({ currentUser }: HireFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
-                  Full Name *
+                  Full Name * {isADEnabled && "(AD Lookup Enabled)"}
                 </label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={hire.name}
-                  onChange={handleInputChange}
-                  required
-                />
+                {isADEnabled ? (
+                  <ADUserLookup 
+                    value={hire.name} 
+                    onChange={handleADUserSelect}
+                    placeholder="Search for employee..."
+                  />
+                ) : (
+                  <Input
+                    id="name"
+                    name="name"
+                    value={hire.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">

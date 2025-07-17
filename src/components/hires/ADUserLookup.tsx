@@ -32,7 +32,7 @@ interface ADUser {
 
 interface ADUserLookupProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, userData?: ADUser) => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -110,7 +110,8 @@ export function ADUserLookup({ value, onChange, placeholder = "Search managers..
   
   const handleSelect = (selectedUser: ADUser) => {
     logger.ui.debug('ADUserLookup', 'Selected user:', selectedUser.displayName);
-    onChange(selectedUser.displayName);
+    // Pass both the display name and the full user data to the parent component
+    onChange(selectedUser.displayName, selectedUser);
     setOpen(false);
   };
   

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcrypt';
-import ldap from 'ldapjs';
+import { Client, Change, Attribute } from 'ldapts';
 import { executeQuery } from '../utils/dbConnection.js';
 import logger from '../utils/logger.js';
 import { search, escapeFilter } from '../lib/ldapService.js';
@@ -107,7 +107,7 @@ const formatBindCredential = (settings, username) => {
   return username;
 };
 
-// Real LDAP/AD Connection using ldapjs
+// Real LDAP/AD Connection using ldapts
 const createLdapClient = (settings) => {
   // Determine the protocol (ldap or ldaps)
   const protocol = settings.protocol || 'ldap';
@@ -124,25 +124,15 @@ const createLdapClient = (settings) => {
   };
   
   // Create client with appropriate URL and explicitly set protocol version to v3
-  const client = ldap.createClient({
+  const client = new Client({
     url: `${protocol}://${settings.server}:${port}`,
     timeout: 10000, // Increased timeout
     connectTimeout: 15000, // Increased connect timeout
     tlsOptions: tlsOptions,
-    reconnect: false, // Disable automatic reconnection to avoid hanging
     idleTimeout: 30000,
-    strictDN: false, // More forgiving DN parsing
-    queueSize: 1000,
-    queueTimeout: 5000,
-    queueDisable: false,
-    version: 3 // Explicitly set LDAP protocol version to 3
   });
   
-  // Add more detailed event handlers
-  client.on('connectError', (err) => {
-    logger.api.error('LDAP connection error event:', err.message);
-  });
-  
+  // Add event handler for error events
   client.on('error', (err) => {
     logger.api.error('LDAP client error event:', err.message);
     if (err.code) {
@@ -150,85 +140,84 @@ const createLdapClient = (settings) => {
     }
   });
   
-  client.on('connect', () => {
-    logger.api.debug('LDAP client connected successfully');
-  });
-  
-  client.on('timeout', () => {
-    logger.api.warn('LDAP client timeout occurred');
-  });
-  
-  client.on('close', () => {
-    logger.api.info('LDAP connection closed');
-  });
-  
   return client;
 };
 
-const testLdapConnection = (settings) => {
-  return new Promise((resolve, reject) => {
-    try {
-      if (!settings.server || !settings.username) {
-        return reject(new Error("Missing required connection parameters"));
-      }
-      
-      if (!settings.password) {
-        return reject(new Error("Password is required for authentication"));
-      }
-
-      // Log connection attempt without password
-      logger.api.debug(`Testing LDAP connection to server: ${settings.server} with protocol: ${settings.protocol}`);
-      logger.api.debug(`Using authentication format: ${settings.authFormat}`);
-      
-      const client = createLdapClient(settings);
-      
-      // Setup error handling
-      client.on('error', (err) => {
-        logger.api.error('LDAP connection error:', err);
-        client.destroy();
-        reject(new Error(`Connection failed: ${err.message}`));
-      });
-      
-      // Format the bind credentials based on settings
-      const bindDN = formatBindCredential(settings, settings.username);
-      logger.api.debug(`Attempting LDAP bind with DN: ${bindDN}`);
-      logger.api.debug(`Password length: ${settings.password ? settings.password.length : 0} characters`);
-      
-      // Bind with the provided credentials, following example code structure
-      client.bind(bindDN, settings.password, (err) => {
-        if (err) {
-          logger.api.error(`LDAP bind error (using ${settings.authFormat || 'default'} format):`, err);
-          logger.api.debug(`Error code: ${err.code}, Error name: ${err.name}`);
-          
-          let errorDetails = '';
-          if (err.code === 49) {
-            if (err.name === 'InvalidCredentialsError') {
-              errorDetails = ' - Username or password is incorrect';
-            } else if (err.name === 'AcceptSecurityContextError') {
-              errorDetails = ' - Account restrictions are preventing login';
-            }
-          } else if (err.code === 53) {
-            errorDetails = ' - The server cannot be located';
-          } else if (err.code === 52) {
-            errorDetails = ' - Invalid username format';
-          }
-          
-          client.destroy();
-          return reject(new Error(`Authentication failed${errorDetails}: ${err.message}`));
-        }
-        
-        const protocol = settings.protocol || 'ldap';
-        const authFormat = settings.authFormat || 'default';
-        const secureMsg = protocol === 'ldaps' ? ' using secure LDAPS connection' : '';
-        logger.api.info(`LDAP connection successful${secureMsg} with ${authFormat} auth format`);
-        client.unbind();
-        resolve({ success: true, message: `Connected successfully${secureMsg} using ${authFormat} auth format` });
-      });
-    } catch (err) {
-      logger.api.error('LDAP connection setup error:', err);
-      reject(new Error(`Connection setup failed: ${err.message}`));
+const testLdapConnection = async (settings) => {
+  try {
+    if (!settings.server || !settings.username) {
+      throw new Error("Missing required connection parameters");
     }
-  });
+    
+    if (!settings.password) {
+      throw new Error("Password is required for authentication");
+    }
+
+    // Log connection attempt without password
+    logger.api.debug(`Testing LDAP connection to server: ${settings.server} with protocol: ${settings.protocol}`);
+    logger.api.debug(`Using authentication format: ${settings.authFormat}`);
+    
+    const client = createLdapClient(settings);
+    
+    // Format the bind credentials based on settings
+    const bindDN = formatBindCredential(settings, settings.username);
+    logger.api.debug(`Attempting LDAP bind with DN: ${bindDN}`);
+    logger.api.debug(`Password length: ${settings.password ? settings.password.length : 0} characters`);
+    
+    // Bind with the provided credentials
+    try {
+      await client.bind(bindDN, settings.password);
+      logger.api.info('LDAP bind successful');
+      
+      // Perform a simple search to verify full connectivity
+      const baseDN = settings.baseDN;
+      const opts = {
+        filter: '(objectClass=*)',
+        scope: 'base',
+        sizeLimit: 1,
+        attributes: ['objectClass']
+      };
+      
+      logger.api.debug(`Performing test search with baseDN: ${baseDN}`);
+      
+      const { searchEntries } = await client.search(baseDN, opts);
+      logger.api.debug(`Search successful, found ${searchEntries.length} entries`);
+      
+      // Unbind and cleanup
+      await client.unbind();
+      
+      return {
+        success: true,
+        message: 'Connection successful',
+        details: {
+          server: settings.server,
+          baseDN: settings.baseDN,
+          protocol: settings.protocol || 'ldap'
+        }
+      };
+    } catch (bindErr) {
+      logger.api.error('LDAP bind failed:', bindErr);
+      
+      // Try to unbind even if bind failed
+      try {
+        await client.unbind();
+      } catch (unbindErr) {
+        // Ignore unbind errors after failed bind
+      }
+      
+      throw new Error(`Authentication failed: ${bindErr.message}`);
+    }
+  } catch (err) {
+    logger.api.error('LDAP connection test failed:', err);
+    return {
+      success: false,
+      message: err.message,
+      details: {
+        server: settings.server,
+        error: err.toString()
+      }
+    };
+  }
 };
 
 // FIXED: Improved password encoding for AD (requires specific unicode format)
@@ -265,73 +254,49 @@ function encodeUnicodePwd(password) {
 
 // Add function to check if user exists in AD
 const checkUserExists = async (settings, username) => {
-  return new Promise((resolve, reject) => {
+  try {
     const client = createLdapClient(settings);
     
-    try {
-      // Format the bind credentials based on settings
-      const bindDN = formatBindCredential(settings, settings.username);
-      logger.api.debug(`Checking if user ${username} exists in AD`);
+    // Format the bind credentials based on settings
+    const bindDN = formatBindCredential(settings, settings.username);
+    logger.api.debug(`Checking if user ${username} exists in AD`);
+    
+    // Bind with service account
+    await client.bind(bindDN, settings.password);
+    
+    // Search for the user by sAMAccountName
+    const searchFilter = `(&(objectClass=user)(sAMAccountName=${username}))`;
+    const searchOptions = {
+      filter: searchFilter,
+      scope: 'sub',
+      attributes: ['sAMAccountName', 'distinguishedName', 'displayName']
+    };
+    
+    logger.api.debug(`Searching for user with filter: ${searchFilter}`);
+    
+    const { searchEntries } = await client.search(settings.baseDN, searchOptions);
+    
+    // Unbind after search
+    await client.unbind();
+    
+    if (searchEntries && searchEntries.length > 0) {
+      const userDN = searchEntries[0].dn;
+      logger.api.info(`User ${username} already exists with DN: ${userDN}`);
       
-      // Bind with service account
-      client.bind(bindDN, settings.password, (err) => {
-        if (err) {
-          logger.api.error('Error binding to AD for user existence check:', err);
-          client.destroy();
-          return reject(err);
-        }
-        
-        // Search for the user by sAMAccountName
-        const searchFilter = `(&(objectClass=user)(sAMAccountName=${username}))`;
-        const searchOptions = {
-          filter: searchFilter,
-          scope: 'sub',
-          attributes: ['sAMAccountName', 'distinguishedName', 'displayName']
-        };
-        
-        logger.api.debug(`Searching for user with filter: ${searchFilter}`);
-        
-        client.search(settings.baseDN, searchOptions, (err, res) => {
-          if (err) {
-            logger.api.error('Error searching for existing user:', err);
-            client.destroy();
-            return reject(err);
-          }
-          
-          let userFound = false;
-          let userDN = null;
-          
-          res.on('searchEntry', (entry) => {
-            userFound = true;
-            // Use entry.dn.toString() directly instead of entry.object.distinguishedName
-            userDN = entry.dn.toString();
-            logger.api.info(`User ${username} already exists with DN: ${userDN}`);
-          });
-          
-          res.on('error', (err) => {
-            logger.api.error('Search error during user existence check:', err);
-            client.destroy();
-            reject(err);
-          });
-          
-          res.on('end', () => {
-            client.unbind();
-            resolve({ exists: userFound, dn: userDN });
-          });
-        });
-      });
-    } catch (err) {
-      logger.api.error('Error in user existence check process:', err);
-      
-      try {
-        client.unbind();
-      } catch (unbindErr) {
-        logger.api.debug('Error unbinding client:', unbindErr);
-      }
-      
-      reject(err);
+      return {
+        exists: true,
+        dn: userDN,
+        displayName: searchEntries[0].displayName || username
+      };
     }
-  });
+    
+    logger.api.info(`User ${username} does not exist in AD`);
+    return { exists: false };
+    
+  } catch (err) {
+    logger.api.error('Error checking if user exists:', err);
+    throw err;
+  }
 };
 
 // Get AD settings
@@ -418,7 +383,7 @@ router.post('/test', async (req, res) => {
       }
     }
     
-    // Test connection using ldapjs
+    // Test connection using ldapts
     const result = await testLdapConnection(finalSettings);
     
     res.json(result);
@@ -466,7 +431,7 @@ router.post('/create-user/:id', async (req, res) => {
       });
     }
     
-    // Create user in AD using ldapjs (now handles existing users)
+    // Create user in AD using ldapts (now handles existing users)
     const result = await createLdapUser(adSettings, userData);
     
     // If successful (either created or updated existing), update the hire record
@@ -550,107 +515,62 @@ router.post('/create-user/:id', async (req, res) => {
 // Add this function around line 500, before the createLdapUser function
 // Function to check if OU exists and create it if needed
 const ensureOUExists = async (client, ouPath, settings) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Skip if it's the default Users container
-      if (ouPath.startsWith('CN=Users')) {
-        return resolve(true);
+  // Skip if it's the default Users container
+  if (ouPath.startsWith('CN=Users')) {
+    return true;
+  }
+  
+  logger.api.debug(`Checking if OU exists: ${ouPath}`);
+  
+  try {
+    // Search for the OU
+    const { searchEntries } = await client.search(ouPath, {
+      scope: 'base',
+      filter: '(objectClass=*)'
+    });
+    
+    // If we get here, the OU exists
+    logger.api.debug(`OU exists: ${ouPath}`);
+    return true;
+  } catch (err) {
+    // If error code is "No Such Object", we need to create the OU
+    if (err.code === 0x20 || err.message.includes('No Such Object')) {
+      logger.api.info(`OU does not exist: ${ouPath}, attempting to create it`);
+      
+      // Parse the OU path to get the components
+      const ouMatch = ouPath.match(/OU=([^,]+),(.*)/); 
+      if (!ouMatch) {
+        throw new Error(`Invalid OU path format: ${ouPath}`);
       }
       
-      logger.api.debug(`Checking if OU exists: ${ouPath}`);
+      const ouName = ouMatch[1];
+      const parentDN = ouMatch[2];
       
-      // Search for the OU
-      client.search(ouPath, {
-        scope: 'base',
-        filter: '(objectClass=*)'
-      }, (err, res) => {
-        if (err) {
-          // If error code is "No Such Object", we need to create the OU
-          if (err.code === 0x20 || err.message.includes('No Such Object')) {
-            logger.api.info(`OU does not exist: ${ouPath}, attempting to create it`);
-            
-            // Parse the OU path to get the components
-            const ouMatch = ouPath.match(/OU=([^,]+),(.*)/);
-            if (!ouMatch) {
-              return reject(new Error(`Invalid OU path format: ${ouPath}`));
-            }
-            
-            const ouName = ouMatch[1];
-            const parentDN = ouMatch[2];
-            
-            // First ensure parent OU exists (recursive call)
-            if (parentDN.startsWith('OU=')) {
-              ensureOUExists(client, parentDN, settings)
-                .then(() => {
-                  // Now create the current OU
-                  const entry = {
-                    objectClass: ['top', 'organizationalUnit'],
-                    ou: ouName
-                  };
-                  
-                  client.add(ouPath, entry, (addErr) => {
-                    if (addErr) {
-                      logger.api.error(`Error creating OU ${ouPath}: ${addErr}`);
-                      return reject(addErr);
-                    }
-                    
-                    logger.api.info(`Successfully created OU: ${ouPath}`);
-                    resolve(true);
-                  });
-                })
-                .catch(reject);
-            } else {
-              // Parent is not an OU (e.g., DC components), just create the current OU
-              const entry = {
-                objectClass: ['top', 'organizationalUnit'],
-                ou: ouName
-              };
-              
-              client.add(ouPath, entry, (addErr) => {
-                if (addErr) {
-                  logger.api.error(`Error creating OU ${ouPath}: ${addErr}`);
-                  return reject(addErr);
-                }
-                
-                logger.api.info(`Successfully created OU: ${ouPath}`);
-                resolve(true);
-              });
-            }
-          } else {
-            // Other search error
-            logger.api.error(`Error searching for OU ${ouPath}: ${err}`);
-            reject(err);
-          }
-        } else {
-          // OU exists
-          let found = false;
-          
-          res.on('searchEntry', () => {
-            found = true;
-            logger.api.debug(`OU exists: ${ouPath}`);
-          });
-          
-          res.on('error', (err) => {
-            logger.api.error(`Search error for OU ${ouPath}: ${err}`);
-            reject(err);
-          });
-          
-          res.on('end', () => {
-            if (found) {
-              resolve(true);
-            } else {
-              // No entries found, OU doesn't exist
-              logger.api.info(`OU not found in search results: ${ouPath}, attempting to create it`);
-              reject(new Error(`OU not found: ${ouPath}`));
-            }
-          });
-        }
-      });
-    } catch (err) {
-      logger.api.error(`Error in ensureOUExists: ${err}`);
-      reject(err);
+      // First ensure parent OU exists (recursive call)
+      if (parentDN.startsWith('OU=')) {
+        await ensureOUExists(client, parentDN, settings);
+      }
+      
+      // Now create the current OU
+      const entry = {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: ouName
+      };
+      
+      try {
+        await client.add(ouPath, entry);
+        logger.api.info(`Successfully created OU: ${ouPath}`);
+        return true;
+      } catch (addErr) {
+        logger.api.error(`Error creating OU ${ouPath}: ${addErr}`);
+        throw addErr;
+      }
+    } else {
+      // Other search error
+      logger.api.error(`Error searching for OU ${ouPath}: ${err}`);
+      throw err;
     }
-  });
+  }
 };
 
 // Helper function to get the default Users container DN dynamically
@@ -666,293 +586,250 @@ const getDefaultUsersDN = (baseDN) => {
 
 // Create user in AD - enhanced to handle existing users
 const createLdapUser = async (settings, userData) => {
-  return new Promise(async (resolve, reject) => {
-    const client = createLdapClient(settings);
+  const client = createLdapClient(settings);
+  
+  try {
+    // Verify we have a password
+    if (!userData.password) {
+      throw new Error("Missing password for user account");
+    }
     
-    try {
-      // Verify we have a password
-      if (!userData.password) {
-        throw new Error("Missing password for user account");
-      }
+    // Format the bind credentials based on settings
+    const bindDN = formatBindCredential(settings, settings.username);
+    logger.api.debug(`Binding to AD with DN: ${bindDN}`);
+    
+    // Bind with service account
+    await client.bind(bindDN, settings.password);
+    
+    logger.api.debug('Successfully bound to AD, checking if user exists');
+    
+    // Check if user already exists
+    const userCheck = await checkUserExists(settings, userData.username);
+    let userDN;
+    let userCreated = false;
+    
+    if (userCheck.exists) {
+      logger.api.info(`User ${userData.username} already exists, skipping creation`);
+      userDN = userCheck.dn;
+      userCreated = false;
+    } else {
+      logger.api.debug('User does not exist, creating new user');
       
-      // Format the bind credentials based on settings
-      const bindDN = formatBindCredential(settings, settings.username);
-      logger.api.debug(`Binding to AD with DN: ${bindDN}`);
-      
-      // Bind with service account
-      await new Promise((resolveBind, rejectBind) => {
-        client.bind(bindDN, settings.password, (err) => {
-          if (err) {
-            logger.api.error('Error binding to AD:', err);
-            return rejectBind(err);
-          }
-          resolveBind();
-        });
-      });
-      
-      logger.api.debug('Successfully bound to AD, checking if user exists');
-      
-      // Check if user already exists
-      const userCheck = await checkUserExists(settings, userData.username);
-      let userDN;
-      let userCreated = false;
-      
-      if (userCheck.exists) {
-        logger.api.info(`User ${userData.username} already exists, skipping creation`);
-        userDN = userCheck.dn;
-        userCreated = false;
-      } else {
-        logger.api.debug('User does not exist, creating new user');
-        
-        // Create user DN and ensure OU exists
-        userDN = `CN=${userData.displayName},${userData.ou}`;
-        logger.api.debug(`User DN will be: ${userDN}`);
+      // Create user DN and ensure OU exists
+      userDN = `CN=${userData.displayName},${userData.ou}`;
+      logger.api.debug(`User DN will be: ${userDN}`);
 
-        // Ensure the OU exists before creating user
-        try {
-          logger.api.debug(`Ensuring OU exists: ${userData.ou}`);
-          await ensureOUExists(client, userData.ou, settings);
-          logger.api.info(`OU verified or created: ${userData.ou}`);
-        } catch (ouErr) {
-          logger.api.error(`Failed to verify/create OU: ${ouErr}`);
-          // If OU creation fails, fall back to Users container using dynamic DN
-          const defaultUsersDN = getDefaultUsersDN(settings.baseDN);
-          userDN = `CN=${userData.displayName},${defaultUsersDN}`;
-          logger.api.warn(`Falling back to default Users container: ${userDN}`);
-        }
-
-        // Encode password for AD - with enhanced error handling
-        let unicodePwd;
-        try {
-          unicodePwd = encodeUnicodePwd(userData.password);
-          logger.api.debug(`Successfully encoded password for user ${userData.username}`);
-        } catch (pwdError) {
-          logger.api.error('Failed to encode password:', pwdError);
-          throw new Error(`Password encoding failed: ${pwdError.message}`);
-        }
-        
-        // Create user entry object with careful attribute typing
-        const entry = {
-          objectClass: ['top', 'person', 'organizationalPerson', 'user'],
-          cn: userData.displayName,
-          sn: userData.lastName || userData.displayName.split(' ').pop() || userData.displayName,
-          givenName: userData.firstName || userData.displayName.split(' ')[0] || userData.displayName,
-          displayName: userData.displayName,
-          sAMAccountName: userData.username,
-          userAccountControl: '512', // Enable account
-        };
-        
-        // Only add non-empty attributes to avoid syntax errors
-        if (userData.email && userData.email.includes('@')) {
-          entry.mail = userData.email;
-          entry.userPrincipalName = userData.email;
-        }
-        
-        if (userData.title) entry.title = userData.title;
-        if (userData.department) entry.department = userData.department;
-        if (userData.company) entry.company = userData.company;
-        if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
-        
-        // Add password as a separate property to ensure correct typing
-        entry.unicodePwd = unicodePwd;
-        
-        // Log the entry object for debugging (without the password)
-        const debugEntry = { ...entry };
-        delete debugEntry.unicodePwd;
-        logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
-        
-        // Create the user with enhanced error logging
-        await new Promise((resolveAdd, rejectAdd) => {
-          client.add(userDN, entry, (err) => {
-            if (err) {
-              logger.api.error(`Error creating user: ${err.message}`);
-              if (err.code) {
-                logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
-              }
-              // Enhanced logging for attribute syntax errors
-              if (err.name === 'InvalidAttributeSyntaxError') {
-                logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
-                logger.api.error('- unicodePwd (password encoding)');
-                logger.api.error('- userPrincipalName and mail (must be valid email formats)');
-                logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
-                
-                // Log each attribute separately to help identify the problematic one
-                logger.api.debug('Checking individual attributes for syntax issues:');
-                for (const [key, value] of Object.entries(debugEntry)) {
-                  logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
-                }
-              }
-              return rejectAdd(err);
-            }
-            logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
-            resolveAdd();
-          });
-        });
-        
-        userCreated = true;
-      }
-      
-      // Always attempt to add to security groups (regardless of whether user was created or already existed)
-      const groupResults = [];
-      
-      if (userData.acl) {
-        try {
-          await addUserToGroup(client, userDN, userData.acl, settings);
-          logger.api.debug(`Added user to ${userData.acl} group`);
-          groupResults.push(userData.acl);
-        } catch (groupErr) {
-          logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
-          // Continue even if group add fails
-        }
-      }
-      
-      // Always add to VPN-USERS group
+      // Ensure the OU exists before creating user
       try {
-        await addUserToGroup(client, userDN, 'VPN-USERS', settings);
-        logger.api.debug(`Added user to VPN-USERS group`);
-        groupResults.push('VPN-USERS');
-      } catch (vpnErr) {
-        logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
+        logger.api.debug(`Ensuring OU exists: ${userData.ou}`);
+        await ensureOUExists(client, userData.ou, settings);
+        logger.api.info(`OU verified or created: ${userData.ou}`);
+      } catch (ouErr) {
+        logger.api.error(`Failed to verify/create OU: ${ouErr}`);
+        // If OU creation fails, fall back to Users container using dynamic DN
+        const defaultUsersDN = getDefaultUsersDN(settings.baseDN);
+        userDN = `CN=${userData.displayName},${defaultUsersDN}`;
+        logger.api.warn(`Falling back to default Users container: ${userDN}`);
+      }
+
+      // Encode password for AD - with enhanced error handling
+      let unicodePwd;
+      try {
+        unicodePwd = encodeUnicodePwd(userData.password);
+        logger.api.debug(`Successfully encoded password for user ${userData.username}`);
+      } catch (pwdError) {
+        logger.api.error('Failed to encode password:', pwdError);
+        throw new Error(`Password encoding failed: ${pwdError.message}`);
+      }
+      
+      // Create user entry object with careful attribute typing
+      const entry = {
+        objectClass: ['top', 'person', 'organizationalPerson', 'user'],
+        cn: userData.displayName,
+        sn: userData.lastName || userData.displayName.split(' ').pop() || userData.displayName,
+        givenName: userData.firstName || userData.displayName.split(' ')[0] || userData.displayName,
+        displayName: userData.displayName,
+        sAMAccountName: userData.username,
+        userAccountControl: '512', // Enable account
+      };
+      
+      // Only add non-empty attributes to avoid syntax errors
+      if (userData.email && userData.email.includes('@')) {
+        entry.mail = userData.email;
+        entry.userPrincipalName = userData.email;
+      }
+      
+      if (userData.title) entry.title = userData.title;
+      if (userData.department) entry.department = userData.department;
+      if (userData.company) entry.company = userData.company;
+      if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
+      
+      // Add password as a separate property to ensure correct typing
+      entry.unicodePwd = unicodePwd;
+      
+      // Log the entry object for debugging (without the password)
+      const debugEntry = { ...entry };
+      delete debugEntry.unicodePwd;
+      logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
+      
+      // Create the user with enhanced error logging
+      try {
+        await client.add(userDN, entry);
+        logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
+        userCreated = true;
+      } catch (err) {
+        logger.api.error(`Error creating user: ${err.message}`);
+        if (err.code) {
+          logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
+        }
+        // Enhanced logging for attribute syntax errors
+        if (err.name === 'InvalidAttributeSyntaxError') {
+          logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
+          logger.api.error('- unicodePwd (password encoding)');
+          logger.api.error('- userPrincipalName and mail (must be valid email formats)');
+          logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
+          
+          // Log each attribute separately to help identify the problematic one
+          logger.api.debug('Checking individual attributes for syntax issues:');
+          for (const [key, value] of Object.entries(debugEntry)) {
+            logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+          }
+        }
+        throw err;
+      }
+    }
+    
+    // Always attempt to add to security groups (regardless of whether user was created or already existed)
+    const groupResults = [];
+    
+    if (userData.acl) {
+      try {
+        await addUserToGroup(client, userDN, userData.acl, settings);
+        logger.api.debug(`Added user to ${userData.acl} group`);
+        groupResults.push(userData.acl);
+      } catch (groupErr) {
+        logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
         // Continue even if group add fails
       }
-      
-      // Unbind when done
-      await new Promise((resolveUnbind) => {
-        client.unbind(() => {
-          logger.api.debug('Successfully unbound from AD server');
-          resolveUnbind();
-        });
-      });
-      
-      // Return success with information about what was done
-      const successMessage = userCreated 
-        ? "Active Directory account created successfully"
-        : "User already exists in Active Directory, groups updated successfully";
-        
-      resolve({
-        success: true,
-        message: successMessage,
-        userCreated: userCreated,
-        details: {
-          samAccountName: userData.username,
-          displayName: userData.displayName,
-          distinguishedName: userDN,
-          groups: groupResults,
-        }
-      });
-      
-    } catch (err) {
-      logger.api.error('Error in AD user creation process:', err);
-      
-      // Ensure client is unbound in case of error
-      try {
-        client.unbind();
-      } catch (unbindErr) {
-        logger.api.debug('Error unbinding client:', unbindErr);
-      }
-      
-      // Return failure with details
-      reject({
-        success: false,
-        error: `Failed to process AD user: ${err.message}`
-      });
     }
-  });
+    
+    // Always add to VPN-USERS group
+    try {
+      await addUserToGroup(client, userDN, 'VPN-USERS', settings);
+      logger.api.debug(`Added user to VPN-USERS group`);
+      groupResults.push('VPN-USERS');
+    } catch (vpnErr) {
+      logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
+      // Continue even if group add fails
+    }
+    
+    // Unbind when done
+    await client.unbind();
+    logger.api.debug('Successfully unbound from AD server');
+    
+    // Return success with information about what was done
+    const successMessage = userCreated 
+      ? "Active Directory account created successfully"
+      : "User already exists in Active Directory, groups updated successfully";
+      
+    return {
+      success: true,
+      message: successMessage,
+      userCreated: userCreated,
+      userDN: userDN,
+      groups: groupResults
+    };
+    
+  } catch (err) {
+    logger.api.error('Error in createLdapUser:', err);
+    
+    // Ensure we unbind even on error
+    try {
+      await client.unbind();
+    } catch (unbindErr) {
+      logger.api.debug('Error unbinding after failure:', unbindErr);
+    }
+    
+    throw err;
+  }
 };
 
-// FIXED: Helper function to add user to a group with fallback search strategy
-const addUserToGroup = (client, userDN, groupName, settings) => {
-  return new Promise((resolve, reject) => {
-    logger.api.debug(`Searching for group: ${groupName} with fallback strategy`);
+// Helper function to add user to a group with fallback search strategy
+const addUserToGroup = async (client, userDN, groupName, settings) => {
+  logger.api.debug(`Searching for group: ${groupName} with fallback strategy`);
+  
+  // Extract root DN from base DN (get just the DC components)
+  const extractRootDN = (baseDN) => {
+    const dcParts = baseDN.match(/DC=[^,]+/gi);
+    return dcParts ? dcParts.join(',') : baseDN;
+  };
+  
+  const rootDN = extractRootDN(settings.baseDN);
+  
+  // Define search locations in order of preference
+  const searchBases = [
+    settings.baseDN, // Current organizational unit
+    rootDN, // Domain root
+    `CN=Users,${rootDN}`, // Users container
+    `CN=Builtin,${rootDN}` // Built-in container
+  ];
+  
+  logger.api.debug(`Will search in the following locations: ${searchBases.join(' -> ')}`);
+  
+  // Try each search base until we find the group
+  for (let baseIndex = 0; baseIndex < searchBases.length; baseIndex++) {
+    const currentBase = searchBases[baseIndex];
+    logger.api.debug(`Searching for group ${groupName} in: ${currentBase}`);
     
-    // Extract root DN from base DN (get just the DC components)
-    const extractRootDN = (baseDN) => {
-      const dcParts = baseDN.match(/DC=[^,]+/gi);
-      return dcParts ? dcParts.join(',') : baseDN;
-    };
-    
-    const rootDN = extractRootDN(settings.baseDN);
-    
-    // Define search locations in order of preference
-    const searchBases = [
-      settings.baseDN, // Current organizational unit
-      rootDN, // Domain root
-      `CN=Users,${rootDN}`, // Users container
-      `CN=Builtin,${rootDN}` // Built-in container
-    ];
-    
-    logger.api.debug(`Will search in the following locations: ${searchBases.join(' -> ')}`);
-    
-    // Function to search in a specific base
-    const searchInBase = (searchBase, baseIndex = 0) => {
-      if (baseIndex >= searchBases.length) {
-        logger.api.warn(`Group ${groupName} not found in any search location`);
-        return reject(new Error(`Group ${groupName} not found in any location`));
-      }
-      
-      const currentBase = searchBases[baseIndex];
-      logger.api.debug(`Searching for group ${groupName} in: ${currentBase}`);
-      
-      client.search(currentBase, {
+    try {
+      const { searchEntries } = await client.search(currentBase, {
         filter: `(&(objectClass=group)(cn=${groupName}))`,
         scope: 'sub'
-      }, (err, res) => {
-        if (err) {
-          logger.api.warn(`Error searching for group ${groupName} in ${currentBase}:`, err);
-          // Try next search base
-          return searchInBase(searchBase, baseIndex + 1);
-        }
-        
-        let groupDN = null;
-        
-        res.on('searchEntry', (entry) => {
-          groupDN = entry.dn.toString();
-          logger.api.info(`Found group ${groupName} at: ${groupDN}`);
-        });
-        
-        res.on('error', (err) => {
-          logger.api.warn(`Search error for group ${groupName} in ${currentBase}:`, err);
-          // Try next search base
-          searchInBase(searchBase, baseIndex + 1);
-        });
-        
-        res.on('end', () => {
-          if (!groupDN) {
-            logger.api.debug(`Group ${groupName} not found in ${currentBase}, trying next location`);
-            // Try next search base
-            return searchInBase(searchBase, baseIndex + 1);
-          }
-          
-          // Group found, now add user to it
-          const change = new ldap.Change({
-            operation: 'add',
-            modification: {
-              type: 'member',
-              values: [userDN]
-            }
-          });
-          
-          logger.api.debug(`Adding user ${userDN} to group ${groupDN}`);
-          client.modify(groupDN, change, (err) => {
-            if (err) {
-              // If the error is that the user is already a member, that's ok
-              if (err.name === 'EntryAlreadyExistsError') {
-                logger.api.info(`User ${userDN} is already a member of ${groupName}`);
-                return resolve();
-              }
-              logger.api.error(`Error adding user to group ${groupName}:`, err);
-              return reject(err);
-            }
-            logger.api.info(`Successfully added user to group ${groupName} (found in ${currentBase})`);
-            resolve();
-          });
-        });
       });
-    };
-    
-    // Start the search process
-    searchInBase(searchBases);
-  });
+      
+      // Check if we found the group
+      if (searchEntries.length > 0) {
+        const groupDN = searchEntries[0].dn;
+        logger.api.info(`Found group ${groupName} at: ${groupDN}`);
+        
+        // Group found, now add user to it
+        const change = new Change({
+          operation: 'add',
+          modification: new Attribute({
+            type: 'member',
+            values: [userDN]
+          })
+        });
+        
+        logger.api.debug(`Adding user ${userDN} to group ${groupDN}`);
+        
+        try {
+          await client.modify(groupDN, change);
+          logger.api.info(`Successfully added user to group ${groupName} (found in ${currentBase})`);
+          return;
+        } catch (modifyErr) {
+          // If the error is that the user is already a member, that's ok
+          if (modifyErr.name === 'EntryAlreadyExistsError') {
+            logger.api.info(`User ${userDN} is already a member of ${groupName}`);
+            return;
+          }
+          logger.api.error(`Error adding user to group ${groupName}:`, modifyErr);
+          throw modifyErr;
+        }
+      }
+      
+      // Group not found in this base, continue to next one
+      logger.api.debug(`Group ${groupName} not found in ${currentBase}, trying next location`);
+      
+    } catch (searchErr) {
+      logger.api.warn(`Error searching for group ${groupName} in ${currentBase}:`, searchErr);
+      // Continue to next search base
+    }
+  }
+  
+  // If we get here, the group wasn't found in any location
+  logger.api.warn(`Group ${groupName} not found in any search location`);
+  throw new Error(`Group ${groupName} not found in any location`);
 };
 
 // Add a new endpoint to search for users in AD
@@ -995,147 +872,86 @@ router.get('/search-users', async (req, res) => {
 
 // Function to search for users in Active Directory
 const searchAdUsers = async (settings, query) => {
-  return new Promise((resolve, reject) => {
-    const client = createLdapClient(settings);
+  const client = createLdapClient(settings);
+  
+  try {
+    // Format the bind credentials based on settings
+    const bindDN = formatBindCredential(settings, settings.username);
+    logger.api.debug(`Binding to AD with DN: ${bindDN} for user search`);
+    logger.api.debug(`Using baseDN: ${settings.baseDN}`);
     
-    try {
-      // Format the bind credentials based on settings
-      const bindDN = formatBindCredential(settings, settings.username);
-      logger.api.debug(`Binding to AD with DN: ${bindDN} for user search`);
-      logger.api.debug(`Using baseDN: ${settings.baseDN}`);
+    // Bind with service account
+    await client.bind(bindDN, settings.password);
+    
+    logger.api.debug('Successfully bound to AD, searching users');
+    
+    // Escape special characters in the query to prevent LDAP injection
+    const safeQuery = escapeLdapFilterValue(query);
+    
+    // Create search filter - expanded to include more attributes and make case insensitive
+    // Using more relaxed filter with multiple search attributes
+    const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${safeQuery}*)(sAMAccountName=*${safeQuery}*)(mail=*${safeQuery}*)(givenName=*${safeQuery}*)(sn=*${safeQuery}*)))`;
+    
+    // Specify which attributes to return
+    const searchOptions = {
+      filter: searchFilter,
+      scope: 'sub',
+      sizeLimit: 100, // Limit results but more generous
+      attributes: ['displayName', 'sAMAccountName', 'mail', 'title', 'department', 'distinguishedName', 'givenName', 'sn']
+    };
+    
+    logger.api.debug(`Searching with filter: ${searchFilter}`);
+    logger.api.debug(`Search base: ${settings.baseDN}`);
+    
+    // Perform the search
+    const { searchEntries } = await client.search(settings.baseDN, searchOptions);
+    
+    // Process the search results
+    const users = searchEntries.map(entry => {
+      // Log the raw entry for debugging
+      logger.api.debug(`Raw search entry: ${JSON.stringify(entry)}`);
       
-      // Bind with service account
-      client.bind(bindDN, settings.password, (err) => {
-        if (err) {
-          logger.api.error('Error binding to AD for user search:', err);
-          client.destroy();
-          return reject(err);
-        }
-        
-        logger.api.debug('Successfully bound to AD, searching users');
-        
-        // Escape special characters in the query to prevent LDAP injection
-        const safeQuery = escapeLdapFilterValue(query);
-        
-        // Create search filter - expanded to include more attributes and make case insensitive
-        // Using more relaxed filter with multiple search attributes
-        const searchFilter = `(&(objectClass=user)(objectCategory=person)(|(displayName=*${safeQuery}*)(sAMAccountName=*${safeQuery}*)(mail=*${safeQuery}*)(givenName=*${safeQuery}*)(sn=*${safeQuery}*)))`;
-        
-        // Specify which attributes to return
-        const searchOptions = {
-          filter: searchFilter,
-          scope: 'sub',
-          sizeLimit: 100, // Limit results but more generous
-          attributes: ['displayName', 'sAMAccountName', 'mail', 'title', 'department', 'distinguishedName', 'givenName', 'sn']
-        };
-        
-        logger.api.debug(`Searching with filter: ${searchFilter}`);
-        logger.api.debug(`Search base: ${settings.baseDN}`);
-        
-        const users = [];
-        
-        // Perform the search with better error handling
-        client.search(settings.baseDN, searchOptions, (err, res) => {
-          if (err) {
-            logger.api.error('Error searching AD:', err);
-            client.destroy();
-            return reject(err);
-          }
-          
-          res.on('searchEntry', (entry) => {
-            // Only process complete entries with object property
-            if (entry && entry.object) {
-              // Log the raw entry for debugging
-              logger.api.debug(`Raw search entry: ${JSON.stringify(entry.object)}`);
-              
-              const user = {
-                displayName: entry.object.displayName || entry.object.cn || '',
-                username: entry.object.sAMAccountName || '',
-                email: entry.object.mail || '',
-                title: entry.object.title || '',
-                department: entry.object.department || '',
-                dn: entry.object.distinguishedName || ''
-              };
-              
-              logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
-              users.push(user);
-            } else {
-              // For incomplete entries, log details to help troubleshoot
-              logger.api.warn('Received incomplete search entry from AD:', entry);
-              
-              // Try to extract any useful information from the entry
-              if (entry && entry.attributes) {
-                try {
-                  const extractedUser = {
-                    displayName: '',
-                    username: '',
-                    email: '',
-                    title: '',
-                    department: '',
-                    dn: ''
-                  };
-                  
-                  // Try to extract attributes directly from attributes array
-                  entry.attributes.forEach(attr => {
-                    const name = attr.type;
-                    const value = attr.values && attr.values.length > 0 ? attr.values[0] : '';
-                    
-                    if (name === 'displayName' || name === 'cn') extractedUser.displayName = value;
-                    if (name === 'sAMAccountName') extractedUser.username = value;
-                    if (name === 'mail') extractedUser.email = value;
-                    if (name === 'title') extractedUser.title = value;
-                    if (name === 'department') extractedUser.department = value;
-                    if (name === 'distinguishedName') extractedUser.dn = value;
-                  });
-                  
-                  // Only add if we got at least some info
-                  if (extractedUser.displayName || extractedUser.username) {
-                    logger.api.debug(`Recovered partial user data: ${JSON.stringify(extractedUser)}`);
-                    users.push(extractedUser);
-                  }
-                } catch (extractErr) {
-                  logger.api.error('Failed to extract user from incomplete entry:', extractErr);
-                }
-              }
-            }
-          });
-          
-          res.on('error', (err) => {
-            logger.api.error('AD search error:', err);
-            // Don't reject here, as we might have already found some users
-            // Just log the error and continue
-          });
-          
-          res.on('end', (result) => {
-            logger.api.info(`AD user search complete, found ${users.length} users`);
-            
-            // If we got empty results but no error, log more debug info
-            if (users.length === 0) {
-              logger.api.debug('No users found. This could be due to:');
-              logger.api.debug('1. No matching users exist');
-              logger.api.debug('2. BaseDN is incorrect');
-              logger.api.debug('3. Search filter is too restrictive');
-              logger.api.debug('4. Service account lacks permissions');
-            }
-            
-            client.unbind();
-            resolve(users);
-          });
-        });
-      });
-    } catch (err) {
-      logger.api.error('Error in AD search process:', err);
+      const user = {
+        displayName: entry.displayName || entry.cn || '',
+        username: entry.sAMAccountName || '',
+        email: entry.mail || '',
+        title: entry.title || '',
+        department: entry.department || '',
+        dn: entry.distinguishedName || ''
+      };
       
-      // Ensure client is unbound in case of error
-      try {
-        client.unbind();
-      } catch (unbindErr) {
-        logger.api.debug('Error unbinding client:', unbindErr);
-      }
-      
-      reject(err);
+      logger.api.debug(`Found user: ${user.displayName} (${user.username})`);
+      return user;
+    });
+    
+    logger.api.info(`AD user search complete, found ${users.length} users`);
+    
+    // If we got empty results but no error, log more debug info
+    if (users.length === 0) {
+      logger.api.debug('No users found. This could be due to:');
+      logger.api.debug('1. No matching users exist');
+      logger.api.debug('2. BaseDN is incorrect');
+      logger.api.debug('3. Search filter is too restrictive');
+      logger.api.debug('4. Service account lacks permissions');
     }
-  });
+    
+    // Unbind when done
+    await client.unbind();
+    
+    return users;
+    
+  } catch (err) {
+    logger.api.error('Error in AD search process:', err);
+    
+    // Ensure client is unbound in case of error
+    try {
+      await client.unbind();
+    } catch (unbindErr) {
+      logger.api.debug('Error unbinding client:', unbindErr);
+    }
+    
+    throw err;
+  }
 };
 
 // Fetch basic user info by sAMAccountName

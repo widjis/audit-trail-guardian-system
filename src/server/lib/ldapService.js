@@ -1,6 +1,6 @@
 // src/server/services/ldapService.js
 
-import ldap from 'ldapjs';
+import { Client, Change, Attribute } from 'ldapts';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
@@ -9,7 +9,6 @@ import { getDbPool } from '../utils/dbConnection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const { Change, Attribute } = ldap;
 
 // Initialize system config service with lazy loading
 let systemConfigService = null;
@@ -67,18 +66,20 @@ export async function getClient() {
   const protocol = ad.protocol || 'ldap';
   const port = protocol === 'ldaps' ? 636 : 389;
   const url = `${protocol}://${ad.server}:${port}`;
-  const client = ldap.createClient({
+  
+  const client = new Client({
     url,
-    reconnect: false,
     tlsOptions: { rejectUnauthorized: false }
   });
 
-  await new Promise((resolve, reject) => {
+  try {
     const bindDN = formatBindCredential(ad, ad.username);
-    client.bind(bindDN, ad.password, err => err ? reject(err) : resolve());
-  });
-
-  return client;
+    await client.bind(bindDN, ad.password);
+    return client;
+  } catch (err) {
+    logger.api.error('LDAP bind error:', err);
+    throw err;
+  }
 }
 
 /**
@@ -92,58 +93,48 @@ export function escapeFilter(value) {
  * General LDAP search
  */
 export async function search(baseDN, filter, attributes) {
-    const client = await getClient();
-    const opts = {
-      filter,
-      scope: 'sub',
-      paged: { pageSize: 200, pagePause: false },   // auto-page through everything
-      attributes: attributes.length > 0 ? attributes : ['*','+']
-    };
-  
-    console.info(`LDAP search: baseDN="${baseDN}", filter="${filter}", attributes=${JSON.stringify(opts.attributes)}`);
-  
-    return new Promise((resolve, reject) => {
-      const results = [];
-  
-      // catch client-level errors
-      client.on('error', err => {
-        console.error('🔴 LDAP client error:', err);
-        client.unbind();
-        reject(err);
-      });
-  
-      client.search(baseDN, opts, (err, res) => {
-        if (err) {
-          client.unbind();
-          return reject(err);
+  const client = await getClient();
+  const opts = {
+    filter,
+    scope: 'sub',
+    sizeLimit: 200,
+    attributes: attributes.length > 0 ? attributes : ['*','+']
+  };
+
+  console.info(`LDAP search: baseDN="${baseDN}", filter="${filter}", attributes=${JSON.stringify(opts.attributes)}`);
+
+  try {
+    const { searchEntries } = await client.search(baseDN, opts);
+    
+    // Transform entries to maintain compatibility with the previous format
+    const results = searchEntries.map(entry => {
+      // Convert attributes to the format expected by the rest of the code
+      const transformedEntry = {};
+      
+      // Process each attribute in the entry
+      Object.entries(entry).forEach(([key, value]) => {
+        // Skip dn as it's handled specially
+        if (key !== 'dn') {
+          transformedEntry[key] = Array.isArray(value) && value.length === 1 ? value[0] : value;
         }
-  
-        res.on('searchEntry', entry => {
-          // build plain object from attributes
-          const obj = entry.attributes.reduce((acc, attr) => {
-            // use attr.values (array) instead of deprecated .vals
-            acc[attr.type] = attr.values.length > 1 ? attr.values : attr.values[0];
-            return acc;
-          }, {});
-          results.push(obj);
-        });
-  
-        res.on('error', err => {
-          console.error('🔴 LDAP search stream error:', err);
-          client.unbind();
-          reject(err);
-        });
-  
-        res.on('end', result => {
-          console.info(`LDAP search completed with status: ${result?.status}`);
-          client.unbind();
-          resolve(results);
-        });
       });
+      
+      return transformedEntry;
     });
+    
+    console.info(`LDAP search completed successfully with ${results.length} results`);
+    await client.unbind();
+    return results;
+  } catch (err) {
+    console.error('🔴 LDAP search error:', err);
+    try {
+      await client.unbind();
+    } catch (unbindErr) {
+      console.error('Error during unbind after search failure:', unbindErr);
+    }
+    throw err;
   }
-  
-  
+}
 
 /**
  * Lookup DN by employeeID
@@ -161,50 +152,46 @@ export async function getDnFromEmployeeId(employeeID) {
 export async function modify(dn, changes) {
   const client = await getClient();
 
-  return new Promise((resolve, reject) => {
-    // 1) catch any client-level errors so they don’t crash your process
-    client.on('error', err => {
-      console.error('🔴 LDAP client error during modify:', err);
-      // if it’s just a socket-reset after unbind, swallow it
-      if (err.code === 'ECONNRESET') {
-        return;
-      }
-      client.unbind();
-      reject(err);
-    });
-
-    // 2) build your Change objects as before
+  try {
+    // Build changes in the format expected by ldapts
     const ldapChanges = changes.flatMap(c =>
       Object.entries(c.modification).map(([attr, val]) => {
         const vals = Array.isArray(val) ? val : [val];
-        return new ldap.Change({
-          operation:    c.operation,
-          modification: new ldap.Attribute({ type: attr, vals })
+        return new Change({
+          operation: c.operation,
+          modification: new Attribute({
+            type: attr,
+            values: vals
+          })
         });
       })
     );
 
     console.log('> LDAP.modify()', dn, ldapChanges);
 
-    // 3) invoke modify
-    client.modify(dn, ldapChanges, err => {
-      // unbind only once modify finishes
-      client.unbind(unbindErr => {
-        if (err) {
-          console.error('🔴 LDAP.modify error:', err);
-          return reject(err);
-        }
-        if (unbindErr) {
-          console.error('🔴 LDAP.unbind error:', unbindErr);
-          // swallow ECONNRESET from unbind
-          if (unbindErr.code !== 'ECONNRESET') {
-            return reject(unbindErr);
-          }
-        }
-        resolve();
-      });
-    });
-  });
+    // Perform the modify operation
+    await client.modify(dn, ldapChanges);
+    
+    // Unbind after successful modification
+    await client.unbind();
+    return;
+  } catch (err) {
+    console.error('🔴 LDAP.modify error:', err);
+    
+    // Attempt to unbind even if the modify operation failed
+    try {
+      await client.unbind();
+    } catch (unbindErr) {
+      console.error('🔴 LDAP.unbind error:', unbindErr);
+      // Only throw the unbind error if it's not a connection reset
+      if (unbindErr.code !== 'ECONNRESET') {
+        throw unbindErr;
+      }
+    }
+    
+    // Throw the original error
+    throw err;
+  }
 }
 
 /**
@@ -212,10 +199,16 @@ export async function modify(dn, changes) {
  */
 export async function moveDN(dn, newSuperior) {
   const client = await getClient();
-  return new Promise((resolve, reject) => {
-    client.modifyDN(dn, { newSuperior }, err => {
-      client.unbind();
-      err ? reject(err) : resolve();
-    });
-  });
+  try {
+    await client.modifyDN(dn, { newSuperior });
+    await client.unbind();
+  } catch (err) {
+    console.error('🔴 LDAP.modifyDN error:', err);
+    try {
+      await client.unbind();
+    } catch (unbindErr) {
+      console.error('🔴 LDAP.unbind error:', unbindErr);
+    }
+    throw err;
+  }
 }
