@@ -12,6 +12,8 @@ import {
   modify as ldapModify,
   moveDN as ldapMoveDn
 } from '../lib/ldapService.js';
+import SystemConfigService from './system-config-service.js';
+import { getDbPool } from '../utils/dbConnection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -127,8 +129,11 @@ async function applyDiffs(adUser, diffs, adBaseDN) {
  * Fetch HRIS rows from SQL Server
  */
 export async function gatherEmployeeData() {
-  const { hrisDbConfig } = loadSettings();
-  if (!hrisDbConfig.enabled) throw new Error('HRIS sync disabled in settings.json');
+  const dbPool = getDbPool();
+  const systemConfig = new SystemConfigService(dbPool);
+  const hrisDbConfig = await systemConfig.getHrisConfig();
+  
+  if (!hrisDbConfig.enabled) throw new Error('HRIS sync disabled in configuration');
 
   const pool = await mssql.connect({
     server: hrisDbConfig.server,
@@ -180,7 +185,9 @@ export async function findUsersInAD(baseDN) {
  * Main sync function: dry-run or real apply
  */
 export async function syncToActiveDirectory(testOnly = true) {
-  const { activeDirectorySettings: ad } = loadSettings();
+  const dbPool = getDbPool();
+  const systemConfig = new SystemConfigService(dbPool);
+  const ad = await systemConfig.getActiveDirectoryConfig();
   const adBaseDN = ad.baseDN;
 
   const [dbUsers, adUsers] = await Promise.all([
@@ -267,7 +274,9 @@ export async function syncToActiveDirectory(testOnly = true) {
  * @param {string[]} employeeIDs - Array of employee IDs to sync
  */
 export async function syncSelectedUsersToAD(employeeIDs) {
-  const { activeDirectorySettings: ad } = loadSettings();
+  const dbPool = getDbPool();
+  const systemConfig = new SystemConfigService(dbPool);
+  const ad = await systemConfig.getActiveDirectoryConfig();
   const adBaseDN = ad.baseDN;
 
   // Fetch all DB rows and AD users
