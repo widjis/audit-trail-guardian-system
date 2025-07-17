@@ -8,8 +8,22 @@ BEGIN
       username VARCHAR(255) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL,
       role VARCHAR(50) NOT NULL DEFAULT 'user',
+      authentication_type VARCHAR(20) NOT NULL DEFAULT 'local',
+      approved BIT NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT GETDATE()
     );
+END
+
+-- Check if authentication_type column exists in users table
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'authentication_type')
+BEGIN
+    ALTER TABLE users ADD authentication_type VARCHAR(20) NOT NULL DEFAULT 'local';
+END
+
+-- Check if approved column exists in users table
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'approved')
+BEGIN
+    ALTER TABLE users ADD approved BIT NOT NULL DEFAULT 1;
 END
 
 -- Check if the departments table already exists
@@ -179,5 +193,26 @@ BEGIN
       created_at DATETIME DEFAULT GETDATE(),
       updated_at DATETIME DEFAULT GETDATE(),
       UNIQUE(name, type)
+    );
+END
+
+-- Check if the system_configurations table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='system_configurations' AND xtype='U')
+BEGIN
+    -- Create the system_configurations table
+    CREATE TABLE system_configurations (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      config_key NVARCHAR(255) NOT NULL UNIQUE,
+      config_name NVARCHAR(255) NOT NULL,
+      config_description NVARCHAR(MAX),
+      config_category NVARCHAR(100) NOT NULL,
+      is_sensitive BIT NOT NULL DEFAULT 0,
+      is_encrypted BIT NOT NULL DEFAULT 0,
+      config_value NVARCHAR(MAX),
+      encrypted_value NVARCHAR(MAX),
+      encryption_iv NVARCHAR(255),
+      encryption_auth_tag NVARCHAR(255),
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE()
     );
 END

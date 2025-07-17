@@ -4,7 +4,7 @@ import { AuthResponse, LoginCredentials } from "../types/types";
 import { toast } from "../components/ui/use-toast";
 
 export const authService = {
-  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  login: async (credentials: LoginCredentials & { authMethod?: string }): Promise<AuthResponse> => {
     const response = await apiClient.post('/auth/login', credentials);
     return response.data;
   },
@@ -25,6 +25,15 @@ export const authService = {
       console.error('Token verification error:', error);
       return false;
     }
+  },
+
+  getAuthConfig: async (): Promise<{ authMode: string; ldapFallbackEnabled: boolean }> => {
+    const response = await apiClient.get('/auth/config');
+    return response.data;
+  },
+
+  updateAuthConfig: async (config: { authMode: string; ldapFallbackEnabled: boolean }): Promise<void> => {
+    await apiClient.post('/auth/config', config);
   },
 };
 
