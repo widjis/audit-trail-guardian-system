@@ -58,7 +58,7 @@ interface ADUserSearchResult {
 }
 
 // The API client already includes /api in its baseURL
-const AD_ENDPOINT = "/system-config/active-directory";
+const AD_ENDPOINT = "/active-directory";
 
 // Add in-memory cache for sensitive information that shouldn't be in localStorage
 const memoryCache = {

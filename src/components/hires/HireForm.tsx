@@ -17,7 +17,7 @@ import { licenseService } from "@/services/license-service";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MultiSelectMailingList } from "./MultiSelectMailingList";
-import { ADUserLookup } from "./ADUserLookup";
+import { ADUserLookup, ADUser } from "./ADUserLookup";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { SrfDocumentUpload } from "./SrfDocumentUpload";
 
@@ -554,21 +554,19 @@ export function HireForm({ currentUser }: HireFormProps) {
   // Check if AD is enabled to decide whether to show the AD user lookup
   const isADEnabled = settingsData?.activeDirectorySettings?.enabled || false;
 
+  // Debug logging to check AD settings
+  logger.ui.debug('HireForm', 'AD Settings Debug:', {
+    settingsData: settingsData,
+    activeDirectorySettings: settingsData?.activeDirectorySettings,
+    isADEnabled: isADEnabled
+  });
+
   // Add the missing handleMailingListChange function
   const handleMailingListChange = (value: string[]) => {
     setHire(prev => ({
       ...prev,
       mailing_list: value
     }));
-  };
-
-  // Handle AD user selection for new hire
-  const handleADUserSelect = (value: string) => {
-    // Set the name field
-    handleSelectChange("name", value);
-    
-    // If we have AD user data, we could potentially auto-fill other fields
-    // This would require extending the ADUserLookup component to return the full user object
   };
 
   return (
@@ -589,23 +587,15 @@ export function HireForm({ currentUser }: HireFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
-                  Full Name * {isADEnabled && "(AD Lookup Enabled)"}
+                  Full Name *
                 </label>
-                {isADEnabled ? (
-                  <ADUserLookup 
-                    value={hire.name} 
-                    onChange={handleADUserSelect}
-                    placeholder="Search for employee..."
-                  />
-                ) : (
-                  <Input
-                    id="name"
-                    name="name"
-                    value={hire.name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                )}
+                <Input
+                  id="name"
+                  name="name"
+                  value={hire.name}
+                  onChange={handleInputChange}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
@@ -697,7 +687,13 @@ export function HireForm({ currentUser }: HireFormProps) {
                 {isADEnabled ? (
                   <ADUserLookup 
                     value={hire.direct_report} 
-                    onChange={(value) => handleSelectChange("direct_report", value)}
+                    onChange={(value, userData) => {
+                      handleSelectChange("direct_report", value);
+                      // Log the selected user data for debugging
+                      if (userData) {
+                        logger.ui.debug('HireForm', 'Selected manager data:', userData);
+                      }
+                    }}
                     placeholder="Search for manager..."
                   />
                 ) : (

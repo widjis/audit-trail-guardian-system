@@ -21,7 +21,7 @@ import { activeDirectoryService } from "@/services/active-directory-service";
 import { useToast } from "@/components/ui/use-toast";
 import logger from "@/utils/logger";
 
-interface ADUser {
+export interface ADUser {
   displayName: string;
   username: string;
   email: string;

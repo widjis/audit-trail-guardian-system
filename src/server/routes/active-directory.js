@@ -132,13 +132,8 @@ const createLdapClient = (settings) => {
     idleTimeout: 30000,
   });
   
-  // Add event handler for error events
-  client.on('error', (err) => {
-    logger.api.error('LDAP client error event:', err.message);
-    if (err.code) {
-      logger.api.error(`LDAP error code: ${err.code}, name: ${err.name}`);
-    }
-  });
+  // Note: ldapts Client doesn't use event emitters for error handling
+  // Errors are handled through try/catch blocks in async operations
   
   return client;
 };

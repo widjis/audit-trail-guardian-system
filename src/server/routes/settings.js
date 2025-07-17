@@ -127,6 +127,20 @@ router.get('/', async (req, res) => {
       // Keep existing JSON data as fallback
     }
     
+    // Get Active Directory settings from database
+    try {
+      const systemConfigService = getSystemConfigService();
+      if (systemConfigService) {
+        const adConfig = await systemConfigService.getActiveDirectoryConfig();
+        if (adConfig) {
+          settings.activeDirectorySettings = adConfig;
+        }
+      }
+    } catch (dbError) {
+      console.error('Error fetching Active Directory settings from database:', dbError);
+      // Keep existing JSON data as fallback
+    }
+    
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get settings', message: err.message });
