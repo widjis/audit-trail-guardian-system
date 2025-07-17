@@ -261,18 +261,16 @@ Please don't hesitate to contact IT for any question.`,
     {
       key: 'whatsapp.new_hire_notification_template',
       name: 'New Hire Notification Template',
-      description: 'WhatsApp message template for new hire notifications with placeholder variables',
+      description: 'WhatsApp message template for new hire notifications with placeholder variables (supports both single and multiple hires)',
       value: whatsappConfig.newHireNotificationTemplate || `🎉 New Hire Alert!
 
-A new employee is joining us:
+We have {{hireCount}} new employee(s) joining us:
 
-Name: {{name}}
-Title: {{title}}
-Department: {{department}}
-Start Date: {{startDate}}
-Email: {{email}}
+{{hireDetails}}
 
-License request has been successfully sent to the IT team.`,
+License request has been successfully sent to the IT team.
+
+Please prepare the necessary equipment and access for these new team members.`,
       sensitive: false
     },
     {

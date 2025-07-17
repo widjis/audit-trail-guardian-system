@@ -191,11 +191,29 @@ Please prepare the necessary equipment and access for this new team member.`,
       let message: string;
       
       if (hireArray.length === 1) {
-        // Single hire - use existing template format
+        // Single hire - use template format
         const hire = hireArray[0];
         message = settings.newHireNotificationTemplate;
         
-        // Replace template variables with actual values
+        // Check if the template has bulk variables
+        const hasBulkVariables = message.includes('{{hireCount}}') || message.includes('{{hireDetails}}');
+        
+        if (hasBulkVariables) {
+          // Use bulk format for single hire
+          const hireDetails = `**${hire.name}**\n• Title: ${hire.title}\n• Department: ${hire.department}\n• Start Date: ${hire.start_date || 'TBD'}\n• Email: ${hire.email}`;
+          
+          message = message.replace(new RegExp(`{{hireCount}}`, 'g'), '1');
+          message = message.replace(new RegExp(`{{hireDetails}}`, 'g'), hireDetails);
+        } else {
+          // Use individual variable replacement for legacy templates
+          Object.entries(hire).forEach(([key, value]) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+              message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
+            }
+          });
+        }
+        
+        // Replace remaining individual variables
         Object.entries(hire).forEach(([key, value]) => {
           if (typeof value === 'string' || typeof value === 'number') {
             message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
@@ -206,22 +224,60 @@ Please prepare the necessary equipment and access for this new team member.`,
         const startDate = hire.start_date || 'TBD';
         message = message.replace(new RegExp(`{{startDate}}`, 'g'), startDate.toString());
       } else {
-        // Multiple hires - generate consolidated message
+        // Multiple hires - use database template with bulk variables
         const hireCount = hireArray.length;
-        message = `🎉 New Hire Alert - ${hireCount} New Employees!\n\n`;
-        message += `We have ${hireCount} new employees joining us:\n\n`;
+        message = settings.newHireNotificationTemplate;
         
-        hireArray.forEach((hire, index) => {
-          const startDate = hire.start_date || 'TBD';
-          message += `${index + 1}. **${hire.name}**\n`;
-          message += `   • Title: ${hire.title}\n`;
-          message += `   • Department: ${hire.department}\n`;
-          message += `   • Start Date: ${startDate}\n`;
-          message += `   • Email: ${hire.email}\n\n`;
-        });
+        // Check if the template has bulk variables ({{hireCount}} or {{hireDetails}})
+        const hasBulkVariables = message.includes('{{hireCount}}') || message.includes('{{hireDetails}}');
         
-        message += `License requests have been successfully sent to the IT team for all new hires.\n\n`;
-        message += `Please prepare the necessary equipment and access for these new team members.`;
+        if (hasBulkVariables) {
+          // Template supports bulk variables - use them
+          let hireDetails = '';
+          hireArray.forEach((hire, index) => {
+            const startDate = hire.start_date || 'TBD';
+            hireDetails += `${index + 1}. **${hire.name}**\n`;
+            hireDetails += `   • Title: ${hire.title}\n`;
+            hireDetails += `   • Department: ${hire.department}\n`;
+            hireDetails += `   • Start Date: ${startDate}\n`;
+            hireDetails += `   • Email: ${hire.email}\n\n`;
+          });
+          
+          // Replace bulk-specific variables
+          message = message.replace(new RegExp(`{{hireCount}}`, 'g'), hireCount.toString());
+          message = message.replace(new RegExp(`{{hireDetails}}`, 'g'), hireDetails);
+          
+          // For multiple hires, use the first hire's data for other variables as fallback
+          const firstHire = hireArray[0];
+          Object.entries(firstHire).forEach(([key, value]) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+              // Only replace if not already replaced by bulk variables
+              if (!['hireCount', 'hireDetails'].includes(key)) {
+                message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
+              }
+            }
+          });
+          
+          // Add start date if available
+          const startDate = firstHire.start_date || 'TBD';
+          message = message.replace(new RegExp(`{{startDate}}`, 'g'), startDate.toString());
+        } else {
+          // Template doesn't support bulk variables - create a bulk-friendly message
+          message = `🎉 New Hire Alert - ${hireCount} New Employees!\n\n`;
+          message += `We have ${hireCount} new employees joining us:\n\n`;
+          
+          hireArray.forEach((hire, index) => {
+            const startDate = hire.start_date || 'TBD';
+            message += `${index + 1}. **${hire.name}**\n`;
+            message += `   • Title: ${hire.title}\n`;
+            message += `   • Department: ${hire.department}\n`;
+            message += `   • Start Date: ${startDate}\n`;
+            message += `   • Email: ${hire.email}\n\n`;
+          });
+          
+          message += `License requests have been successfully sent to the IT team for all new hires.\n\n`;
+          message += `Please prepare the necessary equipment and access for these new team members.`;
+        }
       }
       
       // Send notifications - either to group or individual recipients

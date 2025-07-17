@@ -123,6 +123,15 @@ export const settingsService = {
     return response.data;
   },
 
+  // Update position grades
+  updatePositionGrades: async (grades: string[]) => {
+    const response = await apiClient.put<{ success: boolean }>(
+      `${SETTINGS_ENDPOINT}/position-grades`, 
+      { grades }
+    );
+    return response.data;
+  },
+
   // Get WhatsApp settings
   getWhatsAppSettings: async () => {
     const response = await apiClient.get<WhatsAppSettings>(`${SETTINGS_ENDPOINT}/whatsapp`);

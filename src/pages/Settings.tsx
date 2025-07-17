@@ -19,6 +19,7 @@ import {
 import { AccountStatusSettings } from "@/components/settings/AccountStatusSettings";
 import { MailingListSettings } from "@/components/settings/MailingListSettings";
 import { DepartmentListSettings } from "@/components/settings/DepartmentListSettings";
+import { PositionGradeSettings } from "@/components/settings/PositionGradeSettings";
 import { DatabaseConfigSettings } from "@/components/settings/DatabaseConfigSettings";
 import { AccountManagementSettings } from "@/components/settings/AccountManagementSettings";
 import { WhatsAppSettings } from "@/components/settings/WhatsAppSettings";
@@ -28,6 +29,7 @@ import { MicrosoftGraphSettings } from "@/components/settings/MicrosoftGraphSett
 import StorageIcon from '@mui/icons-material/Storage';
 import MessageIcon from '@mui/icons-material/Message';
 import GroupIcon from '@mui/icons-material/Group';
+import WorkIcon from '@mui/icons-material/Work';
 import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import AccountBoxIcon from '@mui/icons-material/AccountBox';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
@@ -41,6 +43,7 @@ const menuItems = [
   { id: "account-status", label: "Account Status", icon: <AccountBoxIcon />, component: AccountStatusSettings },
   { id: "mailing-list", label: "Mailing List", icon: <MessageIcon />, component: MailingListSettings },
   { id: "departments", label: "Departments", icon: <GroupIcon />, component: DepartmentListSettings },
+  { id: "position-grades", label: "Position Grades", icon: <WorkIcon />, component: PositionGradeSettings },
   { id: "whatsapp", label: "WhatsApp", icon: <WhatsAppIcon />, component: WhatsAppSettings },
   { id: "active-directory", label: "Active Directory", icon: <DirectoryIcon />, component: ActiveDirectorySettings },
   { id: "exchange-online", label: "Exchange Online", icon: <EmailIcon />, component: ExchangeOnlineSettings },
