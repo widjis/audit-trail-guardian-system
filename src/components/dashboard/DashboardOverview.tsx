@@ -226,6 +226,25 @@ export function DashboardOverview() {
   const next7Days = new Date(now);
   next7Days.setDate(now.getDate() + 7);
 
+  // Calculate upcoming events in the next 7 days
+  const upcomingEvents = hires.filter(hire => {
+    const startDate = hire.start_date ? new Date(hire.start_date) : null;
+    const onSiteDate = hire.on_site_date ? new Date(hire.on_site_date) : null;
+    
+    return (startDate && startDate >= now && startDate <= next7Days) ||
+           (onSiteDate && onSiteDate >= now && onSiteDate <= next7Days);
+  });
+
+  const upcomingStartDates = hires.filter(hire => {
+    const startDate = hire.start_date ? new Date(hire.start_date) : null;
+    return startDate && startDate >= now && startDate <= next7Days;
+  });
+
+  const upcomingOnSiteDates = hires.filter(hire => {
+    const onSiteDate = hire.on_site_date ? new Date(hire.on_site_date) : null;
+    return onSiteDate && onSiteDate >= now && onSiteDate <= next7Days;
+  });
+
   // Department data for charts
   const topDepartments = departmentData
     .sort((a, b) => b.count - a.count)
@@ -370,11 +389,14 @@ export function DashboardOverview() {
             icon={<Clock className="h-5 w-5" />}
           />
           <StatsCard
-            title="Average Progress"
-            value={`${averageProgress}%`}
-            description="Across all new hires"
-            icon={<BarChartIcon className="h-5 w-5" />}
-            trend={{ value: averageProgress >= 70 ? averageProgress - 60 : averageProgress - 70, label: "vs target" }}
+            title="Upcoming 7 Days"
+            value={upcomingEvents.length}
+            description={`${upcomingStartDates.length} start dates, ${upcomingOnSiteDates.length} on-site dates`}
+            icon={<CalendarDays className="h-5 w-5" />}
+            trend={{ 
+              value: upcomingEvents.length > 0 ? Math.round((upcomingStartDates.length / upcomingEvents.length) * 100) : 0, 
+              label: "start dates" 
+            }}
           />
         </div>
       ) : (
@@ -399,11 +421,14 @@ export function DashboardOverview() {
             icon={<Clock className="h-5 w-5" />}
           />
           <StatsCard
-            title="Average Progress"
-            value={`${averageProgress}%`}
-            description="Across all new hires"
-            icon={<BarChartIcon className="h-5 w-5" />}
-            trend={{ value: averageProgress >= 70 ? averageProgress - 60 : averageProgress - 70, label: "vs target" }}
+            title="Upcoming 7 Days"
+            value={upcomingEvents.length}
+            description={`${upcomingStartDates.length} start dates, ${upcomingOnSiteDates.length} on-site dates`}
+            icon={<CalendarDays className="h-5 w-5" />}
+            trend={{ 
+              value: upcomingEvents.length > 0 ? Math.round((upcomingStartDates.length / upcomingEvents.length) * 100) : 0, 
+              label: "start dates" 
+            }}
           />
           <StatsCard
             title="Upcoming Onboarding"
@@ -788,6 +813,126 @@ export function DashboardOverview() {
         </CardContent>
       </Card>
       </div>
+
+      {/* Upcoming Events Section */}
+      {upcomingEvents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-blue-500" />
+                  Upcoming Events (Next 7 Days)
+                </CardTitle>
+                <CardDescription>
+                  {upcomingStartDates.length} start dates and {upcomingOnSiteDates.length} on-site dates scheduled
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="h-8">
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  Calendar View
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Event Type Tabs */}
+              <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+                <div className="px-3 py-1 bg-white rounded text-sm font-medium shadow-sm">
+                  All Events ({upcomingEvents.length})
+                </div>
+                <div className="px-3 py-1 text-sm text-gray-600">
+                  Start Dates ({upcomingStartDates.length})
+                </div>
+                <div className="px-3 py-1 text-sm text-gray-600">
+                  On-Site ({upcomingOnSiteDates.length})
+                </div>
+              </div>
+
+              {/* Events Timeline */}
+              <div className="space-y-3">
+                {Array.from({ length: 7 }, (_, i) => {
+                  const date = new Date(now);
+                  date.setDate(now.getDate() + i);
+                  
+                  const dayEvents = upcomingEvents.filter(hire => {
+                    const startDate = hire.start_date ? new Date(hire.start_date) : null;
+                    const onSiteDate = hire.on_site_date ? new Date(hire.on_site_date) : null;
+                    
+                    return (startDate && startDate.toDateString() === date.toDateString()) ||
+                           (onSiteDate && onSiteDate.toDateString() === date.toDateString());
+                  });
+
+                  if (dayEvents.length === 0) return null;
+
+                  return (
+                    <div key={i} className="border-l-4 border-l-blue-500 pl-4 py-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="font-semibold text-sm">
+                          {date.toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : `${i} days away`}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {dayEvents.map(hire => {
+                          const hasStartDate = hire.start_date && new Date(hire.start_date).toDateString() === date.toDateString();
+                          const hasOnSiteDate = hire.on_site_date && new Date(hire.on_site_date).toDateString() === date.toDateString();
+                          const progress = calculateProgressPercentage(hire);
+                          
+                          return (
+                            <div key={hire.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                <div>
+                                  <div className="font-medium text-sm">{hire.name}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {hire.department} • {hire.title}
+                                  </div>
+                                  <div className="flex gap-2 mt-1">
+                                    {hasStartDate && (
+                                      <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
+                                        Start Date
+                                      </span>
+                                    )}
+                                    {hasOnSiteDate && (
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
+                                        On-Site
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="text-right">
+                                <div className="text-sm font-medium">{progress}% Ready</div>
+                                <div className="w-16 bg-gray-200 rounded-full h-2 mt-1">
+                                  <div 
+                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${progress}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }).filter(Boolean)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Enhanced Recent Hires Table */}
       <Card>

@@ -18,6 +18,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -33,22 +34,30 @@ export function MainLayout({ children }: MainLayoutProps) {
     checkAuth();
   }, [isAuthenticated, navigate]);
 
-  // Load sidebar preference on component mount
+  // Load sidebar preference only once on component mount
   useEffect(() => {
-    const loadSidebarPreference = async () => {
-      try {
-        const savedCollapsed = await getPreference('sidebarCollapsed', false);
-        setSidebarCollapsed(Boolean(savedCollapsed));
-      } catch (error) {
-        console.error('Failed to load sidebar preference in MainLayout:', error);
-      }
-    };
-    
-    loadSidebarPreference();
-  }, [getPreference]);
+    if (!preferencesLoaded) {
+      const loadSidebarPreference = async () => {
+        try {
+          const savedCollapsed = await getPreference('sidebarCollapsed', false);
+          setSidebarCollapsed(Boolean(savedCollapsed));
+          setPreferencesLoaded(true);
+        } catch (error) {
+          console.error('Failed to load sidebar preference in MainLayout:', error);
+          setPreferencesLoaded(true);
+        }
+      };
+      
+      loadSidebarPreference();
+    }
+  }, [getPreference, preferencesLoaded]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleSidebarCollapseChange = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
   };
 
   if (isLoading) {
@@ -58,7 +67,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const drawerWidth = sidebarCollapsed ? 60 : 240;
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1, display: { md: 'none' } }}>
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}>
@@ -75,17 +84,30 @@ export function MainLayout({ children }: MainLayoutProps) {
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          transition: 'width 0.2s',
+          transition: 'width 0.3s ease-in-out',
           '& .MuiDrawer-paper': { 
             width: drawerWidth, 
             boxSizing: 'border-box',
-            transition: 'width 0.2s'
+            transition: 'width 0.3s ease-in-out',
+            overflow: 'hidden'
           },
         }}
       >
-        <Sidebar onClose={isMobile ? handleDrawerToggle : undefined} onCollapseChange={setSidebarCollapsed} collapsed={sidebarCollapsed} />
+        <Sidebar onClose={isMobile ? handleDrawerToggle : undefined} onCollapseChange={handleSidebarCollapseChange} collapsed={sidebarCollapsed} />
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: 'auto', mt: { xs: 8, md: 0 } }}>
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          p: 3, 
+          overflow: 'auto', 
+          mt: { xs: 8, md: 0 },
+          width: `calc(100vw - ${drawerWidth}px)`,
+          transition: 'width 0.3s ease-in-out',
+          minHeight: '100vh',
+          boxSizing: 'border-box'
+        }}
+      >
         {children}
       </Box>
     </Box>

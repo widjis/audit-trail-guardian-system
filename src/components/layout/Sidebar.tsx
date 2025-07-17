@@ -31,7 +31,22 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const { savePreference } = useUserPreferences();
   
+  // Prevent sidebar state changes during navigation
+  const [isNavigating, setIsNavigating] = useState(false);
+  
+  useEffect(() => {
+    // Set navigating flag when location changes
+    setIsNavigating(true);
+    const timer = setTimeout(() => {
+      setIsNavigating(false);
+    }, 100); // Short delay to prevent state changes during navigation
+    
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+  
   const toggleSidebar = async () => {
+    if (isNavigating) return; // Prevent toggle during navigation
+    
     const newValue = !collapsed;
     onCollapseChange?.(newValue);
     // Save the preference
@@ -100,11 +115,36 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
   if (isAdminOrSupport) navItems = [...navItems, ...adminOrSupportNavItems];
   if (isAdmin) navItems = [...navItems, ...adminOnlyNavItems];
 
+  const handleNavigation = (event: React.MouseEvent, path: string) => {
+    // Close mobile drawer if open
+    if (onClose) {
+      onClose();
+    }
+    // Don't prevent default - let React Router handle navigation
+  };
+
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'primary.main', color: 'primary.contrastText', width: collapsed ? 60 : 240, transition: 'width 0.2s' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', px: 2, py: 2 }}>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100%', 
+      bgcolor: 'primary.main', 
+      color: 'primary.contrastText', 
+      width: collapsed ? 60 : 240, 
+      transition: 'width 0.3s ease-in-out',
+      overflow: 'hidden'
+    }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: collapsed ? 'center' : 'space-between', 
+        px: 2, 
+        py: 2,
+        minHeight: 64,
+        flexShrink: 0
+      }}>
         {!collapsed && (
           <Box>
             <Typography variant="h6" fontWeight="bold">MTI Onboarding</Typography>
@@ -115,24 +155,55 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
           {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </IconButton>
       </Box>
-      <List sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+      <List sx={{ 
+        flex: 1, 
+        overflow: 'auto', 
+        px: 1,
+        '&::-webkit-scrollbar': {
+          width: '4px',
+        },
+        '&::-webkit-scrollbar-track': {
+          background: 'transparent',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: '2px',
+        },
+      }}>
         {navItems.map((item) => (
           collapsed ? (
-            <Tooltip key={item.path} title={item.label} placement="right">
+            <Tooltip key={item.path} title={item.label} placement="right" arrow>
               <ListItemButton
                 component={Link}
                 to={item.path}
                 selected={isActive(item.path)}
+                onClick={(e) => handleNavigation(e, item.path)}
                 sx={{ 
                   borderRadius: 1, 
                   justifyContent: 'center',
                   minHeight: 48,
                   width: 48,
                   mx: 'auto',
-                  mb: 1
+                  mb: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  '&.Mui-selected': {
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.25)',
+                    },
+                  },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 'auto', color: 'inherit', justifyContent: 'center' }}>
+                <ListItemIcon sx={{ 
+                  minWidth: 'auto', 
+                  color: 'inherit', 
+                  justifyContent: 'center',
+                  margin: 0
+                }}>
                   {item.icon}
                 </ListItemIcon>
               </ListItemButton>
@@ -143,7 +214,21 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
               component={Link}
               to={item.path}
               selected={isActive(item.path)}
-              sx={{ borderRadius: 1, justifyContent: 'initial' }}
+              onClick={(e) => handleNavigation(e, item.path)}
+              sx={{ 
+                borderRadius: 1, 
+                justifyContent: 'initial',
+                mb: 0.5,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                },
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.25)',
+                  },
+                },
+              }}
             >
               <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
@@ -151,21 +236,25 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
           )
         ))}
       </List>
-      <Divider sx={{ bgcolor: 'primary.light' }} />
+      <Divider sx={{ bgcolor: 'primary.light', flexShrink: 0 }} />
       
       {/* Account Section */}
-      <Box sx={{ p: collapsed ? 1 : 2 }}>
+      <Box sx={{ p: collapsed ? 1 : 2, flexShrink: 0 }}>
         {collapsed ? (
           // Collapsed view - Avatar only with tooltip and menu
           <>
-            <Tooltip title={`${user?.username || 'User'} (${user?.role || 'Role'})`} placement="right">
+            <Tooltip title={`${user?.username || 'User'} (${user?.role || 'Role'})`} placement="right" arrow>
               <Box
                 onClick={handleAccountClick}
                 sx={{
                   display: 'flex',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  '&:hover': { opacity: 0.8 }
+                  borderRadius: 1,
+                  p: 0.5,
+                  '&:hover': { 
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  }
                 }}
               >
                 <Avatar
@@ -194,6 +283,11 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
               transformOrigin={{
                 vertical: 'bottom',
                 horizontal: 'left',
+              }}
+              sx={{
+                '& .MuiPaper-root': {
+                  minWidth: 200,
+                }
               }}
             >
               <MenuItem disabled>
@@ -234,7 +328,15 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
                 </Typography>
               </Box>
             </Box>
-            <ListItemButton onClick={logout} sx={{ borderRadius: 1 }}>
+            <ListItemButton 
+              onClick={logout} 
+              sx={{ 
+                borderRadius: 1,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                }
+              }}
+            >
               <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
                 <LogoutIcon />
               </ListItemIcon>
