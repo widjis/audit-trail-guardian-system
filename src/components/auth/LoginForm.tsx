@@ -287,7 +287,7 @@ export function LoginForm() {
         fullWidth
         placeholder={
           authMethod === 'ldap' 
-            ? "john.doe@merdekabattery.com" 
+            ? "mti.user@merdekabattery.com" 
             : "mti.user@merdekabattery.com"
         }
         InputProps={{

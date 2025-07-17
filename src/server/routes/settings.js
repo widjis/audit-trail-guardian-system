@@ -826,22 +826,22 @@ router.get('/microsoft-graph', async (req, res) => {
     }
     
     // Fallback to JSON file if database fails or no config found
-    if (!microsoftGraphSettings) {
-      const settings = await getSettings();
-      microsoftGraphSettings = settings.microsoftGraphSettings || {
-        enabled: false,
-        clientId: '',
-        clientSecret: '',
-        tenantId: '',
-        authority: '',
-        scope: ["https://graph.microsoft.com/.default"],
-        defaultToRecipients: [],
-        defaultCcRecipients: [],
-        defaultBccRecipients: [],
-        senderEmail: '',
-        useAdSender: false,
-        emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
-        emailBodyTemplate: `Dear IT Team,
+      if (!microsoftGraphSettings) {
+        const settings = await getSettings();
+        microsoftGraphSettings = settings.microsoftGraphSettings || {
+          enabled: false,
+          clientId: '',
+          clientSecret: '',
+          tenantId: '',
+          authority: '',
+          scope: ["https://graph.microsoft.com/.default"],
+          defaultToRecipients: [],
+          defaultCcRecipients: [],
+          defaultBccRecipients: [],
+          senderEmail: '',
+          useLoggedInUserAsSender: false,
+          emailSubjectTemplate: 'License Request for {{hireCount}} New Employees',
+          emailBodyTemplate: `Dear IT Team,
 
 I hope this email finds you well. I am writing to request Microsoft 365 license assignments for the following new employees who have recently joined our organization:
 
@@ -853,9 +853,9 @@ Thank you for your assistance.
 
 Best regards,
 HR Department`
-      };
-      console.log('Microsoft Graph settings retrieved from JSON fallback');
-    }
+        };
+        console.log('Microsoft Graph settings retrieved from JSON fallback');
+      }
     
     res.json(microsoftGraphSettings);
   } catch (error) {
@@ -880,7 +880,7 @@ router.put('/microsoft-graph', async (req, res) => {
       defaultCcRecipients: 'msgraph.default_cc_recipients',
       defaultBccRecipients: 'msgraph.default_bcc_recipients',
       senderEmail: 'msgraph.sender_email',
-      useAdSender: 'msgraph.use_ad_sender',
+      useLoggedInUserAsSender: 'msgraph.use_logged_in_user_as_sender',
       emailSubjectTemplate: 'msgraph.email_subject_template',
       emailBodyTemplate: 'msgraph.email_body_template'
     };

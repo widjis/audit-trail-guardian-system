@@ -303,7 +303,7 @@ class SystemConfigService {
         if (key === 'default_cc_recipients') configKey = 'defaultCcRecipients';
         if (key === 'default_bcc_recipients') configKey = 'defaultBccRecipients';
         if (key === 'sender_email') configKey = 'senderEmail';
-        if (key === 'use_ad_sender') configKey = 'useAdSender';
+        if (key === 'use_logged_in_user_as_sender') configKey = 'useLoggedInUserAsSender';
         if (key === 'email_subject_template') configKey = 'emailSubjectTemplate';
         if (key === 'email_body_template') configKey = 'emailBodyTemplate';
         
@@ -328,7 +328,7 @@ class SystemConfigService {
         }
         
         // Convert boolean values
-        if (['enabled', 'useAdSender'].includes(configKey)) {
+        if (['enabled', 'useLoggedInUserAsSender'].includes(configKey)) {
           value = value === 'true' || value === true;
         }
         
