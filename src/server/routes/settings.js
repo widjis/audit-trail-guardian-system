@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { executeQuery } from '../utils/dbConnection.js';
 import sql from 'mssql';
 import { microsoftGraphService } from '../services/microsoftGraphService.js';
-import { getAdUserInfo } from './active-directory.js';
+import { getAdUserInfo } from './active-directory.ts';
 import { resolveSenderEmail } from '../utils/emailUtils.js';
 import SystemConfigService from '../services/system-config-service.js';
 import { getDbPool } from '../utils/dbConnection.js';

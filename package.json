@@ -76,7 +76,7 @@
     "express": "^5.1.0",
     "fuse.js": "^7.1.0",
     "input-otp": "^1.2.4",
-    "ldapjs": "^3.0.7",
+    "ldapts": "^8.0.6",
     "lucide-react": "^0.462.0",
     "mssql": "^10.0.4",
     "multer": "^1.4.5-lts.2",
@@ -92,7 +92,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.3",
-    "zod": "^3.23.8"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
@@ -121,6 +121,7 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^3.4.11",
     "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"

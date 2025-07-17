@@ -2,7 +2,7 @@
 /**
  * Centralized logger utility for backend
  * Controls logging based on environment variables
- * Enhanced with better LDAP error logging
+ * Enhanced with better LDAP error logging, audit trails, security logging, and performance monitoring
  */
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -34,6 +34,9 @@ const defaultConfig = {
   enableApi: true,   // API logs enabled by default
   enableDb: true,    // Database logs enabled by default
   enableLdap: true,  // LDAP logs enabled by default
+  enableAudit: true, // Audit logs enabled by default
+  enableSecurity: true, // Security logs enabled by default
+  enablePerformance: true, // Performance logs enabled by default
   logToFile: false,  // File logging disabled by default
   logPath: './logs'  // Default log file path
 };
@@ -45,6 +48,9 @@ const getLoggerConfig = () => {
     enableApi: process.env.LOG_API !== 'false', 
     enableDb: process.env.LOG_DB !== 'false',
     enableLdap: process.env.LOG_LDAP !== 'false',
+    enableAudit: process.env.LOG_AUDIT !== 'false',
+    enableSecurity: process.env.LOG_SECURITY !== 'false',
+    enablePerformance: process.env.LOG_PERFORMANCE !== 'false',
     logToFile: process.env.LOG_TO_FILE === 'true',
     logPath: process.env.LOG_PATH || defaultConfig.logPath
   };
@@ -106,7 +112,7 @@ const sanitizeForLog = (obj) => {
   const sanitized = JSON.parse(JSON.stringify(obj));
   
   // List of fields that should be redacted
-  const sensitiveFields = ['password', 'pwd', 'secret', 'token', 'key', 'unicodePwd'];
+  const sensitiveFields = ['password', 'pwd', 'secret', 'token', 'key', 'unicodePwd', 'authorization'];
   
   // Recursively sanitize the object
   const sanitizeObj = (obj) => {
@@ -300,6 +306,157 @@ const logger = {
     operation: () => {},
     errorDetail: () => {},
     connection: () => {}
+  },
+
+  // Audit trail logging
+  audit: config.enableAudit ? {
+    ...createLoggerForComponent('AUDIT'),
+    
+    userAction: (userId, action, details = {}) => {
+      const logData = {
+        userId,
+        action,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'user_action'
+      };
+      console.info(`[${getTimeStamp()}] [AUDIT] [USER-ACTION] User ${userId} performed ${action}`, logData);
+      writeLogToFile('AUDIT', 'user-action', `User ${userId} performed ${action}`, logData);
+    },
+    
+    systemEvent: (event, details = {}) => {
+      const logData = {
+        event,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'system_event'
+      };
+      console.info(`[${getTimeStamp()}] [AUDIT] [SYSTEM-EVENT] ${event}`, logData);
+      writeLogToFile('AUDIT', 'system-event', event, logData);
+    },
+    
+    dataAccess: (userId, resource, operation, details = {}) => {
+      const logData = {
+        userId,
+        resource,
+        operation,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'data_access'
+      };
+      console.info(`[${getTimeStamp()}] [AUDIT] [DATA-ACCESS] User ${userId} ${operation} ${resource}`, logData);
+      writeLogToFile('AUDIT', 'data-access', `User ${userId} ${operation} ${resource}`, logData);
+    }
+  } : {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    userAction: () => {},
+    systemEvent: () => {},
+    dataAccess: () => {}
+  },
+
+  // Security logging
+  security: config.enableSecurity ? {
+    ...createLoggerForComponent('SECURITY'),
+    
+    authAttempt: (email, success, ip, details = {}) => {
+      const logLevel = success ? 'info' : 'warn';
+      const logData = {
+        email,
+        success,
+        ip,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'auth_attempt'
+      };
+      console[logLevel](`[${getTimeStamp()}] [SECURITY] [AUTH-ATTEMPT] ${success ? 'Successful' : 'Failed'} login for ${email} from ${ip}`, logData);
+      writeLogToFile('SECURITY', 'auth-attempt', `${success ? 'Successful' : 'Failed'} login for ${email} from ${ip}`, logData);
+    },
+    
+    suspiciousActivity: (userId, activity, details = {}) => {
+      const logData = {
+        userId,
+        activity,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'suspicious_activity'
+      };
+      console.error(`[${getTimeStamp()}] [SECURITY] [SUSPICIOUS] User ${userId} - ${activity}`, logData);
+      writeLogToFile('SECURITY', 'suspicious', `User ${userId} - ${activity}`, logData);
+    },
+    
+    securityEvent: (event, severity, details = {}) => {
+      const logData = {
+        event,
+        severity,
+        details: sanitizeForLog(details),
+        timestamp: getTimeStamp(),
+        type: 'security_event'
+      };
+      console.warn(`[${getTimeStamp()}] [SECURITY] [EVENT] ${severity} - ${event}`, logData);
+      writeLogToFile('SECURITY', 'event', `${severity} - ${event}`, logData);
+    }
+  } : {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    authAttempt: () => {},
+    suspiciousActivity: () => {},
+    securityEvent: () => {}
+  },
+
+  // Performance monitoring
+  performance: config.enablePerformance ? {
+    ...createLoggerForComponent('PERFORMANCE'),
+    
+    metric: (metric, value, context = {}) => {
+      const logData = {
+        metric,
+        value,
+        context: sanitizeForLog(context),
+        timestamp: getTimeStamp(),
+        type: 'performance_metric'
+      };
+      console.info(`[${getTimeStamp()}] [PERFORMANCE] [METRIC] ${metric}: ${value}`, logData);
+      writeLogToFile('PERFORMANCE', 'metric', `${metric}: ${value}`, logData);
+    },
+    
+    slowQuery: (query, duration, rowCount = null) => {
+      const logData = {
+        query: query.substring(0, 200), // Truncate long queries
+        duration,
+        rowCount,
+        timestamp: getTimeStamp(),
+        type: 'slow_query'
+      };
+      console.warn(`[${getTimeStamp()}] [PERFORMANCE] [SLOW-QUERY] ${duration}ms - ${query.substring(0, 100)}...`, logData);
+      writeLogToFile('PERFORMANCE', 'slow-query', `${duration}ms - ${query.substring(0, 100)}...`, logData);
+    },
+    
+    slowRequest: (method, url, duration, statusCode, userId = null) => {
+      const logData = {
+        method,
+        url,
+        duration,
+        statusCode,
+        userId,
+        timestamp: getTimeStamp(),
+        type: 'slow_request'
+      };
+      console.warn(`[${getTimeStamp()}] [PERFORMANCE] [SLOW-REQUEST] ${method} ${url} - ${duration}ms (${statusCode})`, logData);
+      writeLogToFile('PERFORMANCE', 'slow-request', `${method} ${url} - ${duration}ms (${statusCode})`, logData);
+    }
+  } : {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    metric: () => {},
+    slowQuery: () => {},
+    slowRequest: () => {}
   }
 };
 

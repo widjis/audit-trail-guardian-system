@@ -1,6 +1,6 @@
 // Test script to verify ldapService works with database configuration
 
-import { getClient, search, getDnFromEmployeeId } from '../src/server/lib/ldapService.js';
+import { getClient, search, getDnFromEmployeeId } from '../src/server/lib/ldapService.ts';
 import { initDbConnection } from '../src/server/utils/dbConnection.js';
 import dotenv from 'dotenv';
 

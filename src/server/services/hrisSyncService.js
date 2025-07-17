@@ -11,7 +11,7 @@ import {
   getDnFromEmployeeId as ldapGetDn,
   modify as ldapModify,
   moveDN as ldapMoveDn
-} from '../lib/ldapService.js';
+} from '../lib/ldapService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
