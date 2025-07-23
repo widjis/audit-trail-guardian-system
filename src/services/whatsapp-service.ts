@@ -200,7 +200,7 @@ Please prepare the necessary equipment and access for this new team member.`,
         
         if (hasBulkVariables) {
           // Use bulk format for single hire
-          const hireDetails = `**${hire.name}**\n• Title: ${hire.title}\n• Department: ${hire.department}\n• Start Date: ${hire.start_date || 'TBD'}\n• Email: ${hire.email}`;
+          const hireDetails = `**${hire.name}**\n• Title: ${hire.title}\n• Department: ${hire.department}\n• Start Date: ${hire.start_date || hire.on_site_date || 'TBD'}\n• Email: ${hire.email}`;
           
           message = message.replace(new RegExp(`{{hireCount}}`, 'g'), '1');
           message = message.replace(new RegExp(`{{hireDetails}}`, 'g'), hireDetails);
@@ -220,8 +220,8 @@ Please prepare the necessary equipment and access for this new team member.`,
           }
         });
         
-        // Add start date if available
-        const startDate = hire.start_date || 'TBD';
+        // Add start date if available, fallback to on_site_date if start_date is not available
+        const startDate = hire.start_date || hire.on_site_date || 'TBD';
         message = message.replace(new RegExp(`{{startDate}}`, 'g'), startDate.toString());
       } else {
         // Multiple hires - use database template with bulk variables
@@ -235,7 +235,7 @@ Please prepare the necessary equipment and access for this new team member.`,
           // Template supports bulk variables - use them
           let hireDetails = '';
           hireArray.forEach((hire, index) => {
-            const startDate = hire.start_date || 'TBD';
+            const startDate = hire.start_date || hire.on_site_date || 'TBD';
             hireDetails += `${index + 1}. **${hire.name}**\n`;
             hireDetails += `   • Title: ${hire.title}\n`;
             hireDetails += `   • Department: ${hire.department}\n`;
@@ -258,8 +258,8 @@ Please prepare the necessary equipment and access for this new team member.`,
             }
           });
           
-          // Add start date if available
-          const startDate = firstHire.start_date || 'TBD';
+          // Add start date if available, fallback to on_site_date if start_date is not available
+          const startDate = firstHire.start_date || firstHire.on_site_date || 'TBD';
           message = message.replace(new RegExp(`{{startDate}}`, 'g'), startDate.toString());
         } else {
           // Template doesn't support bulk variables - create a bulk-friendly message
@@ -267,7 +267,7 @@ Please prepare the necessary equipment and access for this new team member.`,
           message += `We have ${hireCount} new employees joining us:\n\n`;
           
           hireArray.forEach((hire, index) => {
-            const startDate = hire.start_date || 'TBD';
+            const startDate = hire.start_date || hire.on_site_date || 'TBD';
             message += `${index + 1}. **${hire.name}**\n`;
             message += `   • Title: ${hire.title}\n`;
             message += `   • Department: ${hire.department}\n`;
