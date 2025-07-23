@@ -232,22 +232,29 @@ class MicrosoftGraphService {
 
       // Send the email using the appropriate endpoint
       let sendResult;
+      
+      // Since we're using application authentication, try the /users endpoint first
       try {
-        console.log('Attempting to send email via /me/sendMail...');
-        sendResult = await graphClient.api('/me/sendMail').post({
-          message: message,
-          saveToSentItems: true
-        });
-        console.log('Email sent successfully via /me/sendMail', sendResult);
-      } catch (meError) {
-        console.log('Failed to send via /me/sendMail, trying /users endpoint:', meError.message);
-        
-        // Try with users endpoint
+        console.log(`Attempting to send email via /users/${senderEmail}/sendMail...`);
         sendResult = await graphClient.api(`/users/${senderEmail}/sendMail`).post({
           message: message,
           saveToSentItems: true
         });
         console.log('Email sent successfully via /users endpoint', sendResult);
+      } catch (usersError) {
+        console.log('Failed to send via /users endpoint, trying /me/sendMail as fallback:', usersError.message);
+        
+        // Try with /me endpoint as fallback (only works with delegated authentication)
+        try {
+          sendResult = await graphClient.api('/me/sendMail').post({
+            message: message,
+            saveToSentItems: true
+          });
+          console.log('Email sent successfully via /me/sendMail fallback', sendResult);
+        } catch (meError) {
+          console.error('Both /users and /me endpoints failed for sending email');
+          throw new Error(`Failed to send email: ${usersError.message} and fallback also failed: ${meError.message}`);
+        }
       }
 
       const totalRecipients = toRecipients.length + ccRecipients.length + bccRecipients.length;
@@ -297,13 +304,17 @@ class MicrosoftGraphService {
       console.log('Testing Microsoft Graph connection...');
       const graphClient = await this.initializeGraphClient(settings);
       
-      // Test by getting user profile or organization info
-      const result = await graphClient.api('/me').get();
-      console.log('Microsoft Graph connection test successful:', result.displayName || result.id);
+      // Test by getting organization info instead of /me since we're using application authentication
+      // This endpoint works with application permissions
+      const result = await graphClient.api('/organization').get();
+      console.log('Microsoft Graph connection test successful:', 
+        result.value && result.value.length > 0 ? 
+          result.value[0].displayName : 'Organization');
       
       return {
         success: true,
-        message: `Successfully connected to Microsoft Graph as ${result.displayName || result.userPrincipalName || 'Service Account'}`
+        message: `Successfully connected to Microsoft Graph for ${result.value && result.value.length > 0 ? 
+          result.value[0].displayName : 'your organization'}`
       };
     } catch (error) {
       console.error('Microsoft Graph connection test failed:', error);
@@ -313,6 +324,26 @@ class MicrosoftGraphService {
         errorMessage = 'Authentication failed. Please verify your Client ID, Client Secret, and Tenant ID.';
       } else if (error.message.includes('AADSTS')) {
         errorMessage = 'Azure AD authentication error. Please check your app registration and permissions.';
+      } else if (error.message.includes('delegated authentication flow')) {
+        errorMessage = 'This endpoint requires delegated authentication. Using organization endpoint instead.';
+        
+        try {
+          // Try with organization endpoint as fallback
+          const graphClient = await this.initializeGraphClient(settings);
+          const result = await graphClient.api('/organization').get();
+          
+          console.log('Microsoft Graph connection test successful with fallback:', 
+            result.value && result.value.length > 0 ? result.value[0].displayName : 'Organization');
+          
+          return {
+            success: true,
+            message: `Successfully connected to Microsoft Graph for ${result.value && result.value.length > 0 ? 
+              result.value[0].displayName : 'your organization'}`
+          };
+        } catch (fallbackError) {
+          console.error('Fallback connection test also failed:', fallbackError);
+          errorMessage = `Connection failed: ${fallbackError.message}`;
+        }
       } else {
         errorMessage = `Connection failed: ${error.message}`;
       }
