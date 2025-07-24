@@ -1305,4 +1305,185 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
   }
 });
 
+// AI Services settings routes
+router.get('/ai-services', async (req, res) => {
+  try {
+    const systemConfigService = getSystemConfigService();
+    if (!systemConfigService) {
+      return res.status(500).json({ error: 'System configuration service not available' });
+    }
+
+    // Get AI services configuration from database
+    const aiConfig = await systemConfigService.getAIServicesConfig();
+    
+    if (!aiConfig) {
+      // Return default configuration if none exists
+      return res.json({
+        geminiApiKey: '',
+        enabled: false,
+        model: 'gemini-2.0-flash',
+        maxTokens: 2048,
+        temperature: 0.7
+      });
+    }
+
+    res.json(aiConfig);
+  } catch (error) {
+    console.error('Error fetching AI services settings:', error);
+    res.status(500).json({ error: 'Failed to fetch AI services settings' });
+  }
+});
+
+router.put('/ai-services', async (req, res) => {
+  try {
+    const { geminiApiKey, enabled, model, maxTokens, temperature } = req.body;
+    const updatedBy = req.user?.username || 'system';
+
+    // Validate required fields
+    if (enabled && !geminiApiKey) {
+      return res.status(400).json({ error: 'API Key is required when AI Services is enabled' });
+    }
+
+    // Validate model
+    const validModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+    if (model && !validModels.includes(model)) {
+      return res.status(400).json({ error: 'Invalid model selected' });
+    }
+
+    // Validate maxTokens
+    if (maxTokens && (maxTokens < 256 || maxTokens > 8192)) {
+      return res.status(400).json({ error: 'Max tokens must be between 256 and 8192' });
+    }
+
+    // Validate temperature
+    if (temperature !== undefined && (temperature < 0 || temperature > 2)) {
+      return res.status(400).json({ error: 'Temperature must be between 0 and 2' });
+    }
+
+    const systemConfigService = getSystemConfigService();
+    if (!systemConfigService) {
+      return res.status(500).json({ error: 'System configuration service not available' });
+    }
+
+    // Map of frontend keys to database keys
+    const configMapping = {
+      enabled: 'ai.enabled',
+      geminiApiKey: 'ai.gemini_api_key',
+      model: 'ai.model',
+      maxTokens: 'ai.max_tokens',
+      temperature: 'ai.temperature'
+    };
+
+    // Update each configuration
+    for (const [frontendKey, dbKey] of Object.entries(configMapping)) {
+      const value = req.body[frontendKey];
+      if (value !== undefined) {
+        const isEncrypted = frontendKey === 'geminiApiKey'; // Encrypt API key
+        await systemConfigService.setConfig(
+          dbKey,
+          value,
+          `AI Services ${frontendKey}`,
+          'ai_services',
+          isEncrypted,
+          isEncrypted, // Mark as sensitive if encrypted
+          updatedBy
+        );
+      }
+    }
+
+    // Return updated configuration
+    const updatedConfig = await systemConfigService.getAIServicesConfig();
+    res.json(updatedConfig);
+
+  } catch (error) {
+    console.error('Error updating AI services settings:', error);
+    res.status(500).json({ error: 'Failed to update AI services settings' });
+  }
+});
+
+router.post('/ai-services/test-connection', async (req, res) => {
+  try {
+    const { geminiApiKey, model } = req.body;
+
+    if (!geminiApiKey) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'API Key is required for testing' 
+      });
+    }
+
+    // Test the Gemini API connection
+    const testPrompt = 'Hello, this is a test message. Please respond with "Connection successful".';
+    
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${geminiApiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: testPrompt
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 100,
+            temperature: 0.1
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.candidates && data.candidates.length > 0) {
+        const generatedText = data.candidates[0].content.parts[0].text;
+        
+        // Update last connection test timestamp
+        const systemConfigService = getSystemConfigService();
+        if (systemConfigService) {
+          await systemConfigService.setConfig(
+            'ai.last_connection_test',
+            new Date().toISOString(),
+            'AI Services last connection test',
+            'ai_services',
+            false,
+            false,
+            req.user?.username || 'system'
+          );
+        }
+
+        res.json({
+          success: true,
+          message: `Connection successful! Model responded: "${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}"`
+        });
+      } else {
+        res.json({
+          success: false,
+          message: 'API responded but no content was generated'
+        });
+      }
+
+    } catch (apiError) {
+      console.error('Gemini API test error:', apiError);
+      res.json({
+        success: false,
+        message: `API connection failed: ${apiError.message}`
+      });
+    }
+
+  } catch (error) {
+    console.error('Error testing AI services connection:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to test connection: ' + error.message
+    });
+  }
+});
+
 export default router;

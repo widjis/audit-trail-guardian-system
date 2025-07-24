@@ -73,6 +73,15 @@ interface MicrosoftGraphSettings {
   useLoggedInUserAsSender?: boolean;
 }
 
+interface AIServicesSettings {
+  geminiApiKey: string;
+  enabled: boolean;
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  lastConnectionTest?: string;
+}
+
 interface SettingsData {
   accountStatuses?: string[];
   positionGrades?: string[];
@@ -84,6 +93,7 @@ interface SettingsData {
   exchangeOnlineSettings?: ExchangeOnlineSettings;
   hrisDbConfig?: HrisDatabaseConfig;
   microsoftGraphSettings?: MicrosoftGraphSettings;
+  aiServicesSettings?: AIServicesSettings;
 }
 
 // The API client already includes /api in its baseURL, so we don't need to include it again
@@ -244,6 +254,28 @@ export const settingsService = {
     const response = await apiClient.post<{ subject: string; body: string }>(
       `${SETTINGS_ENDPOINT}/microsoft-graph/email-template-preview`,
       { hires }
+    );
+    return response.data;
+  },
+
+  // AI Services settings methods
+  getAIServicesSettings: async () => {
+    const response = await apiClient.get<AIServicesSettings>(`${SETTINGS_ENDPOINT}/ai-services`);
+    return response.data;
+  },
+
+  updateAIServicesSettings: async (settings: AIServicesSettings) => {
+    const response = await apiClient.put<AIServicesSettings>(
+      `${SETTINGS_ENDPOINT}/ai-services`,
+      settings
+    );
+    return response.data;
+  },
+
+  testAIServicesConnection: async (settings: AIServicesSettings) => {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      `${SETTINGS_ENDPOINT}/ai-services/test-connection`,
+      settings
     );
     return response.data;
   },

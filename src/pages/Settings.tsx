@@ -27,6 +27,7 @@ import { ActiveDirectorySettings } from "@/components/settings/ActiveDirectorySe
 import { ExchangeOnlineSettings } from "@/components/settings/ExchangeOnlineSettings";
 import { MicrosoftGraphSettings } from "@/components/settings/MicrosoftGraphSettings";
 import AuthenticationSettings from "@/components/settings/AuthenticationSettings";
+import AIServicesSettings from "@/components/settings/AIServicesSettings";
 import StorageIcon from '@mui/icons-material/Storage';
 import MessageIcon from '@mui/icons-material/Message';
 import GroupIcon from '@mui/icons-material/Group';
@@ -38,6 +39,7 @@ import DirectoryIcon from '@mui/icons-material/Folder';
 import EmailIcon from '@mui/icons-material/Email';
 import GraphIcon from '@mui/icons-material/ShowChart';
 import SecurityIcon from '@mui/icons-material/Security';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -50,6 +52,7 @@ const menuItems = [
   { id: "active-directory", label: "Active Directory", icon: <DirectoryIcon />, component: ActiveDirectorySettings },
   { id: "exchange-online", label: "Exchange Online", icon: <EmailIcon />, component: ExchangeOnlineSettings },
   { id: "microsoft-graph", label: "Microsoft Graph", icon: <GraphIcon />, component: MicrosoftGraphSettings },
+  { id: "ai-services", label: "AI Services", icon: <PsychologyIcon />, component: AIServicesSettings },
   { id: "authentication", label: "Authentication", icon: <SecurityIcon />, component: AuthenticationSettings },
   { id: "database", label: "Databases", icon: <StorageIcon />, component: DatabaseConfigSettings },
   { id: "account-management", label: "ICT Support", icon: <SettingsApplicationsIcon />, component: AccountManagementSettings },

@@ -17,6 +17,66 @@ class SystemConfigService {
   }
 
   /**
+   * Get AI Services configuration
+   * @returns {Promise<Object>} AI Services configuration object
+   */
+  async getAIServicesConfig() {
+    try {
+      const configs = await this.getConfigsByCategory('ai_services');
+      
+      if (!configs || configs.length === 0) {
+        console.warn('No AI Services configuration found in database');
+        return null;
+      }
+      
+      // Reconstruct AI Services config object
+      const aiConfig = {
+        geminiApiKey: '',
+        enabled: false,
+        model: 'gemini-2.0-flash-exp',
+        maxTokens: 2048,
+        temperature: 0.7,
+        lastConnectionTest: null
+      };
+      
+      for (const config of configs) {
+        const key = config.config_key.replace('ai.', '');
+        
+        // Convert key names to match original format
+        let configKey = key;
+        if (key === 'gemini_api_key') configKey = 'geminiApiKey';
+        if (key === 'max_tokens') configKey = 'maxTokens';
+        if (key === 'last_connection_test') configKey = 'lastConnectionTest';
+        
+        let value = config.value;
+        
+        // Convert boolean values
+        if (configKey === 'enabled') {
+          value = value === 'true' || value === true;
+        }
+        
+        // Convert numeric values
+        if (configKey === 'maxTokens') {
+          value = parseInt(value) || 2048;
+        }
+        
+        if (configKey === 'temperature') {
+          value = parseFloat(value) || 0.7;
+        }
+        
+        aiConfig[configKey] = value;
+      }
+      
+      console.log('AI Services configuration retrieved from database');
+      return aiConfig;
+      
+    } catch (error) {
+      console.error('Failed to get AI Services configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Decrypt encrypted configuration value
    * @param {Object} encryptedData - Object containing encrypted, iv, and authTag
    * @returns {string} Decrypted value
@@ -406,6 +466,93 @@ class SystemConfigService {
       
     } catch (error) {
       console.error('Failed to get WhatsApp configuration:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set configuration value (create or update)
+   * @param {string} configKey - Configuration key
+   * @param {any} value - New value
+   * @param {string} configName - Configuration name/description
+   * @param {string} configCategory - Configuration category
+   * @param {boolean} isEncrypted - Whether to encrypt the value
+   * @param {boolean} isSensitive - Whether the config is sensitive
+   * @param {string} updatedBy - User who updated the config
+   * @returns {Promise<boolean>} Success status
+   */
+  async setConfig(configKey, value, configName, configCategory, isEncrypted = false, isSensitive = false, updatedBy = 'system') {
+    try {
+      // Check if configuration already exists
+      const existingConfig = await this.pool.request()
+        .input('configKey', sql.NVarChar(100), configKey)
+        .query('SELECT id FROM system_configurations WHERE config_key = @configKey');
+
+      if (existingConfig.recordset.length > 0) {
+        // Configuration exists, update it
+        return await this.updateConfig(configKey, value, updatedBy);
+      } else {
+        // Configuration doesn't exist, create it
+        let insertQuery;
+        let request = this.pool.request()
+          .input('configKey', sql.NVarChar(100), configKey)
+          .input('configName', sql.NVarChar(200), configName)
+          .input('configDescription', sql.NVarChar(500), configName)
+          .input('configCategory', sql.NVarChar(50), configCategory)
+          .input('isEncrypted', sql.Bit, isEncrypted)
+          .input('isSensitive', sql.Bit, isSensitive)
+          .input('isActive', sql.Bit, true)
+          .input('createdBy', sql.NVarChar(100), updatedBy)
+          .input('updatedBy', sql.NVarChar(100), updatedBy);
+
+        if (isEncrypted) {
+          // Encrypt the value
+          const encrypted = this.encrypt(typeof value === 'object' ? JSON.stringify(value) : value.toString());
+          
+          insertQuery = `
+            INSERT INTO system_configurations 
+            (config_key, config_name, config_description, config_category, 
+             is_encrypted, is_sensitive, is_active, encrypted_value, 
+             encryption_iv, encryption_auth_tag, created_by, updated_by, 
+             created_at, updated_at)
+            VALUES 
+            (@configKey, @configName, @configDescription, @configCategory, 
+             @isEncrypted, @isSensitive, @isActive, @encryptedValue, 
+             @encryptionIv, @encryptionAuthTag, @createdBy, @updatedBy, 
+             GETDATE(), GETDATE())
+          `;
+          
+          request = request
+            .input('encryptedValue', sql.NVarChar(sql.MAX), encrypted.encrypted)
+            .input('encryptionIv', sql.NVarChar(100), encrypted.iv)
+            .input('encryptionAuthTag', sql.NVarChar(100), encrypted.authTag);
+        } else {
+          // Plain text value
+          insertQuery = `
+            INSERT INTO system_configurations 
+            (config_key, config_name, config_description, config_category, 
+             is_encrypted, is_sensitive, is_active, config_value, 
+             created_by, updated_by, created_at, updated_at)
+            VALUES 
+            (@configKey, @configName, @configDescription, @configCategory, 
+             @isEncrypted, @isSensitive, @isActive, @configValue, 
+             @createdBy, @updatedBy, GETDATE(), GETDATE())
+          `;
+          
+          request = request.input('configValue', sql.NVarChar(sql.MAX), 
+            typeof value === 'object' ? JSON.stringify(value) : value.toString());
+        }
+
+        await request.query(insertQuery);
+        
+        // Clear cache
+        configCache.delete(configKey);
+        
+        console.log(`[SystemConfig] Created new config: ${configKey}`);
+        return true;
+      }
+    } catch (error) {
+      console.error(`[SystemConfig] Error setting config ${configKey}:`, error);
       throw error;
     }
   }
