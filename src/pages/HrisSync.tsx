@@ -209,10 +209,10 @@ export default function HrisSync() {
                       type="number"
                       min="0"
                       max="1"
-                      step="0.1"
+                      step="0.05"
                       value={confidenceThreshold}
                       onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value) || 0.4)}
-                      placeholder="0.4"
+                      placeholder="0.25"
                     />
                     <p className="text-xs text-muted-foreground">
                       Minimum confidence score for fuzzy matching (0.0 - 1.0)

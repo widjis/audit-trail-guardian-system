@@ -201,17 +201,36 @@ export function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.4, returnWit
 
 /**
  * Compute LDAP diffs between one DB row and one AD user
- * @returns {Object} diffs map
+ * @param {Object} dbRow - HRIS database row
+ * @param {Object} adUser - Active Directory user object
+ * @param {boolean} wasFuzzyMatched - Whether this user was found via fuzzy matching
+ * @returns {Object} diffs map and field comparison
  */
-function computeDiffs(dbRow, adUser) {
+function computeDiffs(dbRow, adUser, wasFuzzyMatched = false) {
   const diffs = {};
   const fieldComparison = {
-    totalFields: 4,
+    totalFields: 5, // Updated to include employeeID
     matchingFields: 0,
     discrepancies: 0,
     details: {},
     highPriorityIssues: []
   };
+
+  // Employee ID comparison - if fuzzy matched, we need to update the employeeID
+  if (wasFuzzyMatched || (dbRow.employee_id && dbRow.employee_id !== adUser.employeeID)) {
+    fieldComparison.discrepancies++;
+    fieldComparison.details.employeeID = { 
+      status: 'discrepancy', 
+      hrisValue: dbRow.employee_id, 
+      adValue: adUser.employeeID || '',
+      note: wasFuzzyMatched ? 'Found via fuzzy matching - updating ID' : 'ID mismatch'
+    };
+    diffs.employeeID = dbRow.employee_id;
+    console.log(`[DIFF] Employee ID ${wasFuzzyMatched ? 'assignment' : 'mismatch'} for ${dbRow.employee_id}: DB="${dbRow.employee_id}" AD="${adUser.employeeID}"`);
+  } else {
+    fieldComparison.matchingFields++;
+    fieldComparison.details.employeeID = { status: 'match', hrisValue: dbRow.employee_id, adValue: adUser.employeeID };
+  }
 
   // Department comparison
   const deptMatch = (dbRow.department || '') === (adUser.department || '');
@@ -290,15 +309,34 @@ function computeDiffs(dbRow, adUser) {
 
 /** Apply the computed diffs to AD (modify + optional move) */
 async function applyDiffs(adUser, diffs, adBaseDN) {
-  // 1) Build only the valid change entries
+  // Map HRIS field names to LDAP attribute names
+  const fieldMapping = {
+    'employeeID': 'employeeID',
+    'department': 'department',
+    'title': 'title', 
+    'mobile': 'mobile',
+    'manager': 'manager'
+  };
+
+  // 1) Build only the valid change entries with proper LDAP attribute names
   const mods = Object.entries(diffs)
-    // drop any empty diffs
-    .filter(([attr, val]) => attr && val != null)
-    // wrap each val in an array
-    .map(([attr, val]) => ({
-      operation:    'replace',
-      modification: { [attr]: Array.isArray(val) ? val : [val] }
-    }));
+    // drop any empty diffs and non-LDAP fields
+    .filter(([attr, val]) => {
+      if (!attr || val == null || val === '') return false;
+      // Only process known LDAP attributes
+      return fieldMapping.hasOwnProperty(attr);
+    })
+    // map to LDAP attributes and ensure string values
+    .map(([attr, val]) => {
+      const ldapAttr = fieldMapping[attr];
+      // Ensure the value is a string
+      const stringVal = typeof val === 'string' ? val : String(val);
+      
+      return {
+        operation: 'replace',
+        modification: { [ldapAttr]: [stringVal] }
+      };
+    });
 
   // nothing changed? skip
   if (mods.length === 0) {
@@ -308,13 +346,25 @@ async function applyDiffs(adUser, diffs, adBaseDN) {
 
   // 2) Apply the modifications
   console.log(`Applying LDAP mods to ${adUser.dn}:`, mods);
-  await ldapModify(adUser.dn, mods);
+  try {
+    await ldapModify(adUser.dn, mods);
+    console.log(`✅ Successfully updated ${adUser.dn}`);
+  } catch (error) {
+    console.error(`❌ Failed to update ${adUser.dn}:`, error.message);
+    throw error;
+  }
 
   // 3) If department moved, also move the OU
   if (diffs.department) {
-    const newOU = `OU=${diffs.department},${adBaseDN}`;
-    console.log(`Moving ${adUser.dn} → ${newOU}`);
-    await ldapMoveDn(adUser.dn, newOU);
+    try {
+      const newOU = `OU=${diffs.department},${adBaseDN}`;
+      console.log(`Moving ${adUser.dn} → ${newOU}`);
+      await ldapMoveDn(adUser.dn, newOU);
+      console.log(`✅ Successfully moved ${adUser.dn} to ${newOU}`);
+    } catch (error) {
+      console.error(`❌ Failed to move ${adUser.dn}:`, error.message);
+      // Don't throw here - the attribute update might have succeeded
+    }
   }
 }
 
@@ -503,7 +553,8 @@ export async function syncToActiveDirectory(testOnly = true, confidenceThreshold
       processedCount++;
 
       // 3) Compute diffs with detailed field comparison
-      const { diffs, fieldComparison } = computeDiffs(row, adUser);
+      const wasFuzzyMatched = matchMethod === 'fuzzy';
+      const { diffs, fieldComparison } = computeDiffs(row, adUser, wasFuzzyMatched);
 
       // 4) Manager comparison (complete the analysis)
       const hrisHasSupervisor = row.supervisor_id && isValidEmployeeId(row.supervisor_id);
@@ -631,7 +682,7 @@ export async function syncToActiveDirectory(testOnly = true, confidenceThreshold
     totalUsers: syncResults.length,
     usersWithChanges: syncResults.filter(r => r.hasChanges).length,
     usersWithoutChanges: syncResults.filter(r => !r.hasChanges).length,
-    totalFieldsAnalyzed: syncResults.length * 4,
+    totalFieldsAnalyzed: syncResults.length * 5, // Updated to include employeeID
     totalMatches: syncResults.reduce((sum, r) => sum + r.fieldComparison.matchingFields, 0),
     totalDiscrepancies: syncResults.reduce((sum, r) => sum + r.fieldComparison.discrepancies, 0),
     highPriorityIssues: syncResults.reduce((sum, r) => sum + r.fieldComparison.highPriorityIssues.length, 0),
@@ -686,12 +737,14 @@ export async function syncSelectedUsersToAD(employeeIDs, confidenceThreshold = 0
 
       // 1) Exact match on employeeID
       let adUser = adUsers.find(u => u.employeeID === empId);
+      let wasFuzzyMatched = false;
 
       // 2) Fuzzy fallback: reassign employeeID & gender if needed
       if (!adUser) {
         const fuzzy = fuzzyMatchAdUser(adUsers, empName, confidenceThreshold);
         if (fuzzy) {
           adUser = fuzzy;
+          wasFuzzyMatched = true;
           // record the ID reassignment in results
           syncResults.push({
             employeeID:  empId,
@@ -729,7 +782,7 @@ export async function syncSelectedUsersToAD(employeeIDs, confidenceThreshold = 0
       }
 
       // 5) Compute attribute diffs (department/title/mobile)
-      const diffs = computeDiffs(row, adUser);
+      const { diffs } = computeDiffs(row, adUser, wasFuzzyMatched);
 
       // 6) Manager diff (async lookup)
       if (row.supervisor_id && isValidEmployeeId(row.supervisor_id)) {
@@ -826,6 +879,7 @@ export async function debugEmployeeSync(employeeId, confidenceThreshold = 0.4) {
 
   // Try exact match first
   let adUser = adUsers.find(u => u.employeeID === employeeId);
+  let wasFuzzyMatched = false;
   let matchingProcess = {
     exactMatch: {
       attempted: true,
@@ -847,6 +901,7 @@ export async function debugEmployeeSync(employeeId, confidenceThreshold = 0.4) {
     
     if (fuzzy) {
       adUser = fuzzy;
+      wasFuzzyMatched = true;
       console.log(`[DEBUG] Fuzzy match found:`, {
         displayName: adUser.displayName,
         employeeID: adUser.employeeID,
@@ -880,7 +935,7 @@ export async function debugEmployeeSync(employeeId, confidenceThreshold = 0.4) {
   }
 
   // Compute diffs
-  const diffs = computeDiffs(dbUser, adUser);
+  const { diffs } = computeDiffs(dbUser, adUser, wasFuzzyMatched);
   console.log(`[DEBUG] Initial diffs computed:`, diffs);
 
   // Check manager diff separately
