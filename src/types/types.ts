@@ -158,4 +158,16 @@ export interface HrisSyncResult {
     mobile?: string;
     [key: string]: string | undefined;
   };
+  fieldComparison?: {
+    totalFields: number;
+    matchingFields: number;
+    discrepancies: string[];
+    highPriorityIssues: string[];
+    details: {
+      department: { status: 'match' | 'discrepancy'; adValue: string; hrisValue: string };
+      title: { status: 'match' | 'discrepancy'; adValue: string; hrisValue: string };
+      mobile: { status: 'match' | 'discrepancy'; adValue: string; hrisValue: string };
+      manager: { status: 'match' | 'discrepancy'; adValue: string; hrisValue: string };
+    };
+  };
 }

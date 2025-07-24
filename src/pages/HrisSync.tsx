@@ -27,6 +27,7 @@ export default function HrisSync() {
   const [manualSyncStatus, setManualSyncStatus] = useState<"idle"|"loading"|"success"|"error">("idle");
   const [exportStatus, setExportStatus] = useState<"idle"|"loading"|"success"|"error">("idle");
   const [syncResults, setSyncResults] = useState<HrisSyncResult[]>([]);
+  const [syncSummary, setSyncSummary] = useState<any>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
@@ -56,12 +57,13 @@ export default function HrisSync() {
     try {
       const res = await fetch("/api/hris-sync/test");
       if (!res.ok) throw new Error("Failed to fetch test sync results");
-      const { results } = await res.json();
+      const { results, summary } = await res.json();
       setSyncResults(results || []);
+      setSyncSummary(summary || null);
       setTestStatus("success");
       toast({
         title: "Test sync completed",
-        description: `${results?.length || 0} users would be updated`,
+        description: `${summary?.usersWithChanges || 0} users need updates, ${summary?.usersWithoutChanges || 0} already in sync`,
       });
     } catch (err) {
       setTestStatus("error");
@@ -228,53 +230,143 @@ export default function HrisSync() {
               </Card>
             </div>
 
+            {/* Summary Statistics */}
+            {syncSummary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sync Analysis Summary</CardTitle>
+                  <CardDescription>Comprehensive field comparison results</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-blue-600">{syncSummary.totalUsers}</div>
+                      <div className="text-sm text-muted-foreground">Total Users</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-green-600">{syncSummary.usersWithoutChanges}</div>
+                      <div className="text-sm text-muted-foreground">In Sync</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-orange-600">{syncSummary.usersWithChanges}</div>
+                      <div className="text-sm text-muted-foreground">Need Updates</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-red-600">{syncSummary.highPriorityIssues}</div>
+                      <div className="text-sm text-muted-foreground">High Priority</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                      <div>
+                        <div className="font-semibold">{syncSummary.totalFieldsAnalyzed}</div>
+                        <div className="text-muted-foreground">Fields Analyzed</div>
+                      </div>
+                      <div>
+                        <div className="font-semibold text-green-600">{syncSummary.totalMatches}</div>
+                        <div className="text-muted-foreground">Matches</div>
+                      </div>
+                      <div>
+                        <div className="font-semibold text-red-600">{syncSummary.totalDiscrepancies}</div>
+                        <div className="text-muted-foreground">Discrepancies</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Sync Results: only changed rows */}
             {changedResults.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Sync Results</CardTitle>
-                  <CardDescription>Users with changes</CardDescription>
+                  <CardTitle>Users Requiring Updates</CardTitle>
+                  <CardDescription>{changedResults.length} users with field discrepancies</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2 mb-4 text-sm">
+                  <div className="flex items-center gap-4 mb-4 text-sm">
                     <div className="flex items-center gap-1">
-                      <div className="h-4 w-4 bg-yellow-100 border-yellow-300 rounded" />
+                      <div className="h-3 w-3 bg-yellow-100 border border-yellow-300 rounded" />
                       <span>New Value</span>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 bg-red-100 border border-red-300 rounded" />
+                      <span>High Priority</span>
+                    </div>
                   </div>
-                  <ScrollArea>
+                  <ScrollArea className="h-96">
                     <table className="min-w-full text-xs border">
                       <thead>
-                        <tr>
+                        <tr className="bg-muted/50">
                           <th className="border px-2 py-1">
                             <Checkbox
                               checked={selectedUsers.length === changedResults.length}
                               onCheckedChange={handleSelectAll}
                             />
                           </th>
-                          <th className="border px-2 py-1">EmployeeID</th>
-                          <th className="border px-2 py-1">DisplayName</th>
-                          <th className="border px-2 py-1">Dept (New)</th>
-                          <th className="border px-2 py-1">Title (New)</th>
-                          <th className="border px-2 py-1">Manager (New)</th>
-                          <th className="border px-2 py-1">Phone (New)</th>
+                          <th className="border px-2 py-1">Employee ID</th>
+                          <th className="border px-2 py-1">Display Name</th>
+                          <th className="border px-2 py-1">Field Analysis</th>
+                          <th className="border px-2 py-1">Department</th>
+                          <th className="border px-2 py-1">Title</th>
+                          <th className="border px-2 py-1">Manager</th>
+                          <th className="border px-2 py-1">Mobile</th>
+                          <th className="border px-2 py-1">Issues</th>
                         </tr>
                       </thead>
                       <tbody>
                         {changedResults.map(row => (
-                          <tr key={row.employeeID}>
+                          <tr key={row.employeeID} className="hover:bg-muted/30">
                             <td className="border px-2 py-1">
                               <Checkbox
                                 checked={isSelected(row.employeeID)}
                                 onCheckedChange={ch => handleSelectOne(row.employeeID, !!ch)}
                               />
                             </td>
-                            <td className="border px-2 py-1">{row.employeeID}</td>
+                            <td className="border px-2 py-1 font-mono">{row.employeeID}</td>
                             <td className="border px-2 py-1">{row.displayName}</td>
-                            <td className="border px-2 py-1">{row.diffs.department ?? "—"}</td>
-                            <td className="border px-2 py-1">{row.diffs.title      ?? "—"}</td>
-                            <td className="border px-2 py-1">{row.diffs.manager    ?? "—"}</td>
-                            <td className="border px-2 py-1">{row.diffs.mobile     ?? "—"}</td>
+                            <td className="border px-2 py-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-green-600 font-semibold">{row.fieldComparison?.matchingFields || 0}</span>
+                                <span className="text-muted-foreground">/</span>
+                                <span className="text-muted-foreground">{row.fieldComparison?.totalFields || 4}</span>
+                                {row.fieldComparison?.highPriorityIssues?.length > 0 && (
+                                  <div className="h-2 w-2 bg-red-500 rounded-full ml-1" title="High priority issues" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.diffs.department ? (
+                                <span className="bg-yellow-100 px-1 rounded text-xs">{row.diffs.department || "—"}</span>
+                              ) : "—"}
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.diffs.title ? (
+                                <span className="bg-yellow-100 px-1 rounded text-xs">{row.diffs.title || "—"}</span>
+                              ) : "—"}
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.diffs.manager ? (
+                                <span className="bg-yellow-100 px-1 rounded text-xs" title={row.diffs.manager}>
+                                  Manager Update
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.diffs.mobile ? (
+                                <span className="bg-yellow-100 px-1 rounded text-xs">{row.diffs.mobile || "—"}</span>
+                              ) : "—"}
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.fieldComparison?.highPriorityIssues?.length > 0 ? (
+                                <div className="text-xs text-red-600">
+                                  {row.fieldComparison.highPriorityIssues.slice(0, 2).join(", ")}
+                                  {row.fieldComparison.highPriorityIssues.length > 2 && "..."}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -294,6 +386,25 @@ export default function HrisSync() {
                       </Button>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* All Users Analysis (when no changes) */}
+            {syncResults.length > 0 && changedResults.length === 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Users In Sync</CardTitle>
+                  <CardDescription>No users require updates - all fields match between HRIS and AD</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">✅</div>
+                    <div className="text-lg font-semibold text-green-600 mb-2">Perfect Synchronization</div>
+                    <div className="text-muted-foreground">
+                      All {syncResults.length} users have matching data between HRIS and Active Directory
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}

@@ -122,30 +122,87 @@ function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.1) {
  */
 function computeDiffs(dbRow, adUser) {
   const diffs = {};
+  const fieldComparison = {
+    totalFields: 4,
+    matchingFields: 0,
+    discrepancies: 0,
+    details: {},
+    highPriorityIssues: []
+  };
 
-  if (dbRow.department !== adUser.department) {
+  // Department comparison
+  const deptMatch = (dbRow.department || '') === (adUser.department || '');
+  if (deptMatch) {
+    fieldComparison.matchingFields++;
+    fieldComparison.details.department = { status: 'match', hrisValue: dbRow.department, adValue: adUser.department };
+  } else {
+    fieldComparison.discrepancies++;
+    fieldComparison.details.department = { status: 'discrepancy', hrisValue: dbRow.department, adValue: adUser.department };
     diffs.department = dbRow.department;
+    if (!dbRow.department) {
+      fieldComparison.highPriorityIssues.push('Missing department in HRIS');
+    }
     console.log(`[DIFF] Department mismatch for ${dbRow.employee_id}: DB="${dbRow.department}" AD="${adUser.department}"`);
   }
-  if (dbRow.position_title !== adUser.title) {
+
+  // Title comparison
+  const titleMatch = (dbRow.position_title || '') === (adUser.title || '');
+  if (titleMatch) {
+    fieldComparison.matchingFields++;
+    fieldComparison.details.title = { status: 'match', hrisValue: dbRow.position_title, adValue: adUser.title };
+  } else {
+    fieldComparison.discrepancies++;
+    fieldComparison.details.title = { status: 'discrepancy', hrisValue: dbRow.position_title, adValue: adUser.title };
     diffs.title = dbRow.position_title;
+    if (!dbRow.position_title) {
+      fieldComparison.highPriorityIssues.push('Missing title in HRIS');
+    }
     console.log(`[DIFF] Title mismatch for ${dbRow.employee_id}: DB="${dbRow.position_title}" AD="${adUser.title}"`);
   }
 
-  // if (dbRow.supervisor_id && isValidEmployeeId(dbRow.supervisor_id)) {
-  //   diffs.manager = null; // placeholder—will fill below
-  //   console.log(`[DIFF] Supervisor/Manager check for ${dbRow.employee_id}: DB supervisor_id="${dbRow.supervisor_id}"`);
-  // }
-
-  if (isValidPhoneNumber(dbRow.phone)) {
+  // Mobile comparison
+  const hrisHasPhone = isValidPhoneNumber(dbRow.phone);
+  const adHasMobile = adUser.mobile && adUser.mobile.trim() !== '';
+  
+  if (hrisHasPhone && adHasMobile) {
     const std = standardizePhoneNumber(dbRow.phone);
-    if (std !== adUser.mobile) {
+    const mobileMatch = std === adUser.mobile;
+    if (mobileMatch) {
+      fieldComparison.matchingFields++;
+      fieldComparison.details.mobile = { status: 'match', hrisValue: std, adValue: adUser.mobile };
+    } else {
+      fieldComparison.discrepancies++;
+      fieldComparison.details.mobile = { status: 'discrepancy', hrisValue: std, adValue: adUser.mobile };
       diffs.mobile = std;
       console.log(`[DIFF] Mobile mismatch for ${dbRow.employee_id}: DB="${std}" AD="${adUser.mobile}"`);
     }
+  } else if (!hrisHasPhone && !adHasMobile) {
+    // Both empty - count as match
+    fieldComparison.matchingFields++;
+    fieldComparison.details.mobile = { status: 'match', hrisValue: '', adValue: '', note: 'Both empty' };
+  } else {
+    // One has value, other doesn't - discrepancy
+    fieldComparison.discrepancies++;
+    const std = hrisHasPhone ? standardizePhoneNumber(dbRow.phone) : '';
+    fieldComparison.details.mobile = { 
+      status: 'discrepancy', 
+      hrisValue: std, 
+      adValue: adUser.mobile || '',
+      note: hrisHasPhone ? 'Missing in AD' : 'Missing in HRIS'
+    };
+    if (hrisHasPhone) {
+      diffs.mobile = std;
+    }
+    if (!hrisHasPhone) {
+      fieldComparison.highPriorityIssues.push('Missing mobile in HRIS');
+    }
   }
 
-  return diffs;
+  // Manager comparison (will be completed in main sync function)
+  // For now, mark as placeholder
+  fieldComparison.details.manager = { status: 'pending', note: 'Will be checked separately' };
+
+  return { diffs, fieldComparison };
 }
 
 /** Apply the computed diffs to AD (modify + optional move) */
@@ -281,21 +338,76 @@ export async function syncToActiveDirectory(testOnly = true) {
         continue;
       }
 
-      // 3) Compute diffs
-      const diffs = computeDiffs(row, adUser);
+      // 3) Compute diffs with detailed field comparison
+      const { diffs, fieldComparison } = computeDiffs(row, adUser);
 
-      // Manager diff (outside computeDiffs for async lookup)
-      if (row.supervisor_id && isValidEmployeeId(row.supervisor_id)) {
+      // 4) Manager comparison (complete the analysis)
+      const hrisHasSupervisor = row.supervisor_id && isValidEmployeeId(row.supervisor_id);
+      const adHasManager = typeof adUser.manager === 'string' && adUser.manager.trim() !== '';
+      
+      if (hrisHasSupervisor && adHasManager) {
         const mgrDN = await ldapGetDn(row.supervisor_id);
-        if (mgrDN && mgrDN !== adUser.manager) {
-          diffs.manager = mgrDN;
+        const managerMatch = mgrDN === adUser.manager;
+        if (managerMatch) {
+          fieldComparison.matchingFields++;
+          fieldComparison.details.manager = { 
+            status: 'match', 
+            hrisValue: row.supervisor_id, 
+            adValue: adUser.manager,
+            supervisorStatus: 'valid'
+          };
+        } else {
+          fieldComparison.discrepancies++;
+          fieldComparison.details.manager = { 
+            status: 'discrepancy', 
+            hrisValue: row.supervisor_id, 
+            adValue: adUser.manager,
+            supervisorStatus: mgrDN ? 'mismatch' : 'not_found_in_ad'
+          };
+          if (mgrDN) {
+            diffs.manager = mgrDN;
+          } else {
+            fieldComparison.highPriorityIssues.push('HRIS supervisor not found in AD');
+          }
+        }
+      } else if (!hrisHasSupervisor && !adHasManager) {
+        // Both empty - count as match
+        fieldComparison.matchingFields++;
+        fieldComparison.details.manager = { 
+          status: 'match', 
+          hrisValue: '', 
+          adValue: '', 
+          note: 'Both empty',
+          supervisorStatus: 'both_empty'
+        };
+      } else {
+        // One has value, other doesn't - discrepancy
+        fieldComparison.discrepancies++;
+        if (hrisHasSupervisor) {
+          const mgrDN = await ldapGetDn(row.supervisor_id);
+          fieldComparison.details.manager = { 
+            status: 'discrepancy', 
+            hrisValue: row.supervisor_id, 
+            adValue: adUser.manager || '',
+            supervisorStatus: 'missing_in_ad'
+          };
+          if (mgrDN) {
+            diffs.manager = mgrDN;
+          }
+        } else {
+          fieldComparison.details.manager = { 
+            status: 'discrepancy', 
+            hrisValue: '', 
+            adValue: adUser.manager,
+            supervisorStatus: 'missing_in_hris'
+          };
+          fieldComparison.highPriorityIssues.push('Missing supervisor in HRIS');
         }
       }
 
-      // 4) If no diffs, skip
-      if (Object.keys(diffs).length === 0) continue;
-
-      //5) Record result, include current values
+      // 5) Always include user in results (even if no diffs) for comprehensive analysis
+      const hasChanges = Object.keys(diffs).length > 0;
+      
       syncResults.push({
         employeeID: empId,
         displayName: adUser.displayName || "",
@@ -306,11 +418,13 @@ export async function syncToActiveDirectory(testOnly = true) {
           mobile:     adUser.mobile || ""
         },
         diffs,
-        action: testOnly ? 'Test' : 'Updated'
+        fieldComparison,
+        hasChanges,
+        action: hasChanges ? (testOnly ? 'Test' : 'Updated') : 'No Changes'
       });
 
-      // 6) Apply to AD if not testOnly
-      if (!testOnly) {
+      // 6) Apply to AD if not testOnly and has changes
+      if (!testOnly && hasChanges) {
         await applyDiffs(adUser, diffs, adBaseDN);
       }
 
@@ -319,7 +433,22 @@ export async function syncToActiveDirectory(testOnly = true) {
     }
   }
 
-  return { test: testOnly, results: syncResults };
+  // Calculate summary statistics
+  const summary = {
+    totalUsers: syncResults.length,
+    usersWithChanges: syncResults.filter(r => r.hasChanges).length,
+    usersWithoutChanges: syncResults.filter(r => !r.hasChanges).length,
+    totalFieldsAnalyzed: syncResults.length * 4,
+    totalMatches: syncResults.reduce((sum, r) => sum + r.fieldComparison.matchingFields, 0),
+    totalDiscrepancies: syncResults.reduce((sum, r) => sum + r.fieldComparison.discrepancies, 0),
+    highPriorityIssues: syncResults.reduce((sum, r) => sum + r.fieldComparison.highPriorityIssues.length, 0)
+  };
+
+  return { 
+    test: testOnly, 
+    results: syncResults,
+    summary 
+  };
 }
 
 /**
