@@ -15,6 +15,7 @@ import Import from "./pages/Import";
 import Settings from "./pages/Settings";
 import HrisSync from "./pages/HrisSync";
 import OnboardEmail from "./pages/OnboardEmail";
+import WorkflowDemo from "./pages/WorkflowDemo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/hires/:id" element={<HireDetail />} />
           <Route path="/import" element={<Import />} />
           <Route path="/onboard-email" element={<OnboardEmail />} />
+          <Route path="/workflow-demo" element={<WorkflowDemo />} />
           <Route path="/hris-sync" element={
             <AdminOrSupportRoute>
               <HrisSync />
