@@ -384,6 +384,199 @@ export async function syncSelectedUsersToAD(employeeIDs) {
 }
 
 /**
+ * Debug specific employee sync process
+ * @param {string} employeeId - Employee ID to debug
+ * @returns {Promise<Object>} Debug information
+ */
+export async function debugEmployeeSync(employeeId) {
+  const dbPool = getDbPool();
+  const systemConfig = new SystemConfigService(dbPool);
+  const ad = await systemConfig.getActiveDirectoryConfig();
+  const adBaseDN = ad.baseDN;
+
+  console.log(`[DEBUG] Starting debug for employee: ${employeeId}`);
+
+  // Fetch all data
+  const [dbUsers, adUsers] = await Promise.all([
+    gatherEmployeeData(),
+    findUsersInAD(adBaseDN)
+  ]);
+
+  // Find the specific employee in HRIS
+  const dbUser = dbUsers.find(row => row.employee_id === employeeId);
+  if (!dbUser) {
+    return {
+      employeeId,
+      found: false,
+      error: 'Employee not found in HRIS database',
+      hrisData: null,
+      adData: null,
+      matchingProcess: null,
+      diffs: null
+    };
+  }
+
+  console.log(`[DEBUG] Found in HRIS:`, {
+    employee_id: dbUser.employee_id,
+    employee_name: dbUser.employee_name,
+    department: dbUser.department,
+    position_title: dbUser.position_title,
+    supervisor_id: dbUser.supervisor_id,
+    phone: dbUser.phone,
+    gender: dbUser.gender
+  });
+
+  const empName = dbUser.employee_name?.trim();
+  if (!empName) {
+    return {
+      employeeId,
+      found: true,
+      error: 'Employee name is empty in HRIS',
+      hrisData: dbUser,
+      adData: null,
+      matchingProcess: { step: 'name_validation', result: 'failed' },
+      diffs: null
+    };
+  }
+
+  // Try exact match first
+  let adUser = adUsers.find(u => u.employeeID === employeeId);
+  let matchingProcess = {
+    exactMatch: {
+      attempted: true,
+      found: !!adUser,
+      result: adUser || null
+    }
+  };
+
+  // Try fuzzy match if exact match failed
+  if (!adUser) {
+    console.log(`[DEBUG] No exact match found, trying fuzzy match for: ${empName}`);
+    const fuzzy = fuzzyMatchAdUser(adUsers, empName);
+    matchingProcess.fuzzyMatch = {
+      attempted: true,
+      found: !!fuzzy,
+      result: fuzzy || null,
+      threshold: 0.1
+    };
+    
+    if (fuzzy) {
+      adUser = fuzzy;
+      console.log(`[DEBUG] Fuzzy match found:`, {
+        displayName: adUser.displayName,
+        employeeID: adUser.employeeID,
+        department: adUser.department,
+        title: adUser.title,
+        manager: adUser.manager,
+        mobile: adUser.mobile
+      });
+    }
+  } else {
+    console.log(`[DEBUG] Exact match found:`, {
+      displayName: adUser.displayName,
+      employeeID: adUser.employeeID,
+      department: adUser.department,
+      title: adUser.title,
+      manager: adUser.manager,
+      mobile: adUser.mobile
+    });
+  }
+
+  if (!adUser) {
+    return {
+      employeeId,
+      found: true,
+      error: 'No matching user found in Active Directory',
+      hrisData: dbUser,
+      adData: null,
+      matchingProcess,
+      diffs: null
+    };
+  }
+
+  // Compute diffs
+  const diffs = computeDiffs(dbUser, adUser);
+  console.log(`[DEBUG] Initial diffs computed:`, diffs);
+
+  // Check manager diff separately
+  let managerDiff = null;
+  if (dbUser.supervisor_id && isValidEmployeeId(dbUser.supervisor_id)) {
+    console.log(`[DEBUG] Checking manager for supervisor_id: ${dbUser.supervisor_id}`);
+    try {
+      const mgrDN = await ldapGetDn(dbUser.supervisor_id);
+      console.log(`[DEBUG] Manager DN lookup result: ${mgrDN}`);
+      console.log(`[DEBUG] Current AD manager: ${adUser.manager}`);
+      
+      if (mgrDN && mgrDN !== adUser.manager) {
+        diffs.manager = mgrDN;
+        managerDiff = {
+          supervisorId: dbUser.supervisor_id,
+          expectedManagerDN: mgrDN,
+          currentManagerDN: adUser.manager,
+          willUpdate: true
+        };
+      } else {
+        managerDiff = {
+          supervisorId: dbUser.supervisor_id,
+          expectedManagerDN: mgrDN,
+          currentManagerDN: adUser.manager,
+          willUpdate: false,
+          reason: mgrDN ? 'Manager DN matches current' : 'Manager DN not found in AD'
+        };
+      }
+    } catch (err) {
+      console.error(`[DEBUG] Error looking up manager DN:`, err);
+      managerDiff = {
+        supervisorId: dbUser.supervisor_id,
+        error: err.message
+      };
+    }
+  } else {
+    managerDiff = {
+      supervisorId: dbUser.supervisor_id,
+      reason: dbUser.supervisor_id ? 'Invalid employee ID format' : 'No supervisor ID in HRIS'
+    };
+  }
+
+  const finalDiffs = { ...diffs };
+  const totalDiffs = Object.keys(finalDiffs).length;
+  
+  console.log(`[DEBUG] Final diffs:`, finalDiffs);
+  console.log(`[DEBUG] Total differences found: ${totalDiffs}`);
+
+  return {
+    employeeId,
+    found: true,
+    hrisData: {
+      employee_id: dbUser.employee_id,
+      employee_name: dbUser.employee_name,
+      department: dbUser.department,
+      position_title: dbUser.position_title,
+      supervisor_id: dbUser.supervisor_id,
+      phone: dbUser.phone,
+      gender: dbUser.gender
+    },
+    adData: {
+      displayName: adUser.displayName,
+      employeeID: adUser.employeeID,
+      department: adUser.department,
+      title: adUser.title,
+      manager: adUser.manager,
+      mobile: adUser.mobile,
+      dn: adUser.dn
+    },
+    matchingProcess,
+    diffs: finalDiffs,
+    managerAnalysis: managerDiff,
+    syncDecision: {
+      willSync: totalDiffs > 0,
+      reason: totalDiffs > 0 ? `${totalDiffs} differences found` : 'No differences found - user will be skipped',
+      differencesCount: totalDiffs
+    }
+  };
+}
+
+/**
  * Optional: export HRIS vs AD comparison to CSV
  */
 export async function exportComparisonCsv(outputPath) {
@@ -412,4 +605,293 @@ export async function exportComparisonCsv(outputPath) {
   const header = Object.keys(merged[0]).join(',');
   const rows   = merged.map(r => Object.values(r).map(v => `"${v||''}"`).join(','));
   fs.writeFileSync(outputPath, [header, ...rows].join('\n'));
+}
+
+/**
+ * Debug function to analyze data counts and matching statistics
+ */
+export async function debugDataCounts() {
+  console.log('[DEBUG] Starting data counts analysis...');
+  
+  try {
+    const dbPool = getDbPool();
+    const systemConfig = new SystemConfigService(dbPool);
+    const hrisDbConfig = await systemConfig.getHrisConfig();
+    const adConfig = await systemConfig.getActiveDirectoryConfig();
+    
+    if (!hrisDbConfig.enabled) {
+      throw new Error('HRIS sync disabled in configuration');
+    }
+
+    // Connect to HRIS database
+    const pool = await mssql.connect({
+      server: hrisDbConfig.server,
+      port: parseInt(hrisDbConfig.port, 10),
+      database: hrisDbConfig.database,
+      user: hrisDbConfig.username,
+      password: hrisDbConfig.password,
+      options: { encrypt: false, trustServerCertificate: true }
+    });
+    
+    const schema = hrisDbConfig.schema || 'dbo';
+    
+    // Get database statistics
+    console.log('[DEBUG] Fetching database statistics...');
+    
+    // Total employees
+    const totalResult = await pool.request().query(`
+      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl]
+    `);
+    const totalEmployees = totalResult.recordset[0].count;
+    
+    // Non-staff employees
+    const nonStaffResult = await pool.request().query(`
+      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+      WHERE grade_interval = 'Non Staff'
+    `);
+    const nonStaffEmployees = nonStaffResult.recordset[0].count;
+    
+    // Staff employees (processed by sync)
+    const staffResult = await pool.request().query(`
+      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+      WHERE grade_interval <> 'Non Staff'
+    `);
+    const staffEmployees = staffResult.recordset[0].count;
+    
+    // Employees with valid names (actually processed)
+    const validNamesResult = await pool.request().query(`
+      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+      WHERE grade_interval <> 'Non Staff' 
+      AND employee_name IS NOT NULL 
+      AND LTRIM(RTRIM(employee_name)) <> ''
+    `);
+    const processedBySync = validNamesResult.recordset[0].count;
+    
+    // Grade breakdown
+    const gradeResult = await pool.request().query(`
+      SELECT grade_interval, COUNT(*) as count 
+      FROM [${schema}].[it_mti_employee_database_tbl] 
+      GROUP BY grade_interval 
+      ORDER BY count DESC
+    `);
+    const gradeBreakdown = gradeResult.recordset;
+    
+    await pool.close();
+    
+    // Get Active Directory statistics
+    console.log('[DEBUG] Fetching Active Directory statistics...');
+    const adUsers = await findUsersInAD(adConfig.baseDN);
+    
+    const totalAdUsers = adUsers.length;
+    const usersWithEmployeeID = adUsers.filter(u => u.employeeID && isValidEmployeeId(u.employeeID)).length;
+    const usersWithoutEmployeeID = totalAdUsers - usersWithEmployeeID;
+    
+    // Get matching statistics
+    console.log('[DEBUG] Analyzing matching statistics...');
+    const dbUsers = await gatherEmployeeData();
+    
+    let exactMatches = 0;
+    let potentialFuzzyMatches = 0;
+    
+    for (const dbUser of dbUsers) {
+      if (!dbUser.employee_name?.trim()) continue;
+      
+      // Check exact match
+      const exactMatch = adUsers.find(u => u.employeeID === dbUser.employee_id);
+      if (exactMatch) {
+        exactMatches++;
+      } else {
+        // Check fuzzy match potential
+        const fuzzyMatch = fuzzyMatchAdUser(adUsers, dbUser.employee_name.trim());
+        if (fuzzyMatch) {
+          potentialFuzzyMatches++;
+        }
+      }
+    }
+    
+    console.log('[DEBUG] Data counts analysis completed');
+    
+    return {
+      database: {
+        totalEmployees,
+        nonStaffEmployees,
+        staffEmployees,
+        processedBySync,
+        gradeBreakdown
+      },
+      activeDirectory: {
+        totalUsers: totalAdUsers,
+        usersWithEmployeeID,
+        usersWithoutEmployeeID
+      },
+      matching: {
+        exactMatches,
+        potentialFuzzyMatches
+      }
+    };
+    
+  } catch (error) {
+    console.error('[DEBUG] Error in debugDataCounts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Debug function to check AD user details by username
+ */
+export async function debugAdUserByUsername(username) {
+  console.log(`[DEBUG] Checking AD user details for username: ${username}`);
+  
+  try {
+    const dbPool = getDbPool();
+    const systemConfig = new SystemConfigService(dbPool);
+    const adConfig = await systemConfig.getActiveDirectoryConfig();
+    
+    // Search for user by multiple attributes
+    const searchFilters = [
+      `(&(objectClass=user)(sAMAccountName=${username}))`,
+      `(&(objectClass=user)(userPrincipalName=${username}))`,
+      `(&(objectClass=user)(userPrincipalName=${username}@*))`,
+      `(&(objectClass=user)(mail=${username}))`,
+      `(&(objectClass=user)(mail=${username}@*))`
+    ];
+    
+    const attributes = [
+      'sAMAccountName', 'userPrincipalName', 'displayName', 'name', 
+      'employeeID', 'department', 'title', 'manager', 'mobile', 
+      'mail', 'distinguishedName', 'objectClass', 'cn'
+    ];
+    
+    let foundUser = null;
+    let searchMethod = null;
+    
+    // Try each search filter until we find the user
+    for (let i = 0; i < searchFilters.length; i++) {
+      const filter = searchFilters[i];
+      console.log(`[DEBUG] Trying search filter: ${filter}`);
+      
+      try {
+        const results = await ldapSearch(adConfig.baseDN, filter, attributes);
+        if (results && results.length > 0) {
+          foundUser = results[0];
+          searchMethod = filter;
+          console.log(`[DEBUG] User found with filter: ${filter}`);
+          break;
+        }
+      } catch (searchError) {
+        console.log(`[DEBUG] Search failed with filter ${filter}:`, searchError.message);
+      }
+    }
+    
+    if (!foundUser) {
+      return {
+        username,
+        found: false,
+        searchMethods: searchFilters,
+        message: 'User not found in Active Directory with any of the search methods'
+      };
+    }
+    
+    // Check if this user has an employeeID and if it matches any HRIS employee
+    const dbUsers = await gatherEmployeeData();
+    let matchingHrisEmployee = null;
+    
+    if (foundUser.employeeID) {
+      matchingHrisEmployee = dbUsers.find(emp => emp.employee_id === foundUser.employeeID);
+    }
+    
+    // Also check for fuzzy name matches
+    let fuzzyMatches = [];
+    if (foundUser.displayName || foundUser.name) {
+      const searchName = foundUser.displayName || foundUser.name;
+      fuzzyMatches = dbUsers.filter(emp => {
+        if (!emp.employee_name) return false;
+        const similarity = calculateSimilarity(searchName.toLowerCase(), emp.employee_name.toLowerCase());
+        return similarity > 0.7; // 70% similarity threshold
+      }).map(emp => ({
+        employee_id: emp.employee_id,
+        employee_name: emp.employee_name,
+        similarity: calculateSimilarity(searchName.toLowerCase(), emp.employee_name.toLowerCase())
+      })).sort((a, b) => b.similarity - a.similarity);
+    }
+    
+    return {
+      username,
+      found: true,
+      searchMethod,
+      adUserDetails: {
+        sAMAccountName: foundUser.sAMAccountName,
+        userPrincipalName: foundUser.userPrincipalName,
+        displayName: foundUser.displayName,
+        name: foundUser.name,
+        employeeID: foundUser.employeeID,
+        department: foundUser.department,
+        title: foundUser.title,
+        manager: foundUser.manager,
+        mobile: foundUser.mobile,
+        mail: foundUser.mail,
+        distinguishedName: foundUser.distinguishedName,
+        cn: foundUser.cn
+      },
+      hrisMatching: {
+        exactMatch: matchingHrisEmployee ? {
+          employee_id: matchingHrisEmployee.employee_id,
+          employee_name: matchingHrisEmployee.employee_name,
+          department: matchingHrisEmployee.department,
+          position_title: matchingHrisEmployee.position_title
+        } : null,
+        fuzzyMatches: fuzzyMatches.slice(0, 5) // Top 5 fuzzy matches
+      },
+      analysis: {
+        hasEmployeeID: !!foundUser.employeeID,
+        employeeIDValue: foundUser.employeeID || 'Not set',
+        hasExactHrisMatch: !!matchingHrisEmployee,
+        hasFuzzyMatches: fuzzyMatches.length > 0,
+        recommendations: generateRecommendations(foundUser, matchingHrisEmployee, fuzzyMatches)
+      }
+    };
+    
+  } catch (error) {
+    console.error(`[DEBUG] Error in debugAdUserByUsername for ${username}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Generate recommendations based on AD user analysis
+ */
+function generateRecommendations(adUser, exactMatch, fuzzyMatches) {
+  const recommendations = [];
+  
+  if (!adUser.employeeID) {
+    recommendations.push({
+      type: 'missing_employee_id',
+      message: 'User does not have an employeeID set in Active Directory',
+      action: 'Set the employeeID attribute in AD to enable HRIS sync matching'
+    });
+  } else if (!exactMatch) {
+    recommendations.push({
+      type: 'employee_id_mismatch',
+      message: `User has employeeID "${adUser.employeeID}" but no matching HRIS employee found`,
+      action: 'Verify the employeeID value matches an employee in the HRIS database'
+    });
+  }
+  
+  if (fuzzyMatches.length > 0 && !exactMatch) {
+    recommendations.push({
+      type: 'potential_fuzzy_match',
+      message: `Found ${fuzzyMatches.length} potential name matches in HRIS`,
+      action: `Consider setting employeeID to one of: ${fuzzyMatches.slice(0, 3).map(m => m.employee_id).join(', ')}`
+    });
+  }
+  
+  if (!adUser.department) {
+    recommendations.push({
+      type: 'missing_department',
+      message: 'User does not have a department set in Active Directory',
+      action: 'Set the department attribute for proper organizational structure'
+    });
+  }
+  
+  return recommendations;
 }

@@ -7,7 +7,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Database, Server, Users, RefreshCw, AlertTriangle, Clock } from "lucide-react";
+import { Database, Server, Users, RefreshCw, AlertTriangle, Clock, Bug, BarChart, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -16,6 +16,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { HrisSyncResult } from "@/types/types";
+import { HrisSyncDebugger } from "@/components/hires/HrisSyncDebugger";
+import { HrisSyncDataCounts } from "@/components/hires/HrisSyncDataCounts";
+import { AdUserDebugger } from "@/components/hires/AdUserDebugger";
 
 export default function HrisSync() {
   // — State hooks
@@ -164,6 +167,9 @@ export default function HrisSync() {
         <Tabs defaultValue="sync" className="space-y-4">
           <TabsList>
             <TabsTrigger value="sync"><RefreshCw className="h-4 w-4" /> Sync</TabsTrigger>
+            <TabsTrigger value="debug"><Bug className="h-4 w-4" /> Debug</TabsTrigger>
+            <TabsTrigger value="ad-lookup"><UserCheck className="h-4 w-4" /> AD User Lookup</TabsTrigger>
+            <TabsTrigger value="analysis"><BarChart className="h-4 w-4" /> Data Analysis</TabsTrigger>
             <TabsTrigger value="export"><Database className="h-4 w-4" /> Export</TabsTrigger>
           </TabsList>
 
@@ -291,6 +297,21 @@ export default function HrisSync() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Debug Tab */}
+          <TabsContent value="debug">
+            <HrisSyncDebugger />
+          </TabsContent>
+
+          {/* AD User Lookup Tab */}
+          <TabsContent value="ad-lookup">
+            <AdUserDebugger />
+          </TabsContent>
+
+          {/* Data Analysis Tab */}
+          <TabsContent value="analysis">
+            <HrisSyncDataCounts />
           </TabsContent>
 
           {/* Export Tab */}

@@ -10,7 +10,9 @@ import {
   syncToActiveDirectory,
   syncSelectedUsersToAD,
   findUsersInAD,
-  loadSettings
+  loadSettings,
+  debugDataCounts,
+  debugAdUserByUsername
 } from '../services/hrisSyncService.js';
 
 // ES-module __dirname shim
@@ -276,6 +278,157 @@ router.get('/query', async (req, res) => {
   } catch (err) {
     console.error('[HRIS] /query error:', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/hris-sync/debug-counts
+ * Debug endpoint for raw data counts
+ */
+router.get('/debug-counts', async (req, res) => {
+  try {
+    const { gatherEmployeeData, findUsersInAD, loadSettings } = await import('../services/hrisSyncService.js');
+    const settings = loadSettings();
+    
+    // Get raw counts
+    const dbUsers = await gatherEmployeeData();
+    const adUsers = await findUsersInAD(settings.activeDirectorySettings.baseDN);
+    
+    // Get database connection for additional queries
+    const dbPool = req.app.locals.dbPool;
+    const SystemConfigService = (await import('../services/system-config-service.js')).default;
+    const systemConfig = new SystemConfigService(dbPool);
+    const hrisDbConfig = await systemConfig.getHrisConfig();
+    
+    // Check total employees in database (including Non Staff)
+    const mssql = (await import('mssql')).default;
+    const pool = await mssql.connect({
+      server: hrisDbConfig.server,
+      port: parseInt(hrisDbConfig.port, 10),
+      database: hrisDbConfig.database,
+      user: hrisDbConfig.username,
+      password: hrisDbConfig.password,
+      options: { encrypt: false, trustServerCertificate: true }
+    });
+    
+    const schema = hrisDbConfig.schema || 'dbo';
+    
+    // Total employees
+    const totalResult = await pool.request().query(`
+      SELECT COUNT(*) as total FROM [${schema}].[it_mti_employee_database_tbl]
+    `);
+    
+    // Non-staff count
+    const nonStaffResult = await pool.request().query(`
+      SELECT COUNT(*) as nonStaff FROM [${schema}].[it_mti_employee_database_tbl] 
+      WHERE grade_interval = 'Non Staff'
+    `);
+    
+    // Staff count (what we're actually processing)
+    const staffResult = await pool.request().query(`
+      SELECT COUNT(*) as staff FROM [${schema}].[it_mti_employee_database_tbl] 
+      WHERE grade_interval <> 'Non Staff'
+    `);
+    
+    // Grade intervals breakdown
+    const gradeBreakdown = await pool.request().query(`
+      SELECT grade_interval, COUNT(*) as count 
+      FROM [${schema}].[it_mti_employee_database_tbl] 
+      GROUP BY grade_interval 
+      ORDER BY count DESC
+    `);
+    
+    await pool.close();
+    
+    res.json({
+      success: true,
+      data: {
+        database: {
+          totalEmployees: totalResult.recordset[0].total,
+          nonStaffEmployees: nonStaffResult.recordset[0].nonStaff,
+          staffEmployees: staffResult.recordset[0].staff,
+          processedBySync: dbUsers.length,
+          gradeBreakdown: gradeBreakdown.recordset
+        },
+        activeDirectory: {
+          totalUsers: adUsers.length,
+          usersWithEmployeeID: adUsers.filter(u => u.employeeID).length,
+          usersWithoutEmployeeID: adUsers.filter(u => !u.employeeID).length
+        },
+        matching: {
+          exactMatches: dbUsers.filter(db => 
+            adUsers.some(ad => ad.employeeID === db.employee_id)
+          ).length,
+          potentialFuzzyMatches: dbUsers.filter(db => 
+            !adUsers.some(ad => ad.employeeID === db.employee_id) &&
+            adUsers.some(ad => ad.displayName && ad.displayName.toLowerCase().includes(db.employee_name?.toLowerCase() || ''))
+          ).length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Debug counts error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      stack: error.stack 
+    });
+  }
+});
+
+/**
+ * GET /api/hris-sync/debug/:employeeId
+ * Debug specific employee sync process
+ */
+router.get('/debug/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { debugEmployeeSync } = await import('../services/hrisSyncService.js');
+    
+    const debugInfo = await debugEmployeeSync(employeeId);
+    res.json({ success: true, debug: debugInfo });
+  } catch (err) {
+    console.error(`[HRIS] /debug/${req.params.employeeId} error:`, err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Debug endpoint for data counts analysis
+router.get('/debug-counts', async (req, res) => {
+  try {
+    console.log('[API] Debug counts endpoint called');
+    const data = await debugDataCounts();
+    res.json({ 
+      success: true, 
+      data,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[API] Debug counts error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Debug endpoint to check AD user by username
+router.get('/debug-ad-user/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const data = await debugAdUserByUsername(username);
+    res.json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error in debug-ad-user endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
