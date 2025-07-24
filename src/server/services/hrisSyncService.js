@@ -47,6 +47,59 @@ function standardizePhoneNumber(num) {
 }
 
 /**
+ * Calculate string similarity using Levenshtein distance
+ * @param {string} str1 
+ * @param {string} str2 
+ * @returns {number} similarity score between 0 and 1 (1 = identical)
+ */
+function calculateSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  if (str1 === str2) return 1;
+  
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1;
+  
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * @param {string} str1 
+ * @param {string} str2 
+ * @returns {number} edit distance
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
+/**
  * Fuzzy-match an AD user by name
  * @param {Array} adUsers – list of objects with a `name` property
  * @param {string} targetName
@@ -800,6 +853,15 @@ export async function debugAdUserByUsername(username) {
       matchingHrisEmployee = dbUsers.find(emp => emp.employee_id === foundUser.employeeID);
     }
     
+    // Perform detailed field comparison if we have a matching HRIS employee
+    let fieldComparison = null;
+    let syncStatus = 'no_match';
+    
+    if (matchingHrisEmployee) {
+      fieldComparison = compareAdHrisFields(foundUser, matchingHrisEmployee);
+      syncStatus = fieldComparison.hasDiscrepancies ? 'has_discrepancies' : 'in_sync';
+    }
+    
     // Also check for fuzzy name matches
     let fuzzyMatches = [];
     if (foundUser.displayName || foundUser.name) {
@@ -838,16 +900,22 @@ export async function debugAdUserByUsername(username) {
           employee_id: matchingHrisEmployee.employee_id,
           employee_name: matchingHrisEmployee.employee_name,
           department: matchingHrisEmployee.department,
-          position_title: matchingHrisEmployee.position_title
+          position_title: matchingHrisEmployee.position_title,
+          supervisor_id: matchingHrisEmployee.supervisor_id,
+          phone: matchingHrisEmployee.phone
         } : null,
-        fuzzyMatches: fuzzyMatches.slice(0, 5) // Top 5 fuzzy matches
+        fuzzyMatches: fuzzyMatches.slice(0, 5), // Top 5 fuzzy matches
+        fieldComparison,
+        syncStatus
       },
       analysis: {
         hasEmployeeID: !!foundUser.employeeID,
         employeeIDValue: foundUser.employeeID || 'Not set',
         hasExactHrisMatch: !!matchingHrisEmployee,
+        isInSync: syncStatus === 'in_sync',
+        hasDiscrepancies: syncStatus === 'has_discrepancies',
         hasFuzzyMatches: fuzzyMatches.length > 0,
-        recommendations: generateRecommendations(foundUser, matchingHrisEmployee, fuzzyMatches)
+        recommendations: generateRecommendations(foundUser, matchingHrisEmployee, fuzzyMatches, fieldComparison)
       }
     };
     
@@ -858,22 +926,165 @@ export async function debugAdUserByUsername(username) {
 }
 
 /**
+ * Compare AD user fields with HRIS employee data
+ */
+function compareAdHrisFields(adUser, hrisEmployee) {
+  const discrepancies = [];
+  const matches = [];
+  
+  // Compare department
+  if (adUser.department !== hrisEmployee.department) {
+    discrepancies.push({
+      field: 'department',
+      adValue: adUser.department || 'Not set',
+      hrisValue: hrisEmployee.department || 'Not set',
+      severity: 'high'
+    });
+  } else {
+    matches.push('department');
+  }
+  
+  // Compare title/position
+  if (adUser.title !== hrisEmployee.position_title) {
+    discrepancies.push({
+      field: 'title',
+      adValue: adUser.title || 'Not set',
+      hrisValue: hrisEmployee.position_title || 'Not set',
+      severity: 'medium'
+    });
+  } else {
+    matches.push('title');
+  }
+  
+  // Compare mobile/phone (normalize phone numbers for comparison)
+  const adMobile = adUser.mobile || '';
+  const hrisPhone = hrisEmployee.phone ? standardizePhoneNumber(hrisEmployee.phone) : '';
+  if (adMobile !== hrisPhone) {
+    discrepancies.push({
+      field: 'mobile',
+      adValue: adMobile || 'Not set',
+      hrisValue: hrisPhone || 'Not set',
+      severity: 'low'
+    });
+  } else {
+    // Count as match if both are empty OR both have matching values
+    matches.push('mobile');
+  }
+  
+  // Check supervisor/manager (this requires additional lookup)
+  let supervisorStatus = 'unknown';
+  console.log(`[DEBUG] Manager comparison - AD manager: "${adUser.manager}", HRIS supervisor_id: "${hrisEmployee.supervisor_id}"`);
+  console.log(`[DEBUG] isValidEmployeeId(${hrisEmployee.supervisor_id}): ${isValidEmployeeId(hrisEmployee.supervisor_id)}`);
+  
+  const adHasManager = adUser.manager && typeof adUser.manager === 'string' && adUser.manager.trim() !== '';
+  const hrisHasSupervisor = hrisEmployee.supervisor_id && isValidEmployeeId(hrisEmployee.supervisor_id);
+  
+  console.log(`[DEBUG] adHasManager: ${adHasManager}, hrisHasSupervisor: ${hrisHasSupervisor}`);
+  
+  if (hrisHasSupervisor) {
+    // HRIS has a valid supervisor
+    if (!adHasManager) {
+      console.log(`[DEBUG] Adding manager discrepancy - AD has no manager but HRIS has supervisor: ${hrisEmployee.supervisor_id}`);
+      discrepancies.push({
+        field: 'manager',
+        adValue: 'Not set',
+        hrisValue: `Should be set (supervisor ID: ${hrisEmployee.supervisor_id})`,
+        severity: 'high'
+      });
+      supervisorStatus = 'missing_in_ad';
+    } else {
+      console.log(`[DEBUG] Both AD and HRIS have manager/supervisor - counting as match for now`);
+      matches.push('manager');
+      supervisorStatus = 'needs_verification';
+    }
+  } else if (adHasManager) {
+    console.log(`[DEBUG] Adding manager discrepancy - AD has manager but HRIS supervisor is invalid/empty`);
+    discrepancies.push({
+      field: 'manager',
+      adValue: adUser.manager,
+      hrisValue: 'Not set in HRIS',
+      severity: 'medium'
+    });
+    supervisorStatus = 'extra_in_ad';
+  } else {
+    console.log(`[DEBUG] Both AD manager and HRIS supervisor are empty/invalid - counting as match`);
+    matches.push('manager');
+    supervisorStatus = 'both_empty';
+  }
+  
+  return {
+    hasDiscrepancies: discrepancies.length > 0,
+    discrepancies,
+    matches,
+    supervisorStatus,
+    summary: {
+      totalFields: 4, // department, title, mobile, manager
+      matchingFields: matches.length,
+      discrepantFields: discrepancies.length,
+      highSeverityIssues: discrepancies.filter(d => d.severity === 'high').length,
+      mediumSeverityIssues: discrepancies.filter(d => d.severity === 'medium').length,
+      lowSeverityIssues: discrepancies.filter(d => d.severity === 'low').length
+    }
+  };
+}
+
+/**
  * Generate recommendations based on AD user analysis
  */
-function generateRecommendations(adUser, exactMatch, fuzzyMatches) {
+function generateRecommendations(adUser, exactMatch, fuzzyMatches, fieldComparison) {
   const recommendations = [];
   
   if (!adUser.employeeID) {
     recommendations.push({
       type: 'missing_employee_id',
       message: 'User does not have an employeeID set in Active Directory',
-      action: 'Set the employeeID attribute in AD to enable HRIS sync matching'
+      action: 'Set the employeeID attribute in AD to enable HRIS sync matching',
+      severity: 'high'
     });
   } else if (!exactMatch) {
     recommendations.push({
       type: 'employee_id_mismatch',
       message: `User has employeeID "${adUser.employeeID}" but no matching HRIS employee found`,
-      action: 'Verify the employeeID value matches an employee in the HRIS database'
+      action: 'Verify the employeeID value matches an employee in the HRIS database',
+      severity: 'high'
+    });
+  }
+  
+  // Add field comparison recommendations
+  if (fieldComparison && fieldComparison.hasDiscrepancies) {
+    fieldComparison.discrepancies.forEach(discrepancy => {
+      recommendations.push({
+        type: 'field_mismatch',
+        field: discrepancy.field,
+        message: `${discrepancy.field.toUpperCase()} mismatch: AD="${discrepancy.adValue}" vs HRIS="${discrepancy.hrisValue}"`,
+        action: `Update ${discrepancy.field} in Active Directory to match HRIS value: "${discrepancy.hrisValue}"`,
+        severity: discrepancy.severity
+      });
+    });
+    
+    // Add summary recommendation
+    const summary = fieldComparison.summary;
+    if (summary.highSeverityIssues > 0) {
+      recommendations.push({
+        type: 'sync_status',
+        message: `User has ${summary.discrepantFields} field discrepancies (${summary.highSeverityIssues} high priority)`,
+        action: 'Run HRIS sync to update AD fields, or manually correct the discrepancies',
+        severity: 'high'
+      });
+    } else if (summary.mediumSeverityIssues > 0) {
+      recommendations.push({
+        type: 'sync_status',
+        message: `User has ${summary.discrepantFields} minor field discrepancies`,
+        action: 'Consider running HRIS sync to update AD fields',
+        severity: 'medium'
+      });
+    }
+  } else if (exactMatch && fieldComparison && !fieldComparison.hasDiscrepancies) {
+    recommendations.push({
+      type: 'sync_status',
+      message: 'User data is fully synchronized between AD and HRIS',
+      action: 'No action required - all fields match',
+      severity: 'info'
     });
   }
   
@@ -881,7 +1092,8 @@ function generateRecommendations(adUser, exactMatch, fuzzyMatches) {
     recommendations.push({
       type: 'potential_fuzzy_match',
       message: `Found ${fuzzyMatches.length} potential name matches in HRIS`,
-      action: `Consider setting employeeID to one of: ${fuzzyMatches.slice(0, 3).map(m => m.employee_id).join(', ')}`
+      action: `Consider setting employeeID to one of: ${fuzzyMatches.slice(0, 3).map(m => m.employee_id).join(', ')}`,
+      severity: 'medium'
     });
   }
   
@@ -889,7 +1101,8 @@ function generateRecommendations(adUser, exactMatch, fuzzyMatches) {
     recommendations.push({
       type: 'missing_department',
       message: 'User does not have a department set in Active Directory',
-      action: 'Set the department attribute for proper organizational structure'
+      action: 'Set the department attribute for proper organizational structure',
+      severity: 'medium'
     });
   }
   

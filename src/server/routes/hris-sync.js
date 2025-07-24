@@ -432,4 +432,175 @@ router.get('/debug-ad-user/:username', async (req, res) => {
   }
 });
 
+// Test endpoint to demonstrate manager comparison logic with mock data
+router.get('/test-manager-comparison/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    console.log(`[DEBUG TEST] Testing manager comparison logic for username: ${username}`);
+    
+    // Mock AD user data based on the screenshots provided
+    const mockAdUser = {
+      sAMAccountName: username,
+      userPrincipalName: `${username}@mti.co.id`,
+      displayName: 'Reyhan Dayu Ramadhani',
+      name: 'Reyhan Dayu Ramadhani',
+      employeeID: 'MT100126',
+      department: 'Human Resources',
+      title: 'Mandarin Translator',
+      manager: '', // Empty manager field as shown in screenshot
+      mobile: '',
+      mail: `${username}@mti.co.id`,
+      distinguishedName: `CN=Reyhan Dayu Ramadhani,OU=Users,DC=mti,DC=co,DC=id`,
+      cn: 'Reyhan Dayu Ramadhani'
+    };
+    
+    // Mock HRIS employee data
+    const mockHrisEmployee = {
+      employee_id: 'MT100126',
+      employee_name: 'Reyhan Dayu Ramadhani',
+      department: 'Human Resources',
+      position_title: 'Mandarin Translator',
+      supervisor_id: 'MT100001', // Mock supervisor ID
+      phone: '+62812345678'
+    };
+    
+    console.log(`[DEBUG TEST] Mock AD User:`, JSON.stringify(mockAdUser, null, 2));
+    console.log(`[DEBUG TEST] Mock HRIS Employee:`, JSON.stringify(mockHrisEmployee, null, 2));
+    
+    // Simulate the manager comparison logic from compareAdHrisFields function
+    const discrepancies = [];
+    const matches = [];
+    
+    // Compare department
+    if (mockAdUser.department !== mockHrisEmployee.department) {
+      discrepancies.push({
+        field: 'department',
+        adValue: mockAdUser.department || 'Not set',
+        hrisValue: mockHrisEmployee.department || 'Not set',
+        severity: 'high'
+      });
+    } else {
+      matches.push('department');
+    }
+    
+    // Compare title/position
+    if (mockAdUser.title !== mockHrisEmployee.position_title) {
+      discrepancies.push({
+        field: 'title',
+        adValue: mockAdUser.title || 'Not set',
+        hrisValue: mockHrisEmployee.position_title || 'Not set',
+        severity: 'medium'
+      });
+    } else {
+      matches.push('title');
+    }
+    
+    // Compare mobile/phone
+    const adMobile = mockAdUser.mobile || '';
+    const hrisPhone = mockHrisEmployee.phone || '';
+    if (adMobile !== hrisPhone) {
+      discrepancies.push({
+        field: 'mobile',
+        adValue: adMobile || 'Not set',
+        hrisValue: hrisPhone || 'Not set',
+        severity: 'low'
+      });
+    } else {
+      // Both are the same (either both empty or both have same value)
+      matches.push('mobile');
+    }
+    
+    // Check supervisor/manager - THIS IS THE KEY LOGIC WE'RE TESTING
+    let supervisorStatus = 'unknown';
+    console.log(`[DEBUG TEST] Manager comparison - AD manager: "${mockAdUser.manager}", HRIS supervisor_id: "${mockHrisEmployee.supervisor_id}"`);
+    
+    // Helper function to check if employee ID is valid
+    const isValidEmployeeId = (id) => {
+      return id && typeof id === 'string' && id.trim().length > 0 && id !== 'null' && id !== 'undefined';
+    };
+    
+    console.log(`[DEBUG TEST] isValidEmployeeId(${mockHrisEmployee.supervisor_id}): ${isValidEmployeeId(mockHrisEmployee.supervisor_id)}`);
+    
+    if (mockHrisEmployee.supervisor_id && isValidEmployeeId(mockHrisEmployee.supervisor_id)) {
+      // We would need to look up the supervisor's DN, but for now just note the discrepancy
+      if (!mockAdUser.manager) {
+        console.log(`[DEBUG TEST] Adding manager discrepancy - AD has no manager but HRIS has supervisor: ${mockHrisEmployee.supervisor_id}`);
+        discrepancies.push({
+          field: 'manager',
+          adValue: 'Not set',
+          hrisValue: `Should be set (supervisor ID: ${mockHrisEmployee.supervisor_id})`,
+          severity: 'high'
+        });
+        supervisorStatus = 'missing_in_ad';
+      } else {
+        // Both have values, would need to verify if they match
+        matches.push('manager');
+        supervisorStatus = 'needs_verification';
+      }
+    } else if (mockAdUser.manager) {
+      console.log(`[DEBUG TEST] Adding manager discrepancy - AD has manager but HRIS supervisor is invalid/empty`);
+      discrepancies.push({
+        field: 'manager',
+        adValue: mockAdUser.manager,
+        hrisValue: 'Not set in HRIS',
+        severity: 'medium'
+      });
+      supervisorStatus = 'extra_in_ad';
+    } else {
+      console.log(`[DEBUG TEST] Both AD manager and HRIS supervisor are empty/invalid - counting as match`);
+      matches.push('manager');
+      supervisorStatus = 'both_empty';
+    }
+    
+    const fieldComparison = {
+      hasDiscrepancies: discrepancies.length > 0,
+      discrepancies,
+      matches,
+      supervisorStatus,
+      summary: {
+        totalFields: 4, // department, title, mobile, manager
+        matchingFields: matches.length,
+        discrepantFields: discrepancies.length,
+        highSeverityIssues: discrepancies.filter(d => d.severity === 'high').length,
+        mediumSeverityIssues: discrepancies.filter(d => d.severity === 'medium').length,
+        lowSeverityIssues: discrepancies.filter(d => d.severity === 'low').length
+      }
+    };
+    
+    console.log(`[DEBUG TEST] Field comparison result:`, JSON.stringify(fieldComparison, null, 2));
+    
+    res.json({
+      success: true,
+      data: {
+        username,
+        found: true,
+        searchMethod: 'mock_test_data',
+        adUserDetails: mockAdUser,
+        hrisMatching: {
+          exactMatch: mockHrisEmployee,
+          fuzzyMatches: [],
+          fieldComparison,
+          syncStatus: fieldComparison.hasDiscrepancies ? 'has_discrepancies' : 'in_sync'
+        },
+        analysis: {
+          hasEmployeeID: !!mockAdUser.employeeID,
+          employeeIDValue: mockAdUser.employeeID || 'Not set',
+          hasExactHrisMatch: true,
+          isInSync: !fieldComparison.hasDiscrepancies,
+          hasDiscrepancies: fieldComparison.hasDiscrepancies,
+          hasFuzzyMatches: false,
+          testNote: 'This is a mock test demonstrating the manager comparison logic'
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error in test-manager-comparison endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 export default router;
