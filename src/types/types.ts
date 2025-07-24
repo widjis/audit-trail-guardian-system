@@ -161,7 +161,7 @@ export interface HrisSyncResult {
   fieldComparison?: {
     totalFields: number;
     matchingFields: number;
-    discrepancies: string[];
+    discrepancies: number;  // Changed from string[] to number
     highPriorityIssues: string[];
     details: {
       department: { status: 'match' | 'discrepancy'; adValue: string; hrisValue: string };

@@ -10,9 +10,9 @@ import {
   syncToActiveDirectory,
   syncSelectedUsersToAD,
   findUsersInAD,
-  loadSettings,
   debugDataCounts,
-  debugAdUserByUsername
+  debugAdUserByUsername,
+  gatherEmployeeData
 } from '../services/hrisSyncService.js';
 
 // ES-module __dirname shim
@@ -166,10 +166,10 @@ function resultsToCsv(results, testOnly) {
 router.get('/test', async (req, res) => {
   try {
     // 1) Run dry-run sync
-    const { test, results } = await syncToActiveDirectory(true);
+    const { test, results, summary } = await syncToActiveDirectory(true);
 
-    // 2) Return results as JSON
-    res.json({ success: true, test, results });
+    // 2) Return results as JSON with summary
+    res.json({ success: true, test, results, summary });
   } catch (err) {
     console.error('[HRIS] /test error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -191,8 +191,8 @@ router.post('/manual', async (req, res) => {
       });
     }
     
-    const { test, results } = await syncSelectedUsersToAD(employeeIDs);
-    res.json({ success: true, test, results });
+    const { test, results, summary } = await syncSelectedUsersToAD(employeeIDs);
+    res.json({ success: true, test, results, summary });
   } catch (err) {
     console.error('[HRIS] /manual sync error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -205,8 +205,8 @@ router.post('/manual', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { test, results } = await syncToActiveDirectory(false);
-    res.json({ success: true, test, results });
+    const { test, results, summary } = await syncToActiveDirectory(false);
+    res.json({ success: true, test, results, summary });
   } catch (err) {
     console.error('[HRIS] / sync error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -287,17 +287,19 @@ router.get('/query', async (req, res) => {
  */
 router.get('/debug-counts', async (req, res) => {
   try {
-    const { gatherEmployeeData, findUsersInAD, loadSettings } = await import('../services/hrisSyncService.js');
-    const settings = loadSettings();
+    const { gatherEmployeeData, findUsersInAD } = await import('../services/hrisSyncService.js');
     
-    // Get raw counts
-    const dbUsers = await gatherEmployeeData();
-    const adUsers = await findUsersInAD(settings.activeDirectorySettings.baseDN);
-    
-    // Get database connection for additional queries
+    // Get database connection for AD settings
     const dbPool = req.app.locals.dbPool;
     const SystemConfigService = (await import('../services/system-config-service.js')).default;
     const systemConfig = new SystemConfigService(dbPool);
+    const adConfig = await systemConfig.getActiveDirectoryConfig();
+    
+    // Get raw counts
+    const dbUsers = await gatherEmployeeData();
+    const adUsers = await findUsersInAD(adConfig.baseDN);
+    
+    // Get HRIS database configuration
     const hrisDbConfig = await systemConfig.getHrisConfig();
     
     // Check total employees in database (including Non Staff)
@@ -602,5 +604,176 @@ router.get('/test-manager-comparison/:username', async (req, res) => {
     });
   }
 });
+
+// Debug endpoint to check supervisor lookup issues
+router.get('/debug-supervisor-lookup', async (req, res) => {
+  try {
+    console.log('[DEBUG SUPERVISOR] Starting supervisor lookup debug...');
+    
+    // Get all HRIS employees with supervisor IDs
+    const hrisEmployees = await gatherEmployeeData();
+    console.log(`[DEBUG SUPERVISOR] Found ${hrisEmployees.length} HRIS employees`);
+    
+    // Get database connection for AD settings
+    const dbPool = req.app.locals.dbPool;
+    const SystemConfigService = (await import('../services/system-config-service.js')).default;
+    const systemConfig = new SystemConfigService(dbPool);
+    const ad = await systemConfig.getActiveDirectoryConfig();
+    
+    // Get all AD users
+    const adUsers = await findUsersInAD(ad.baseDN);
+    console.log(`[DEBUG SUPERVISOR] Found ${adUsers.length} AD users`);
+    
+    // Create a map of employee ID to AD user for quick lookup
+    const adUserMap = new Map();
+    adUsers.forEach(user => {
+      if (user.employeeID) {
+        adUserMap.set(user.employeeID, user);
+      }
+    });
+    
+    const supervisorIssues = [];
+    let checkedCount = 0;
+    let issuesFound = 0;
+    
+    for (const employee of hrisEmployees) {
+      if (!employee.supervisor_id || employee.supervisor_id.trim() === '') {
+        continue; // Skip employees without supervisors
+      }
+      
+      checkedCount++;
+      
+      // Check if this employee exists in AD
+      const adUser = adUserMap.get(employee.employee_id);
+      if (!adUser) {
+        continue; // Skip if employee not in AD
+      }
+      
+      // Check if supervisor exists in AD
+      const supervisorInAd = adUserMap.get(employee.supervisor_id);
+      
+      if (!supervisorInAd) {
+        // Supervisor not found in AD - this is the issue we're investigating
+        issuesFound++;
+        
+        // Try to find supervisor by name or other methods
+        const supervisorSearchResults = [];
+        
+        // Search by employee ID in different formats
+        const supervisorId = employee.supervisor_id;
+        const possibleFormats = [
+          supervisorId,
+          supervisorId.toUpperCase(),
+          supervisorId.toLowerCase(),
+          supervisorId.replace(/^0+/, ''), // Remove leading zeros
+          '0' + supervisorId, // Add leading zero
+        ];
+        
+        for (const format of possibleFormats) {
+          const found = adUserMap.get(format);
+          if (found) {
+            supervisorSearchResults.push({
+              method: `employeeID_format_${format}`,
+              user: found
+            });
+          }
+        }
+        
+        // Search by name if we have HRIS supervisor name
+        // (This would require additional HRIS data with supervisor names)
+        
+        supervisorIssues.push({
+          employee: {
+            id: employee.employee_id,
+            name: employee.employee_name,
+            department: employee.department,
+            supervisorId: employee.supervisor_id
+          },
+          adUser: {
+            displayName: adUser.displayName,
+            employeeID: adUser.employeeID,
+            currentManager: adUser.manager || 'Not set'
+          },
+          issue: 'supervisor_not_found_in_ad',
+          supervisorSearchResults,
+          possibleCauses: [
+            'Supervisor employee ID format mismatch',
+            'Supervisor not synced to AD yet',
+            'Supervisor terminated but still in HRIS',
+            'Data entry error in HRIS supervisor ID'
+          ]
+        });
+      }
+    }
+    
+    console.log(`[DEBUG SUPERVISOR] Checked ${checkedCount} employees with supervisors`);
+    console.log(`[DEBUG SUPERVISOR] Found ${issuesFound} supervisor lookup issues`);
+    
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalHrisEmployees: hrisEmployees.length,
+          totalAdUsers: adUsers.length,
+          employeesWithSupervisors: checkedCount,
+          supervisorIssuesFound: issuesFound
+        },
+        issues: supervisorIssues.slice(0, 50), // Limit to first 50 issues
+        analysis: {
+          commonPatterns: analyzeSupervisorPatterns(supervisorIssues),
+          recommendations: [
+            'Check if supervisor employee IDs have format inconsistencies',
+            'Verify if supervisors exist in HRIS but not in AD',
+            'Review data entry processes for supervisor assignments',
+            'Consider implementing fuzzy matching for supervisor lookups'
+          ]
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[DEBUG SUPERVISOR] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Helper function to analyze supervisor issue patterns
+function analyzeSupervisorPatterns(issues) {
+  const patterns = {
+    supervisorIdFormats: {},
+    departmentDistribution: {},
+    commonSupervisorIds: {}
+  };
+  
+  issues.forEach(issue => {
+    // Analyze supervisor ID formats
+    const supervisorId = issue.employee.supervisorId;
+    const format = getSupervisorIdFormat(supervisorId);
+    patterns.supervisorIdFormats[format] = (patterns.supervisorIdFormats[format] || 0) + 1;
+    
+    // Analyze department distribution
+    const dept = issue.employee.department || 'Unknown';
+    patterns.departmentDistribution[dept] = (patterns.departmentDistribution[dept] || 0) + 1;
+    
+    // Track common supervisor IDs that are missing
+    patterns.commonSupervisorIds[supervisorId] = (patterns.commonSupervisorIds[supervisorId] || 0) + 1;
+  });
+  
+  return patterns;
+}
+
+// Helper function to determine supervisor ID format
+function getSupervisorIdFormat(supervisorId) {
+  if (!supervisorId) return 'empty';
+  if (/^MT\d+$/.test(supervisorId)) return 'MT_format';
+  if (/^\d+$/.test(supervisorId)) return 'numeric_only';
+  if (/^[A-Z]+\d+$/.test(supervisorId)) return 'letters_numbers';
+  return 'other';
+}
 
 export default router;

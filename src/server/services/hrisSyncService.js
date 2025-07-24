@@ -100,20 +100,103 @@ function levenshteinDistance(str1, str2) {
 }
 
 /**
- * Fuzzy-match an AD user by name
- * @param {Array} adUsers – list of objects with a `name` property
+ * Fuzzy-match an AD user by name with improved matching
+ * @param {Array} adUsers – list of objects with name properties
  * @param {string} targetName
  * @param {number} threshold – max Fuse.js score (lower = better)
+ * @param {boolean} returnWithScore – if true, returns object with match and confidence info
  */
-function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.1) {
+function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.4, returnWithScore = false) {
+  console.log(`[FUZZY] Searching for: "${targetName}" among ${adUsers.length} AD users`);
+  
+  // Enhanced Fuse.js configuration for better matching
   const fuse = new Fuse(adUsers, {
-    keys: ['name'],
-    threshold,
-    distance: 100,
-    includeScore: true
+    keys: [
+      { name: 'name', weight: 0.4 },
+      { name: 'displayName', weight: 0.3 },
+      { name: 'sAMAccountName', weight: 0.3 }
+    ],
+    threshold: threshold,
+    distance: 200,
+    includeScore: true,
+    ignoreLocation: true,
+    findAllMatches: true,
+    minMatchCharLength: 3
   });
-  const [best] = fuse.search(targetName);
-  return best && best.score <= threshold ? best.item : null;
+  
+  const results = fuse.search(targetName);
+  console.log(`[FUZZY] Found ${results.length} potential matches for "${targetName}"`);
+  
+  // Log top 3 matches for debugging
+  results.slice(0, 3).forEach((result, index) => {
+    console.log(`[FUZZY] Match ${index + 1}: "${result.item.name}" (displayName: "${result.item.displayName}") - Score: ${result.score.toFixed(3)}`);
+  });
+  
+  const [best] = results;
+  
+  // Prepare confidence information
+  const confidenceInfo = {
+    searchResults: results.slice(0, 5).map(r => ({
+      user: r.item,
+      score: r.score,
+      confidence: Math.max(0, (1 - r.score) * 100), // Convert to percentage (higher = better)
+      method: 'fuzzy_search'
+    })),
+    threshold: threshold,
+    bestScore: best?.score || null,
+    bestConfidence: best ? Math.max(0, (1 - best.score) * 100) : 0
+  };
+  
+  if (best && best.score <= threshold) {
+    console.log(`[FUZZY] ✅ Selected match: "${best.item.name}" with score ${best.score.toFixed(3)} (${confidenceInfo.bestConfidence.toFixed(1)}% confidence)`);
+    
+    if (returnWithScore) {
+      return {
+        match: best.item,
+        confidence: confidenceInfo,
+        method: 'fuzzy_search'
+      };
+    }
+    return best.item;
+  } else {
+    console.log(`[FUZZY] ❌ No suitable match found for "${targetName}" (best score: ${best?.score?.toFixed(3) || 'N/A'})`);
+    
+    // Additional fallback: try simple string contains matching
+    const containsMatch = adUsers.find(user => {
+      const userName = (user.name || '').toLowerCase();
+      const userDisplayName = (user.displayName || '').toLowerCase();
+      const target = targetName.toLowerCase();
+      
+      return userName.includes(target) || target.includes(userName) ||
+             userDisplayName.includes(target) || target.includes(userDisplayName);
+    });
+    
+    if (containsMatch) {
+      console.log(`[FUZZY] 🔄 Fallback match found: "${containsMatch.name}" using contains matching`);
+      
+      if (returnWithScore) {
+        return {
+          match: containsMatch,
+          confidence: {
+            ...confidenceInfo,
+            bestConfidence: 50, // Assign moderate confidence for contains matching
+            method: 'contains_matching'
+          },
+          method: 'contains_matching'
+        };
+      }
+      return containsMatch;
+    }
+    
+    if (returnWithScore) {
+      return {
+        match: null,
+        confidence: confidenceInfo,
+        method: 'no_match'
+      };
+    }
+    return null;
+  }
 }
 
 /**
@@ -166,7 +249,7 @@ function computeDiffs(dbRow, adUser) {
   
   if (hrisHasPhone && adHasMobile) {
     const std = standardizePhoneNumber(dbRow.phone);
-    const mobileMatch = std === adUser.mobile;
+    const mobileMatch = std === adUser.mobile.trim();
     if (mobileMatch) {
       fieldComparison.matchingFields++;
       fieldComparison.details.mobile = { status: 'match', hrisValue: std, adValue: adUser.mobile };
@@ -257,10 +340,14 @@ export async function gatherEmployeeData() {
   const sql = `
     SELECT *
       FROM [${schema}].[it_mti_employee_database_tbl]
-     WHERE grade_interval <> 'Non Staff';`;
+      WHERE grade_interval <> 'Non Staff';`;
 
   const { recordset } = await pool.request().query(sql);
   await pool.close();
+  
+  console.log(`[HRIS] Found ${recordset.length} staff employees in database (Non Staff excluded)`);
+  console.log(`[HRIS] Sample employee IDs: ${recordset.slice(0, 5).map(r => r.employee_id).join(', ')}`);
+  
   return recordset;
 }
 
@@ -277,18 +364,30 @@ export async function findUsersInAD(baseDN) {
   const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','distinguishedName'];
   const entries = await ldapSearch(baseDN, filter, attrs);
 
-  // map into consistent shape
-  return entries.map(e => ({
-    sAMAccountName: e.sAMAccountName,
-    displayName:    e.displayName,
-    name:           e.name,
-    employeeID:     e.employeeID,
-    department:     e.department,
-    title:          e.title,
-    manager:        e.manager,
-    mobile:         e.mobile,
-    dn:             e.distinguishedName
-  }));
+  // map into consistent shape with normalized mobile field
+  return entries.map(e => {
+    // Normalize mobile field (LDAP might return array)
+    let normalizedMobile = '';
+    if (e.mobile) {
+      if (Array.isArray(e.mobile)) {
+        normalizedMobile = e.mobile[0] || '';
+      } else if (typeof e.mobile === 'string') {
+        normalizedMobile = e.mobile;
+      }
+    }
+    
+    return {
+      sAMAccountName: e.sAMAccountName,
+      displayName:    e.displayName,
+      name:           e.name,
+      employeeID:     e.employeeID,
+      department:     e.department,
+      title:          e.title,
+      manager:        e.manager,
+      mobile:         normalizedMobile,
+      dn:             e.distinguishedName
+    };
+  });
 }
 
 /**
@@ -305,7 +404,12 @@ export async function syncToActiveDirectory(testOnly = true) {
     findUsersInAD(adBaseDN)
   ]);
 
+  console.log(`[SYNC] Processing ${dbUsers.length} HRIS users against ${adUsers.length} AD users`);
+
   const syncResults = [];
+  let processedCount = 0;
+  let skippedNoName = 0;
+  let skippedNoAdMatch = 0;
 
   for (const row of dbUsers) {
     try {
@@ -313,16 +417,44 @@ export async function syncToActiveDirectory(testOnly = true) {
       const empName = row.employee_name?.trim();
       const empGender = row.gender;
 
-      if (!empName) continue;
+      if (!empName) {
+        skippedNoName++;
+        continue;
+      }
 
-      // 1) Exact match
-      let adUser = adUsers.find(u => u.employeeID === empId);
+      // 1) Enhanced exact match - try multiple approaches
+      let adUser = null;
+      let matchMethod = 'none';
+      
+      // First try: exact employeeID match
+      adUser = adUsers.find(u => u.employeeID === empId);
+      if (adUser) {
+        matchMethod = 'employeeID';
+        console.log(`[MATCH] ✅ Exact employeeID match for ${empName} (${empId})`);
+      }
+      
+      // Second try: exact name match (case-insensitive)
+      if (!adUser) {
+        adUser = adUsers.find(u => {
+          const adName = (u.name || '').toLowerCase().trim();
+          const adDisplayName = (u.displayName || '').toLowerCase().trim();
+          const hrisName = empName.toLowerCase().trim();
+          
+          return adName === hrisName || adDisplayName === hrisName;
+        });
+        if (adUser) {
+          matchMethod = 'exactName';
+          console.log(`[MATCH] ✅ Exact name match for ${empName}: AD="${adUser.name || adUser.displayName}"`);
+        }
+      }
 
       // 2) Fuzzy fallback
       if (!adUser) {
         const fuzzy = fuzzyMatchAdUser(adUsers, empName);
         if (fuzzy) {
           adUser = fuzzy;
+          matchMethod = 'fuzzy';
+          console.log(`[MATCH] 🔄 Fuzzy match for ${empName}: AD="${fuzzy.name || fuzzy.displayName}"`);
           if (!testOnly) {
             await ldapModify(fuzzy.dn, [
               { operation:'replace', modification:{ employeeID: empId } },
@@ -335,8 +467,11 @@ export async function syncToActiveDirectory(testOnly = true) {
       // **Guard against still‐undefined** adUser
       if (!adUser) {
         console.warn(`No AD match for ${empName}`);
+        skippedNoAdMatch++;
         continue;
       }
+
+      processedCount++;
 
       // 3) Compute diffs with detailed field comparison
       const { diffs, fieldComparison } = computeDiffs(row, adUser);
@@ -411,6 +546,7 @@ export async function syncToActiveDirectory(testOnly = true) {
       syncResults.push({
         employeeID: empId,
         displayName: adUser.displayName || "",
+        matchMethod, // Track how this user was matched
         current: {
           department: adUser.department || "",
           title:      adUser.title || "",
@@ -432,6 +568,14 @@ export async function syncToActiveDirectory(testOnly = true) {
       console.error(`Error processing ${row.employee_id}:`, err);
     }
   }
+
+  // Log processing summary
+  console.log(`[SYNC] Processing Summary:`);
+  console.log(`  - Total HRIS users: ${dbUsers.length}`);
+  console.log(`  - Skipped (no name): ${skippedNoName}`);
+  console.log(`  - Skipped (no AD match): ${skippedNoAdMatch}`);
+  console.log(`  - Successfully processed: ${processedCount}`);
+  console.log(`  - Final results: ${syncResults.length}`);
 
   // Calculate summary statistics
   const summary = {

@@ -94,14 +94,19 @@ export function escapeFilter(value) {
  */
 export async function search(baseDN, filter, attributes) {
   const client = await getClient();
+  
+  // Make sizeLimit configurable via environment variable
+  // Default to 1000, set to 0 for unlimited (be careful with large directories)
+  const sizeLimit = process.env.LDAP_SIZE_LIMIT ? parseInt(process.env.LDAP_SIZE_LIMIT) : 1000;
+  
   const opts = {
     filter,
     scope: 'sub',
-    sizeLimit: 200,
+    sizeLimit: sizeLimit,
     attributes: attributes.length > 0 ? attributes : ['*','+']
   };
 
-  console.info(`LDAP search: baseDN="${baseDN}", filter="${filter}", attributes=${JSON.stringify(opts.attributes)}`);
+  console.info(`LDAP search: baseDN="${baseDN}", filter="${filter}", sizeLimit=${sizeLimit}, attributes=${JSON.stringify(opts.attributes)}`);
 
   try {
     const { searchEntries } = await client.search(baseDN, opts);
@@ -122,7 +127,7 @@ export async function search(baseDN, filter, attributes) {
       return transformedEntry;
     });
     
-    console.info(`LDAP search completed successfully with ${results.length} results`);
+    console.info(`LDAP search completed successfully with ${results.length} results (limit was ${sizeLimit})`);
     await client.unbind();
     return results;
   } catch (err) {

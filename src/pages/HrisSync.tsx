@@ -19,6 +19,7 @@ import { HrisSyncResult } from "@/types/types";
 import { HrisSyncDebugger } from "@/components/hires/HrisSyncDebugger";
 import { HrisSyncDataCounts } from "@/components/hires/HrisSyncDataCounts";
 import { AdUserDebugger } from "@/components/hires/AdUserDebugger";
+import SupervisorDebugger from "@/components/hires/SupervisorDebugger";
 
 export default function HrisSync() {
   // — State hooks
@@ -34,10 +35,22 @@ export default function HrisSync() {
   const [nextScheduledRun, setNextScheduledRun] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // — Only rows that have at least one diff
-  const changedResults = syncResults.filter((row: HrisSyncResult) =>
-    Object.values(row.diffs).some(v => v !== undefined && v !== null)
-  );
+  // — Only rows that have changes OR field discrepancies OR high priority issues
+  // — Skip users who are "Missing in HRIS" (not found in HRIS database)
+  const changedResults = syncResults.filter((row: HrisSyncResult) => {
+    // Skip if user has "Missing in HRIS" issues
+    const hasMissingInHrisIssues = row.fieldComparison?.highPriorityIssues?.some(issue => 
+      issue.includes('Missing') && issue.includes('HRIS')
+    );
+    if (hasMissingInHrisIssues) {
+      return false;
+    }
+
+    const hasDiffs = Object.values(row.diffs).some(v => v !== undefined && v !== null);
+    const hasDiscrepancies = row.fieldComparison?.discrepancies > 0;
+    const hasHighPriorityIssues = row.fieldComparison?.highPriorityIssues?.length > 0;
+    return hasDiffs || hasDiscrepancies || hasHighPriorityIssues;
+  });
 
   // — Selection handlers
   const isSelected = (employeeID: string) => selectedUsers.includes(employeeID);
@@ -411,8 +424,9 @@ export default function HrisSync() {
           </TabsContent>
 
           {/* Debug Tab */}
-          <TabsContent value="debug">
+          <TabsContent value="debug" className="space-y-6">
             <HrisSyncDebugger />
+            <SupervisorDebugger />
           </TabsContent>
 
           {/* AD User Lookup Tab */}
