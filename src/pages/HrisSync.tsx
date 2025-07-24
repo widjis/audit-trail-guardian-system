@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
@@ -20,6 +21,7 @@ import { HrisSyncDebugger } from "@/components/hires/HrisSyncDebugger";
 import { HrisSyncDataCounts } from "@/components/hires/HrisSyncDataCounts";
 import { AdUserDebugger } from "@/components/hires/AdUserDebugger";
 import SupervisorDebugger from "@/components/hires/SupervisorDebugger";
+import EmployeesNotInAdDebugger from "@/components/hires/EmployeesNotInAdDebugger";
 
 export default function HrisSync() {
   // — State hooks
@@ -33,6 +35,7 @@ export default function HrisSync() {
   const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
   const [nextScheduledRun, setNextScheduledRun] = useState<string | null>(null);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.4);
   const { toast } = useToast();
 
   // — Only rows that have changes OR field discrepancies OR high priority issues
@@ -68,7 +71,7 @@ export default function HrisSync() {
     setTestStatus("loading");
     setSelectedUsers([]);
     try {
-      const res = await fetch("/api/hris-sync/test");
+      const res = await fetch(`/api/hris-sync/test?confidenceThreshold=${confidenceThreshold}`);
       if (!res.ok) throw new Error("Failed to fetch test sync results");
       const { results, summary } = await res.json();
       setSyncResults(results || []);
@@ -198,6 +201,24 @@ export default function HrisSync() {
                   <CardTitle>Test Sync</CardTitle>
                   <CardDescription>Dry-run only</CardDescription>
                 </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="confidence-threshold">Confidence Threshold</Label>
+                    <Input
+                      id="confidence-threshold"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={confidenceThreshold}
+                      onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value) || 0.4)}
+                      placeholder="0.4"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Minimum confidence score for fuzzy matching (0.0 - 1.0)
+                    </p>
+                  </div>
+                </CardContent>
                 <CardFooter>
                   <Button onClick={handleTestSync} disabled={testStatus === "loading"} className="w-full">
                     {testStatus === "loading"
@@ -285,6 +306,95 @@ export default function HrisSync() {
                       </div>
                     </div>
                   </div>
+                  {/* Processing Summary from Terminal */}
+                  {syncSummary.processingStats && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="text-sm font-medium mb-2">Processing Summary</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs">
+                        <div>
+                          <div className="font-semibold text-blue-600">{syncSummary.processingStats.totalHrisUsers}</div>
+                          <div className="text-muted-foreground">Total HRIS</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-red-600">{syncSummary.processingStats.skippedNoMatch}</div>
+                          <div className="text-muted-foreground">Skipped (No AD Match)</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-green-600">{syncSummary.processingStats.successfullyProcessed}</div>
+                          <div className="text-muted-foreground">Successfully Processed</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-orange-600">{syncSummary.processingStats.skippedNoName}</div>
+                          <div className="text-muted-foreground">Skipped (No Name)</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Skipped Users Section */}
+            {syncSummary?.skippedUsers && syncSummary.skippedUsers.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Skipped Users - No AD Match Found</CardTitle>
+                  <CardDescription>
+                    {syncSummary.skippedUsers.length} users skipped due to fuzzy matching scores above threshold ({confidenceThreshold})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 text-sm text-muted-foreground">
+                    <strong>Note:</strong> Lower scores indicate better matches. Users with scores above {confidenceThreshold} are skipped.
+                  </div>
+                  <ScrollArea className="h-64">
+                    <table className="min-w-full text-xs border">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="border px-2 py-1">Employee ID</th>
+                          <th className="border px-2 py-1">Name</th>
+                          <th className="border px-2 py-1">Department</th>
+                          <th className="border px-2 py-1">Best Match Score</th>
+                          <th className="border px-2 py-1">Best Match Name</th>
+                          <th className="border px-2 py-1">Confidence</th>
+                          <th className="border px-2 py-1">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syncSummary.skippedUsers.map((user, index) => (
+                          <tr key={user.employeeId || index} className="hover:bg-muted/30">
+                            <td className="border px-2 py-1 font-mono">{user.employeeId}</td>
+                            <td className="border px-2 py-1">{user.name}</td>
+                            <td className="border px-2 py-1">{user.department || 'N/A'}</td>
+                            <td className="border px-2 py-1">
+                              <span className={`font-semibold ${
+                                user.bestScore <= 0.2 ? 'text-green-600' :
+                                user.bestScore <= 0.4 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {user.bestScore?.toFixed(3) || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="border px-2 py-1">{user.bestMatchName || 'No match'}</td>
+                            <td className="border px-2 py-1">
+                              <span className={`text-xs ${
+                                user.confidence >= 80 ? 'text-green-600' :
+                                user.confidence >= 60 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {user.confidence?.toFixed(1) || '0.0'}%
+                              </span>
+                            </td>
+                            <td className="border px-2 py-1">
+                              <span className="text-red-600 text-xs">
+                                Score &gt; {confidenceThreshold}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </ScrollArea>
                 </CardContent>
               </Card>
             )}
@@ -319,6 +429,7 @@ export default function HrisSync() {
                           </th>
                           <th className="border px-2 py-1">Employee ID</th>
                           <th className="border px-2 py-1">Display Name</th>
+                          <th className="border px-2 py-1">Match Score</th>
                           <th className="border px-2 py-1">Field Analysis</th>
                           <th className="border px-2 py-1">Department</th>
                           <th className="border px-2 py-1">Title</th>
@@ -338,6 +449,24 @@ export default function HrisSync() {
                             </td>
                             <td className="border px-2 py-1 font-mono">{row.employeeID}</td>
                             <td className="border px-2 py-1">{row.displayName}</td>
+                            <td className="border px-2 py-1">
+                              {row.fuzzyScore !== undefined && row.fuzzyScore !== null ? (
+                                <div className="flex items-center gap-1">
+                                  <span className={`text-xs font-semibold ${
+                                    row.fuzzyScore <= 0.2 ? 'text-green-600' :
+                                    row.fuzzyScore <= 0.4 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {row.fuzzyScore.toFixed(3)}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({row.matchMethod})
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">N/A</span>
+                              )}
+                            </td>
                             <td className="border px-2 py-1">
                               <div className="flex items-center gap-1">
                                 <span className="text-green-600 font-semibold">{row.fieldComparison?.matchingFields || 0}</span>
@@ -427,6 +556,7 @@ export default function HrisSync() {
           <TabsContent value="debug" className="space-y-6">
             <HrisSyncDebugger />
             <SupervisorDebugger />
+            <EmployeesNotInAdDebugger />
           </TabsContent>
 
           {/* AD User Lookup Tab */}

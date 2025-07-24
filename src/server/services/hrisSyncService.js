@@ -106,7 +106,7 @@ function levenshteinDistance(str1, str2) {
  * @param {number} threshold – max Fuse.js score (lower = better)
  * @param {boolean} returnWithScore – if true, returns object with match and confidence info
  */
-function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.4, returnWithScore = false) {
+export function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.4, returnWithScore = false) {
   console.log(`[FUZZY] Searching for: "${targetName}" among ${adUsers.length} AD users`);
   
   // Enhanced Fuse.js configuration for better matching
@@ -393,7 +393,7 @@ export async function findUsersInAD(baseDN) {
 /**
  * Main sync function: dry-run or real apply
  */
-export async function syncToActiveDirectory(testOnly = true) {
+export async function syncToActiveDirectory(testOnly = true, confidenceThreshold = 0.4) {
   const dbPool = getDbPool();
   const systemConfig = new SystemConfigService(dbPool);
   const ad = await systemConfig.getActiveDirectoryConfig();
@@ -407,6 +407,7 @@ export async function syncToActiveDirectory(testOnly = true) {
   console.log(`[SYNC] Processing ${dbUsers.length} HRIS users against ${adUsers.length} AD users`);
 
   const syncResults = [];
+  const skippedUsers = []; // Track skipped users with their details
   let processedCount = 0;
   let skippedNoName = 0;
   let skippedNoAdMatch = 0;
@@ -425,6 +426,7 @@ export async function syncToActiveDirectory(testOnly = true) {
       // 1) Enhanced exact match - try multiple approaches
       let adUser = null;
       let matchMethod = 'none';
+      let fuzzyResult = null; // Store fuzzy result for confidence calculation
       
       // First try: exact employeeID match
       adUser = adUsers.find(u => u.employeeID === empId);
@@ -450,22 +452,49 @@ export async function syncToActiveDirectory(testOnly = true) {
 
       // 2) Fuzzy fallback
       if (!adUser) {
-        const fuzzy = fuzzyMatchAdUser(adUsers, empName);
-        if (fuzzy) {
-          adUser = fuzzy;
+        fuzzyResult = fuzzyMatchAdUser(adUsers, empName, confidenceThreshold, true);
+        if (fuzzyResult && fuzzyResult.match) {
+          adUser = fuzzyResult.match;
           matchMethod = 'fuzzy';
-          console.log(`[MATCH] 🔄 Fuzzy match for ${empName}: AD="${fuzzy.name || fuzzy.displayName}"`);
+          console.log(`[MATCH] 🔄 Fuzzy match for ${empName}: AD="${fuzzyResult.match.name || fuzzyResult.match.displayName}" (${fuzzyResult.confidence.bestConfidence.toFixed(1)}% confidence)`);
           if (!testOnly) {
-            await ldapModify(fuzzy.dn, [
+            await ldapModify(fuzzyResult.match.dn, [
               { operation:'replace', modification:{ employeeID: empId } },
               { operation:'replace', modification:{ gender: empGender } }
             ]);
           }
+        } else if (fuzzyResult && fuzzyResult.confidence) {
+          // User was found but score was above threshold - track as skipped
+          const bestMatch = fuzzyResult.confidence.searchResults && fuzzyResult.confidence.searchResults.length > 0 
+            ? fuzzyResult.confidence.searchResults[0] 
+            : null;
+          skippedUsers.push({
+            employeeId: empId,
+            name: empName,
+            department: row.department || '',
+            bestScore: fuzzyResult.confidence.bestScore,
+            bestMatchName: bestMatch ? (bestMatch.user.name || bestMatch.user.displayName) : 'No match',
+            confidence: fuzzyResult.confidence.bestConfidence,
+            reason: `Score ${fuzzyResult.confidence.bestScore?.toFixed(3)} > threshold ${confidenceThreshold}`
+          });
+          console.log(`[SKIP] ❌ Fuzzy match for ${empName} rejected: score ${fuzzyResult.confidence.bestScore?.toFixed(3)} > threshold ${confidenceThreshold}`);
         }
       }
 
       // **Guard against still‐undefined** adUser
       if (!adUser) {
+        // If no fuzzy result was attempted, add to skipped users
+        if (!fuzzyResult) {
+          skippedUsers.push({
+            employeeId: empId,
+            name: empName,
+            department: row.department || '',
+            bestScore: null,
+            bestMatchName: 'No match attempted',
+            confidence: 0,
+            reason: 'No matching candidates found'
+          });
+        }
         console.warn(`No AD match for ${empName}`);
         skippedNoAdMatch++;
         continue;
@@ -543,10 +572,30 @@ export async function syncToActiveDirectory(testOnly = true) {
       // 5) Always include user in results (even if no diffs) for comprehensive analysis
       const hasChanges = Object.keys(diffs).length > 0;
       
+      // Calculate confidence score and raw fuzzy score based on match method
+      let confidenceScore;
+      let fuzzyScore; // Add raw fuzzy score
+      if (matchMethod === 'employeeID') {
+        confidenceScore = 1.0; // 100% confidence for exact ID match
+        fuzzyScore = 0.0; // Perfect score for exact match
+      } else if (matchMethod === 'exactName') {
+        confidenceScore = 0.95; // 95% confidence for exact name match
+        fuzzyScore = 0.05; // Very low score for exact name match
+      } else if (matchMethod === 'fuzzy' && fuzzyResult) {
+        // Use the confidence from fuzzy matching
+        confidenceScore = fuzzyResult.confidence?.bestConfidence ? fuzzyResult.confidence.bestConfidence / 100 : 0.5;
+        fuzzyScore = fuzzyResult.confidence?.bestScore || null; // Raw fuzzy score
+      } else {
+        confidenceScore = undefined; // No confidence score available
+        fuzzyScore = undefined; // No fuzzy score available
+      }
+      
       syncResults.push({
         employeeID: empId,
         displayName: adUser.displayName || "",
         matchMethod, // Track how this user was matched
+        confidenceScore, // Add confidence score
+        fuzzyScore, // Add raw fuzzy matching score
         current: {
           department: adUser.department || "",
           title:      adUser.title || "",
@@ -585,7 +634,16 @@ export async function syncToActiveDirectory(testOnly = true) {
     totalFieldsAnalyzed: syncResults.length * 4,
     totalMatches: syncResults.reduce((sum, r) => sum + r.fieldComparison.matchingFields, 0),
     totalDiscrepancies: syncResults.reduce((sum, r) => sum + r.fieldComparison.discrepancies, 0),
-    highPriorityIssues: syncResults.reduce((sum, r) => sum + r.fieldComparison.highPriorityIssues.length, 0)
+    highPriorityIssues: syncResults.reduce((sum, r) => sum + r.fieldComparison.highPriorityIssues.length, 0),
+    // Add processing statistics
+    processingStats: {
+      totalHrisUsers: dbUsers.length,
+      skippedNoName: skippedNoName,
+      skippedNoMatch: skippedNoAdMatch,
+      successfullyProcessed: processedCount
+    },
+    // Add skipped users details
+    skippedUsers: skippedUsers
   };
 
   return { 
@@ -599,7 +657,7 @@ export async function syncToActiveDirectory(testOnly = true) {
  * Sync selected users to Active Directory
  * @param {string[]} employeeIDs - Array of employee IDs to sync
  */
-export async function syncSelectedUsersToAD(employeeIDs) {
+export async function syncSelectedUsersToAD(employeeIDs, confidenceThreshold = 0.4) {
   const dbPool = getDbPool();
   const systemConfig = new SystemConfigService(dbPool);
   const ad = await systemConfig.getActiveDirectoryConfig();
@@ -631,7 +689,7 @@ export async function syncSelectedUsersToAD(employeeIDs) {
 
       // 2) Fuzzy fallback: reassign employeeID & gender if needed
       if (!adUser) {
-        const fuzzy = fuzzyMatchAdUser(adUsers, empName);
+        const fuzzy = fuzzyMatchAdUser(adUsers, empName, confidenceThreshold);
         if (fuzzy) {
           adUser = fuzzy;
           // record the ID reassignment in results
@@ -712,9 +770,10 @@ export async function syncSelectedUsersToAD(employeeIDs) {
 /**
  * Debug specific employee sync process
  * @param {string} employeeId - Employee ID to debug
+ * @param {number} confidenceThreshold - Confidence threshold for fuzzy matching
  * @returns {Promise<Object>} Debug information
  */
-export async function debugEmployeeSync(employeeId) {
+export async function debugEmployeeSync(employeeId, confidenceThreshold = 0.4) {
   const dbPool = getDbPool();
   const systemConfig = new SystemConfigService(dbPool);
   const ad = await systemConfig.getActiveDirectoryConfig();
@@ -778,12 +837,12 @@ export async function debugEmployeeSync(employeeId) {
   // Try fuzzy match if exact match failed
   if (!adUser) {
     console.log(`[DEBUG] No exact match found, trying fuzzy match for: ${empName}`);
-    const fuzzy = fuzzyMatchAdUser(adUsers, empName);
+    const fuzzy = fuzzyMatchAdUser(adUsers, empName, confidenceThreshold);
     matchingProcess.fuzzyMatch = {
       attempted: true,
       found: !!fuzzy,
       result: fuzzy || null,
-      threshold: 0.1
+      threshold: confidenceThreshold
     };
     
     if (fuzzy) {

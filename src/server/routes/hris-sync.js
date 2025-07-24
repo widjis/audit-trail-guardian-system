@@ -165,8 +165,11 @@ function resultsToCsv(results, testOnly) {
  */
 router.get('/test', async (req, res) => {
   try {
-    // 1) Run dry-run sync
-    const { test, results, summary } = await syncToActiveDirectory(true);
+    // Extract confidence threshold from query parameters
+    const confidenceThreshold = parseFloat(req.query.confidenceThreshold) || 0.4;
+    
+    // 1) Run dry-run sync with confidence threshold
+    const { test, results, summary } = await syncToActiveDirectory(true, confidenceThreshold);
 
     // 2) Return results as JSON with summary
     res.json({ success: true, test, results, summary });
@@ -182,7 +185,7 @@ router.get('/test', async (req, res) => {
  */
 router.post('/manual', async (req, res) => {
   try {
-    const { employeeIDs } = req.body;
+    const { employeeIDs, confidenceThreshold = 0.4 } = req.body;
     
     if (!employeeIDs || !Array.isArray(employeeIDs) || employeeIDs.length === 0) {
       return res.status(400).json({ 
@@ -191,7 +194,7 @@ router.post('/manual', async (req, res) => {
       });
     }
     
-    const { test, results, summary } = await syncSelectedUsersToAD(employeeIDs);
+    const { test, results, summary } = await syncSelectedUsersToAD(employeeIDs, confidenceThreshold);
     res.json({ success: true, test, results, summary });
   } catch (err) {
     console.error('[HRIS] /manual sync error:', err);
@@ -205,7 +208,8 @@ router.post('/manual', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { test, results, summary } = await syncToActiveDirectory(false);
+    const { confidenceThreshold = 0.4 } = req.body;
+    const { test, results, summary } = await syncToActiveDirectory(false, confidenceThreshold);
     res.json({ success: true, test, results, summary });
   } catch (err) {
     console.error('[HRIS] / sync error:', err);
@@ -385,9 +389,10 @@ router.get('/debug-counts', async (req, res) => {
 router.get('/debug/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
+    const { confidenceThreshold = 0.4 } = req.query;
     const { debugEmployeeSync } = await import('../services/hrisSyncService.js');
     
-    const debugInfo = await debugEmployeeSync(employeeId);
+    const debugInfo = await debugEmployeeSync(employeeId, parseFloat(confidenceThreshold));
     res.json({ success: true, debug: debugInfo });
   } catch (err) {
     console.error(`[HRIS] /debug/${req.params.employeeId} error:`, err);
@@ -604,6 +609,189 @@ router.get('/test-manager-comparison/:username', async (req, res) => {
     });
   }
 });
+
+// Debug endpoint to check employees not found in AD with confidence levels
+router.get('/debug-employees-not-in-ad', async (req, res) => {
+  try {
+    console.log('[DEBUG NOT IN AD] Starting employees not found in AD debug...');
+    
+    // Get threshold from query parameter (default 0.4)
+    const threshold = parseFloat(req.query.threshold) || 0.4;
+    console.log(`[DEBUG NOT IN AD] Using fuzzy matching threshold: ${threshold}`);
+    
+    // Get all HRIS employees
+    const { gatherEmployeeData, findUsersInAD, fuzzyMatchAdUser } = await import('../services/hrisSyncService.js');
+    const hrisEmployees = await gatherEmployeeData();
+    console.log(`[DEBUG NOT IN AD] Found ${hrisEmployees.length} HRIS employees`);
+    
+    // Get database connection for AD settings
+    const dbPool = req.app.locals.dbPool;
+    const SystemConfigService = (await import('../services/system-config-service.js')).default;
+    const systemConfig = new SystemConfigService(dbPool);
+    const ad = await systemConfig.getActiveDirectoryConfig();
+    
+    // Get all AD users
+    const adUsers = await findUsersInAD(ad.baseDN);
+    console.log(`[DEBUG NOT IN AD] Found ${adUsers.length} AD users`);
+    
+    // Create a map of employee ID to AD user for quick lookup
+    const adUserMap = new Map();
+    adUsers.forEach(user => {
+      if (user.employeeID) {
+        adUserMap.set(user.employeeID, user);
+      }
+    });
+    
+    const employeesNotInAd = [];
+    let checkedCount = 0;
+    
+    for (const employee of hrisEmployees) {
+      if (!employee.employee_name || employee.employee_name.trim() === '') {
+        continue; // Skip employees without names
+      }
+      
+      checkedCount++;
+      
+      // Check if this employee exists in AD by employee ID
+      const adUser = adUserMap.get(employee.employee_id);
+      if (adUser) {
+        continue; // Skip if employee found in AD
+      }
+      
+      // Employee not found in AD - try fuzzy matching with confidence
+      const fuzzyResult = fuzzyMatchAdUser(adUsers, employee.employee_name, threshold, true);
+      
+      employeesNotInAd.push({
+        employee: {
+          id: employee.employee_id,
+          name: employee.employee_name,
+          department: employee.department,
+          position: employee.position_title,
+          phone: employee.phone,
+          gender: employee.gender
+        },
+        fuzzyMatching: {
+          threshold: threshold,
+          bestMatch: fuzzyResult.match ? {
+            displayName: fuzzyResult.match.displayName,
+            name: fuzzyResult.match.name,
+            employeeID: fuzzyResult.match.employeeID,
+            department: fuzzyResult.match.department,
+            title: fuzzyResult.match.title
+          } : null,
+          confidence: fuzzyResult.confidence.bestConfidence,
+          method: fuzzyResult.method,
+          allMatches: fuzzyResult.confidence.searchResults.map(result => ({
+            displayName: result.user.displayName,
+            name: result.user.name,
+            employeeID: result.user.employeeID,
+            confidence: result.confidence,
+            score: result.score
+          }))
+        },
+        recommendations: generateNotInAdRecommendations(employee, fuzzyResult)
+      });
+    }
+    
+    console.log(`[DEBUG NOT IN AD] Checked ${checkedCount} employees`);
+    console.log(`[DEBUG NOT IN AD] Found ${employeesNotInAd.length} employees not in AD`);
+    
+    // Analyze confidence distribution
+    const confidenceDistribution = {
+      high: employeesNotInAd.filter(e => e.fuzzyMatching.confidence >= 80).length,
+      medium: employeesNotInAd.filter(e => e.fuzzyMatching.confidence >= 60 && e.fuzzyMatching.confidence < 80).length,
+      low: employeesNotInAd.filter(e => e.fuzzyMatching.confidence >= 40 && e.fuzzyMatching.confidence < 60).length,
+      veryLow: employeesNotInAd.filter(e => e.fuzzyMatching.confidence < 40).length
+    };
+    
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalHrisEmployees: hrisEmployees.length,
+          totalAdUsers: adUsers.length,
+          employeesChecked: checkedCount,
+          employeesNotInAd: employeesNotInAd.length,
+          threshold: threshold,
+          confidenceDistribution
+        },
+        employees: employeesNotInAd.slice(0, 100), // Limit to first 100
+        analysis: {
+          thresholdInfo: {
+            current: threshold,
+            recommended: 0.4,
+            description: 'Lower values = stricter matching, Higher values = more lenient matching'
+          },
+          confidenceGuide: {
+            high: '80-100%: Very likely matches, safe to review',
+            medium: '60-79%: Possible matches, needs manual review',
+            low: '40-59%: Weak matches, probably different people',
+            veryLow: '0-39%: Very unlikely matches or no matches found'
+          }
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[DEBUG NOT IN AD] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Helper function to generate recommendations for employees not in AD
+function generateNotInAdRecommendations(employee, fuzzyResult) {
+  const recommendations = [];
+  
+  if (fuzzyResult.confidence.bestConfidence >= 80) {
+    recommendations.push({
+      type: 'high_confidence_match',
+      message: 'High confidence match found - consider setting Employee ID in AD',
+      action: 'Set Employee ID in AD user account'
+    });
+  } else if (fuzzyResult.confidence.bestConfidence >= 60) {
+    recommendations.push({
+      type: 'medium_confidence_match',
+      message: 'Possible match found - manual review recommended',
+      action: 'Manually verify if this is the same person'
+    });
+  } else if (fuzzyResult.confidence.bestConfidence >= 40) {
+    recommendations.push({
+      type: 'low_confidence_match',
+      message: 'Weak match found - likely different people',
+      action: 'Check if employee exists in AD with different name format'
+    });
+  } else {
+    recommendations.push({
+      type: 'no_match',
+      message: 'No suitable matches found in AD',
+      action: 'Employee may need to be created in Active Directory'
+    });
+  }
+  
+  // Additional recommendations based on employee data
+  if (!employee.phone) {
+    recommendations.push({
+      type: 'missing_data',
+      message: 'Missing phone number in HRIS',
+      action: 'Update phone number in HRIS for better matching'
+    });
+  }
+  
+  if (!employee.department) {
+    recommendations.push({
+      type: 'missing_data',
+      message: 'Missing department in HRIS',
+      action: 'Update department in HRIS for better organization'
+    });
+  }
+  
+  return recommendations;
+}
 
 // Debug endpoint to check supervisor lookup issues
 router.get('/debug-supervisor-lookup', async (req, res) => {

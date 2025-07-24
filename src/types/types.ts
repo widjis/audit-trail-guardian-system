@@ -151,6 +151,9 @@ export interface UserPreferencesResponse {
 export interface HrisSyncResult {
   employeeID: string;
   displayName: string;
+  confidenceScore?: number; // Confidence score for fuzzy matching (0-1)
+  fuzzyScore?: number; // Raw fuzzy matching score (lower = better match)
+  matchMethod?: string; // How the user was matched: 'employeeID', 'exactName', 'fuzzy'
   diffs: {
     department?: string;
     title?: string;
