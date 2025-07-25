@@ -1305,6 +1305,82 @@ router.post('/microsoft-graph/email-template-preview', async (req, res) => {
   }
 });
 
+// Welcome Card Email endpoint
+router.post('/microsoft-graph/send-welcome-card', async (req, res) => {
+  try {
+    const { fromEmail, toEmail, subject, htmlContent } = req.body;
+
+    // Validate required fields
+    if (!fromEmail || !toEmail || !subject || !htmlContent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: fromEmail, toEmail, subject, or htmlContent'
+      });
+    }
+
+    // Get Microsoft Graph settings from database
+    const configService = getSystemConfigService();
+    const graphSettings = configService ? await configService.getMicrosoftGraphConfig() : null;
+    
+    if (!graphSettings) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to load Microsoft Graph configuration from database'
+      });
+    }
+
+    if (!graphSettings.enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Microsoft Graph is not enabled'
+      });
+    }
+
+    // Prepare email data for Microsoft Graph (using the same format as license request)
+    const emailData = {
+      recipients: [toEmail], // Array of email addresses
+      subject: subject,
+      body: {
+        contentType: 'HTML',
+        content: htmlContent
+      },
+      senderEmail: fromEmail
+    };
+
+    console.log('\n=== Sending Welcome Card Email with Microsoft Graph ===');
+    console.log('From:', fromEmail);
+    console.log('To:', toEmail);
+    console.log('Subject:', subject);
+
+    // Send email using Microsoft Graph service
+    const result = await microsoftGraphService.sendEmail(graphSettings, emailData);
+    
+    if (result.success) {
+      console.log('✓ Welcome card email sent successfully');
+      
+      res.json({
+        success: true,
+        message: 'Welcome card email sent successfully',
+        recipient: toEmail
+      });
+    } else {
+      console.log('✗ Welcome card email sending failed:', result.message);
+      res.json({
+        success: false,
+        message: result.message || 'Failed to send welcome card email'
+      });
+    }
+  } catch (error) {
+    console.error('=== Welcome Card Email Sending Error ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send welcome card email: ' + error.message
+    });
+  }
+});
+
 // AI Services settings routes
 router.get('/ai-services', async (req, res) => {
   try {

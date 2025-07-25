@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { hiresApi } from "@/services/api";
 import { settingsService } from "@/services/settings-service";
 import { NewHire } from "@/types/types";
+import { WelcomeCardGenerator } from "./WelcomeCardGenerator";
 import { 
   FileText, 
   Users, 
@@ -786,6 +787,12 @@ Please generate a complete email that feels personal and genuine, not templated.
             </div>
           </CardContent>
         </Card>
+
+        {/* Welcome Card Generator */}
+        <WelcomeCardGenerator 
+          selectedHire={selectedHire}
+          emailContent={emailContent}
+        />
       </div>
     </div>
   );
