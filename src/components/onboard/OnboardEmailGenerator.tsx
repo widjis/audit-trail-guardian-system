@@ -137,16 +137,12 @@ export function OnboardEmailGenerator() {
     });
   };
 
-  const analyzeWithGeminiVision = async (file: File, apiKey: string): Promise<string> => {
+  const analyzeWithGeminiVision = async (file: File, apiKey: string, customPrompt?: string): Promise<string> => {
     try {
       const base64Data = await convertFileToBase64(file);
       
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Please analyze this CV/Resume document and provide detailed insights in the following structured format:
+      // Use custom prompt if provided, otherwise fall back to default
+      const defaultPrompt = `Please analyze this CV/Resume document and provide detailed insights in the following structured format:
 
 **PROFESSIONAL PROFILE:**
 - Current role and seniority level
@@ -182,7 +178,16 @@ export function OnboardEmailGenerator() {
 - Interests or hobbies that could be mentioned
 - Professional values and work style
 
-Please format the response clearly with bullet points and be specific about skills, experiences, and achievements mentioned in the CV.`
+Please format the response clearly with bullet points and be specific about skills, experiences, and achievements mentioned in the CV.`;
+
+      const promptToUse = customPrompt && customPrompt.trim() ? customPrompt : defaultPrompt;
+      
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: promptToUse
               },
               {
                 inline_data: {
@@ -256,7 +261,11 @@ Please format the response clearly with bullet points and be specific about skil
     setIsAnalyzing(true);
     try {
       // Use real Gemini Vision API to analyze the uploaded CV
-      const insights = await analyzeWithGeminiVision(uploadedFile, aiSettings.geminiApiKey);
+      const insights = await analyzeWithGeminiVision(
+        uploadedFile, 
+        aiSettings.geminiApiKey, 
+        aiSettings.cvAnalysisPrompt
+      );
       
       const formattedInsights = `
 **CV Analysis for ${selectedHire.name}**
@@ -309,28 +318,44 @@ ${insights}
     setIsGenerating(true);
     try {
       // Use AI to generate personalized welcome email
-      const emailPrompt = `Based on the following CV analysis and hire information, create a personalized welcome email:
+      const newHireInfo = `Name: ${selectedHire.name}
+Position: ${selectedHire.title}
+Department: ${selectedHire.department}
+Email: ${selectedHire.email}
+Manager/Direct Report: ${selectedHire.direct_report || 'TBD'}
+Start Date: ${selectedHire.on_site_date ? new Date(selectedHire.on_site_date).toLocaleDateString() : 'TBD'}`;
+
+      // Use custom prompt if available, otherwise fall back to default
+      const defaultEmailPrompt = `Based on the following new hire information and CV analysis, create a personalized welcome email:
 
 **New Hire Information:**
-- Name: ${selectedHire.name}
-- Position: ${selectedHire.title}
-- Department: ${selectedHire.department}
-- Email: ${selectedHire.email}
-- Start Date: ${selectedHire.on_site_date ? new Date(selectedHire.on_site_date).toLocaleDateString() : 'TBD'}
+{newHireInfo}
 
 **CV Analysis:**
-${cvInsights}
+{cvAnalysis}
 
-Please create a warm, professional welcome email that:
-1. Personally addresses the new hire by name
-2. References specific skills or experiences from their CV
-3. Explains how their background aligns with the role
-4. Provides clear next steps for their first day
-5. Includes practical information (arrival time, dress code, etc.)
-6. Maintains an encouraging and welcoming tone
-7. Shows genuine excitement about their joining
+**Email Requirements:**
+- Professional but not overly formal
+- Personalized based on their background
+- Encouraging and supportive
 
-Format as a complete email with subject line. Make it feel personal and specific to this individual, not generic.`;
+**Content Guidelines:**
+- Reference specific skills or experiences from their CV
+- Mention how their background aligns with the role
+- Include relevant company culture elements
+- Keep the email concise but meaningful
+- End with clear next steps or contact information
+
+Please generate a complete email that feels personal and genuine, not templated.`;
+
+      // Replace placeholders in prompt (custom or default)
+      let emailPrompt = aiSettings.emailComposerPrompt && aiSettings.emailComposerPrompt.trim() 
+        ? aiSettings.emailComposerPrompt 
+        : defaultEmailPrompt;
+      
+      emailPrompt = emailPrompt
+        .replace('{newHireInfo}', newHireInfo)
+        .replace('{cvAnalysis}', cvInsights);
 
       const requestBody = {
         contents: [

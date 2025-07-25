@@ -80,6 +80,8 @@ interface AIServicesSettings {
   maxTokens: number;
   temperature: number;
   lastConnectionTest?: string;
+  cvAnalysisPrompt?: string;
+  emailComposerPrompt?: string;
 }
 
 interface SettingsData {

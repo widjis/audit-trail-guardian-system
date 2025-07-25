@@ -29,7 +29,7 @@ class SystemConfigService {
         return null;
       }
       
-      // Reconstruct AI Services config object
+      // Reconstruct AI Services config object with only basic defaults
       const aiConfig = {
         geminiApiKey: '',
         enabled: false,
@@ -47,6 +47,8 @@ class SystemConfigService {
         if (key === 'gemini_api_key') configKey = 'geminiApiKey';
         if (key === 'max_tokens') configKey = 'maxTokens';
         if (key === 'last_connection_test') configKey = 'lastConnectionTest';
+        if (key === 'cv_analysis_prompt') configKey = 'cvAnalysisPrompt';
+        if (key === 'email_composer_prompt') configKey = 'emailComposerPrompt';
         
         let value = config.value;
         
@@ -64,6 +66,7 @@ class SystemConfigService {
           value = parseFloat(value) || 0.7;
         }
         
+        // Only set the value if it exists in the database
         aiConfig[configKey] = value;
       }
       

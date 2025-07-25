@@ -1323,7 +1323,38 @@ router.get('/ai-services', async (req, res) => {
         enabled: false,
         model: 'gemini-2.0-flash',
         maxTokens: 2048,
-        temperature: 0.7
+        temperature: 0.7,
+        cvAnalysisPrompt: `Please analyze this CV/resume and provide detailed insights in the following areas:
+
+1. **Professional Profile**: Summarize the candidate's overall professional background and career level.
+
+2. **Key Competencies**: List the main technical skills, soft skills, and areas of expertise.
+
+3. **Career Highlights**: Identify notable achievements, career progression, and standout experiences.
+
+4. **Educational Background**: Summarize educational qualifications and relevant certifications.
+
+5. **Position Relevance**: Assess how well the candidate's background aligns with typical organizational needs.
+
+6. **Personalization Insights**: Identify unique aspects of their background that could be mentioned in a personalized welcome message.
+
+Please provide a structured analysis that will help create a personalized and engaging welcome email for this new team member.`,
+        emailComposerPrompt: `Based on the CV analysis provided, create a warm and personalized welcome email for our new team member. The email should:
+
+1. **Personal Welcome**: Reference specific aspects of their background that show we've taken time to learn about them.
+
+2. **Role Alignment**: Connect their experience and skills to how they'll contribute to our team.
+
+3. **Company Culture**: Convey our company's welcoming culture and values.
+
+4. **Next Steps**: Include practical information about their first day and onboarding process.
+
+5. **Tone**: Professional yet warm, enthusiastic but not overwhelming.
+
+Please generate both a subject line and email body that feels genuine and personalized, avoiding generic corporate language. The email should make the new hire feel valued and excited about joining our team.
+
+New hire information: {newHireInfo}
+CV Analysis: {cvAnalysis}`
       });
     }
 
@@ -1336,7 +1367,7 @@ router.get('/ai-services', async (req, res) => {
 
 router.put('/ai-services', async (req, res) => {
   try {
-    const { geminiApiKey, enabled, model, maxTokens, temperature } = req.body;
+    const { geminiApiKey, enabled, model, maxTokens, temperature, cvAnalysisPrompt, emailComposerPrompt } = req.body;
     const updatedBy = req.user?.username || 'system';
 
     // Validate required fields
@@ -1371,7 +1402,9 @@ router.put('/ai-services', async (req, res) => {
       geminiApiKey: 'ai.gemini_api_key',
       model: 'ai.model',
       maxTokens: 'ai.max_tokens',
-      temperature: 'ai.temperature'
+      temperature: 'ai.temperature',
+      cvAnalysisPrompt: 'ai.cv_analysis_prompt',
+      emailComposerPrompt: 'ai.email_composer_prompt'
     };
 
     // Update each configuration

@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -50,6 +51,8 @@ interface AIServicesSettings {
   maxTokens: number;
   temperature: number;
   lastConnectionTest?: string;
+  cvAnalysisPrompt?: string;
+  emailComposerPrompt?: string;
 }
 
 const AIServicesSettings: React.FC = () => {
@@ -62,6 +65,60 @@ const AIServicesSettings: React.FC = () => {
     model: 'gemini-1.5-flash',
     maxTokens: 2048,
     temperature: 0.7,
+    cvAnalysisPrompt: `Analyze this CV/resume and provide detailed insights in the following format:
+
+**Professional Profile:**
+- Brief summary of the candidate's professional background
+- Years of experience and career level
+
+**Key Competencies:**
+- Technical skills and expertise areas
+- Soft skills and leadership qualities
+- Industry knowledge and certifications
+
+**Career Highlights:**
+- Notable achievements and accomplishments
+- Previous roles and responsibilities
+- Career progression and growth
+
+**Educational Background:**
+- Degrees, certifications, and qualifications
+- Relevant training and professional development
+
+**Position Relevance:**
+- How well the candidate fits the role requirements
+- Strengths that align with the position
+- Areas for potential development
+
+**Personalization Insights:**
+- Unique aspects of the candidate's background
+- Personal interests or volunteer work
+- Cultural fit indicators
+
+Please provide specific, actionable insights that can be used to create a personalized welcome email.`,
+    emailComposerPrompt: `Create a warm, professional welcome email for a new hire based on their CV analysis and company information. The email should:
+
+**Structure:**
+- Professional yet friendly greeting
+- Personalized welcome message referencing their background
+- Excitement about their specific skills and experience
+- Brief overview of what to expect on their first day
+- Warm closing with next steps
+
+**Tone:**
+- Welcoming and enthusiastic
+- Professional but not overly formal
+- Personalized based on their background
+- Encouraging and supportive
+
+**Content Guidelines:**
+- Reference specific skills or experiences from their CV
+- Mention how their background aligns with the role
+- Include relevant company culture elements
+- Keep the email concise but meaningful
+- End with clear next steps or contact information
+
+Please generate a complete email that feels personal and genuine, not templated.`
   });
   
   const [showApiKey, setShowApiKey] = useState(false);
@@ -98,7 +155,14 @@ const AIServicesSettings: React.FC = () => {
   // Update local state when data is fetched
   useEffect(() => {
     if (currentSettings) {
-      setSettings(currentSettings);
+      // Merge current settings with defaults, preserving defaults for missing values
+      setSettings(prev => ({
+        ...prev,
+        ...currentSettings,
+        // Ensure prompts use defaults if not provided by backend
+        cvAnalysisPrompt: currentSettings.cvAnalysisPrompt || prev.cvAnalysisPrompt,
+        emailComposerPrompt: currentSettings.emailComposerPrompt || prev.emailComposerPrompt
+      }));
     }
   }, [currentSettings]);
 
@@ -373,6 +437,53 @@ const AIServicesSettings: React.FC = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Controls randomness: 0 = focused, 2 = creative
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Prompt Customization Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Prompt Customization</CardTitle>
+            <CardDescription>
+              Customize the prompts used for CV analysis and email composition
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* CV Analysis Prompt */}
+            <div className="space-y-3">
+              <Label htmlFor="cvAnalysisPrompt" className="text-base font-medium">
+                CV Analysis Prompt
+              </Label>
+              <Textarea
+                id="cvAnalysisPrompt"
+                value={settings.cvAnalysisPrompt}
+                onChange={(e) => handleInputChange('cvAnalysisPrompt', e.target.value)}
+                placeholder="Enter the prompt for CV analysis..."
+                className="min-h-[120px] resize-y"
+                disabled={updateSettingsMutation.isPending}
+              />
+              <p className="text-xs text-muted-foreground">
+                This prompt will be used to analyze uploaded CVs and extract relevant information.
+              </p>
+            </div>
+
+            {/* Email Composer Prompt */}
+            <div className="space-y-3">
+              <Label htmlFor="emailComposerPrompt" className="text-base font-medium">
+                Email Composer Prompt
+              </Label>
+              <Textarea
+                id="emailComposerPrompt"
+                value={settings.emailComposerPrompt}
+                onChange={(e) => handleInputChange('emailComposerPrompt', e.target.value)}
+                placeholder="Enter the prompt for email composition..."
+                className="min-h-[120px] resize-y"
+                disabled={updateSettingsMutation.isPending}
+              />
+              <p className="text-xs text-muted-foreground">
+                This prompt will be used to generate personalized welcome emails based on CV analysis.
               </p>
             </div>
           </CardContent>
