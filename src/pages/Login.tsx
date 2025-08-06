@@ -125,110 +125,126 @@ export default function Login() {
           display: 'flex', 
           width: '100%', 
           maxWidth: '1200px',
-          gap: { xs: 0, md: 4 }, 
           alignItems: 'center',
-          flexDirection: { xs: 'column', md: 'row' },
           justifyContent: 'center'
         }}>
-          
-          {/* Left Side - Welcome Content */}
-          <Box 
-            sx={{ 
-              flex: { md: 1 }, 
-              color: 'white',
-              display: { xs: 'none', md: 'block' },
-              maxWidth: { md: '500px' },
-              pr: { md: 2, lg: 4 }
-            }}
-          >
-            <Box sx={{ mb: { md: 3, lg: 4 } }}>
-              <Chip 
-                icon={<TrendingUp />}
-                label={formatDateTime(currentDateTime)}
-                sx={{ 
-                  bgcolor: alpha(theme.palette.common.white, 0.2),
-                  color: 'white',
-                  mb: 3,
-                  '& .MuiChip-icon': { color: 'white' },
-                  fontFamily: 'monospace',
-                  fontSize: { md: '0.8rem', lg: '0.85rem' }
-                }}
-              />
-            </Box>
-            
-            <Typography 
-              variant="h2" 
-              component="h1" 
-              sx={{ 
-                fontWeight: 700,
-                mb: 2,
-                fontSize: { md: '2.5rem', lg: '3rem', xl: '3.5rem' },
-                lineHeight: 1.2
-              }}
-            >
-              Welcome Back 👋
-            </Typography>
-            
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                mb: 1,
-                opacity: 0.9,
-                fontWeight: 400,
-                fontSize: { md: '1.1rem', lg: '1.25rem' }
-              }}
-            >
-              Today is a new day. It's your day. You shape it.
-            </Typography>
-            
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                mb: { md: 3, lg: 4 },
-                opacity: 0.8,
-                fontSize: { md: '0.95rem', lg: '1rem' }
-              }}
-            >
-              Sign in to start managing new hire employees.
-            </Typography>
-
-            {/* Feature highlights */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Factory sx={{ opacity: 0.8, fontSize: { md: '1.2rem', lg: '1.5rem' } }} />
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { md: '0.85rem', lg: '0.9rem' } }}>
-                  Onboarding system audit log
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Security sx={{ opacity: 0.8, fontSize: { md: '1.2rem', lg: '1.5rem' } }} />
-                <Typography variant="body2" sx={{ opacity: 0.8, fontSize: { md: '0.85rem', lg: '0.9rem' } }}>
-                  Enterprise security & compliance
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Right Side - Login Form */}
+          {/* Login Form */}
           <Box sx={{ 
-            flex: { xs: 'none', md: 'none' }, 
-            width: { xs: '100%', sm: '400px', md: '420px', lg: '450px' },
-            maxWidth: { xs: '100%', sm: '400px' }
+            flex: 1, 
+            width: { xs: '100%', sm: '500px', md: '1200px', lg: '1400px' },
+            maxWidth: { xs: '100%', sm: '500px', md: '1400px' }
           }}>
             <Paper
-              elevation={24}
+              elevation={0}
               sx={{
-                p: { xs: 3, sm: 4 },
-                borderRadius: 3,
+                borderRadius: { xs: 2, md: 3 },
                 bgcolor: 'background.paper',
-                backdropFilter: 'blur(10px)',
-                border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
-                boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, 0.1)}`,
                 width: '100%',
-                maxHeight: { xs: 'calc(100vh - 32px)', sm: 'none' },
-                overflow: 'auto'
+                minHeight: { xs: 'calc(100vh - 32px)', md: '700px' },
+                overflow: 'hidden',
+                boxShadow: { xs: 'none', md: '0 8px 32px rgba(0, 0, 0, 0.12)' },
+                border: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.1)' },
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' }
               }}
             >
+              {/* Left side - Welcome Section with Background */}
+              <Box
+                sx={{
+                  flex: { xs: 0, md: 1 },
+                  display: { xs: 'none', md: 'flex' },
+                  backgroundImage: 'url("/image.png")',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  position: 'relative',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  p: 6,
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)'
+                  }
+                }}
+              >
+                <Box sx={{ position: 'relative', zIndex: 1, color: 'white' }}>
+                  <Chip 
+                    icon={<TrendingUp />}
+                    label={formatDateTime(currentDateTime)}
+                    sx={{ 
+                      bgcolor: alpha(theme.palette.common.white, 0.2),
+                      color: 'white',
+                      mb: 3,
+                      '& .MuiChip-icon': { color: 'white' },
+                      fontFamily: 'monospace',
+                      fontSize: '0.85rem'
+                    }}
+                  />
+                  <Typography
+                    variant="h2"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 2,
+                      fontSize: { md: '3rem', lg: '3.5rem' },
+                      lineHeight: 1.2
+                    }}
+                  >
+                    Welcome Back 👋
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      mb: 1,
+                      opacity: 0.9,
+                      fontSize: '1.1rem',
+                      fontWeight: 400
+                    }}
+                  >
+                    Today is a new day. It's your day. You shape it.
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      mb: 4,
+                      opacity: 0.8,
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Sign in to start managing new hire employees.
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Factory sx={{ opacity: 0.8, fontSize: '1.5rem' }} />
+                      <Typography variant="body2" sx={{ opacity: 0.8, fontSize: '0.9rem' }}>
+                        Onboarding system audit log
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Security sx={{ opacity: 0.8, fontSize: '1.5rem' }} />
+                      <Typography variant="body2" sx={{ opacity: 0.8, fontSize: '0.9rem' }}>
+                        Enterprise security & compliance
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+              
+              {/* Right side - Login form */}
+              <Box
+                sx={{
+                  flex: { xs: 1, md: '0 0 450px' },
+                  p: { xs: 3, sm: 4, md: 5 },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}
+              >
               {/* Mobile Header - Only show on mobile */}
               <Box sx={{ 
                 display: { xs: 'block', md: 'none' }, 
@@ -322,6 +338,7 @@ export default function Login() {
                     Sign Up
                   </Typography>
                 </Typography>
+              </Box>
               </Box>
             </Paper>
           </Box>
