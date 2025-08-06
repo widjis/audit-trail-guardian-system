@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { templates } from "./WelcomeCardTemplates";
 import { NewHire } from "@/types/types";
 import { microsoftGraphService } from "@/services/microsoft-graph-service";
+import html2canvas from 'html2canvas';
 import { 
   Upload, 
   Download, 
@@ -20,6 +21,28 @@ import {
   Mail,
   Send
 } from "lucide-react";
+
+// Define html2canvas options interface based on the library's actual options
+interface Html2CanvasOptions {
+  allowTaint?: boolean;
+  backgroundColor?: string | null;
+  canvas?: HTMLCanvasElement;
+  foreignObjectRendering?: boolean;
+  imageTimeout?: number;
+  ignoreElements?: (element: Element) => boolean;
+  logging?: boolean;
+  onclone?: (clonedDoc: Document, element: HTMLElement) => void;
+  proxy?: string;
+  removeContainer?: boolean;
+  scale?: number;
+  useCORS?: boolean;
+  width?: number;
+  height?: number;
+  scrollX?: number;
+  scrollY?: number;
+  windowWidth?: number;
+  windowHeight?: number;
+}
 
 interface WelcomeCardGeneratorProps {
   selectedHire: NewHire | null;
@@ -37,6 +60,7 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // Email fields
   const [fromEmail, setFromEmail] = useState("");
@@ -136,65 +160,369 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
     }, 1000);
   };
 
-  const downloadCard = async () => {
-    if (!cardRef.current) return;
+const downloadCard = async () => {
+  if (!cardRef.current) return;
+  setIsDownloading(true);
 
-    try {
-      // Import html2canvas dynamically
-      const html2canvas = (await import('html2canvas')).default;
-      
-      const canvas = await html2canvas(cardRef.current, {
-        background: null,
-        useCORS: true,
-        allowTaint: true,
-        width: cardRef.current.scrollWidth * 2,
-        height: cardRef.current.scrollHeight * 2,
-      });
+  try {
+    // 1) Wait for webfonts & all <img> to finish loading
+    await (document as any).fonts?.ready;
+    await waitForImagesToLoad(cardRef.current);
 
-      const link = document.createElement('a');
-      link.download = `welcome-card-${selectedHire?.name?.replace(/\s+/g, '-').toLowerCase() || 'new-hire'}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
+    // 2) Scroll card into view & let layout settle
+    cardRef.current.scrollIntoView({ block: 'center' });
+    await new Promise((r) => setTimeout(r, 100));
 
-      toast({
-        title: "Card Downloaded",
-        description: "Welcome card saved successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Download Failed",
-        description: "Failed to download card. Please try again.",
-        variant: "destructive"
-      });
+    // 3) Inline styles + strip backgrounds
+    function prepareNode(root: HTMLElement) {
+      const queue = [root];
+      while (queue.length) {
+        const el = queue.shift()!;
+
+        // Get computed styles once
+        const cs = getComputedStyle(el);
+
+        // Build an inline style string for everything *except* background-image
+        const inline = Array.from(cs)
+          .filter(prop => prop !== 'background-image')
+          .map(prop => `${prop}:${cs.getPropertyValue(prop)};`)
+          .join('');
+        el.setAttribute('style', inline);
+
+        // Only clear background on child elements, not the root
+        if (el !== root) {
+          el.style.backgroundImage = 'none';
+          el.style.background      = 'none';
+        }
+
+        // enqueue children
+        for (const child of Array.from(el.children)) {
+          if (child instanceof HTMLElement) queue.push(child);
+        }
+      }
     }
+
+    prepareNode(cardRef.current);
+
+    // 4) Capture with html2canvas default renderer
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(cardRef.current, {
+      useCORS:      true,
+      allowTaint:   false,
+      backgroundColor: '#ffffff',
+      scale:        2,
+      logging:      false,
+
+      // Skip any canvas or broken images inside your card
+      ignoreElements: (el) => {
+        if (el.tagName === 'CANVAS') return true;
+        if (el.tagName === 'IMG') {
+          const img = el as HTMLImageElement;
+          return !img.complete || img.naturalWidth === 0;
+        }
+        return false;
+      },
+    } as any);
+
+    // 5) Download PNG
+    const blob = await new Promise<Blob>((res) => canvas.toBlob(res, 'image/png', 0.95)!);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href      = url;
+    a.download  = `welcome-card-${selectedHire?.name?.replace(/\s+/g,'-').toLowerCase() || 'card'}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    toast({ title: 'Card Downloaded', description: 'Your PNG is ready.' });
+  } catch (err: any) {
+    console.error('Error downloading card:', err);
+    toast({
+      title: 'Download Failed',
+      description: err.message || 'Something went wrong.',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsDownloading(false);
+  }
+};
+
+
+
+
+
+
+  // Helper function to validate and fix problematic images
+  const validateAndFixImages = (element: HTMLElement): Promise<void> => {
+    return new Promise((resolve) => {
+      const images = element.querySelectorAll('img');
+      
+      images.forEach((img) => {
+        // If image has zero dimensions or failed to load, replace with placeholder
+        if (img.naturalWidth === 0 || img.naturalHeight === 0 || !img.complete) {
+          // Create a placeholder div instead of broken image
+          const placeholder = document.createElement('div');
+          placeholder.style.width = img.style.width || '64px';
+          placeholder.style.height = img.style.height || '64px';
+          placeholder.style.backgroundColor = '#f0f0f0';
+          placeholder.style.border = '2px dashed #ccc';
+          placeholder.style.display = 'flex';
+          placeholder.style.alignItems = 'center';
+          placeholder.style.justifyContent = 'center';
+          placeholder.style.fontSize = '12px';
+          placeholder.style.color = '#666';
+          placeholder.textContent = 'Image';
+          placeholder.style.borderRadius = img.style.borderRadius || '0';
+          
+          // Replace the image with placeholder
+          img.parentNode?.replaceChild(placeholder, img);
+        }
+      });
+      
+      // Small delay to ensure DOM updates are complete
+      setTimeout(resolve, 100);
+    });
   };
 
-  // Convert the welcome card to HTML for email
-  const convertCardToHTML = (): string => {
-    if (!cardRef.current) return "";
+  // Helper function to wait for all images to load
+  const waitForImagesToLoad = (element: HTMLElement): Promise<void> => {
+    return new Promise((resolve) => {
+      const images = element.querySelectorAll('img');
+      if (images.length === 0) {
+        resolve();
+        return;
+      }
 
-    // Get the card HTML content
-    const cardHTML = cardRef.current.innerHTML;
+      let loadedCount = 0;
+      const totalImages = images.length;
+      let timeoutId: NodeJS.Timeout;
+
+      const checkComplete = () => {
+        loadedCount++;
+        if (loadedCount === totalImages) {
+          clearTimeout(timeoutId);
+          // Add small delay to ensure rendering is complete
+          setTimeout(resolve, 200);
+        }
+      };
+
+      // Set a timeout to prevent hanging indefinitely
+      timeoutId = setTimeout(() => {
+        console.warn('Image loading timeout reached, proceeding anyway');
+        resolve();
+      }, 5000); // 5 second timeout
+
+      images.forEach((img) => {
+        // Check if image is already loaded and has valid dimensions
+        if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
+          checkComplete();
+        } else if (img.complete && (img.naturalHeight === 0 || img.naturalWidth === 0)) {
+          // Image failed to load, count it as complete
+          console.warn('Image failed to load:', img.src);
+          checkComplete();
+        } else {
+          // Image is still loading
+          const handleLoad = () => {
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+            checkComplete();
+          };
+          
+          const handleError = () => {
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+            console.warn('Image load error:', img.src);
+            checkComplete();
+          };
+          
+          img.addEventListener('load', handleLoad);
+          img.addEventListener('error', handleError);
+        }
+      });
+    });
+  };
+
+  // Generate HTML content for the welcome card
+  const generateCardHTML = (): string => {
+    if (!cardRef.current) {
+      throw new Error('Card element not found');
+    }
+
+    // Get the card element's HTML content
+    const cardElement = cardRef.current;
+    const cardHTML = cardElement.outerHTML;
     
-    // Create a complete HTML email template
+    // Create a complete HTML document with embedded styles
+    const fullHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome Card - ${selectedHire?.name || 'New Team Member'}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .welcome-card-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        /* Material UI Card styles */
+        .MuiCard-root {
+            background-color: #fff;
+            color: rgba(0, 0, 0, 0.87);
+            transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+            border-radius: 4px;
+            box-shadow: 0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12);
+            overflow: hidden;
+        }
+        
+        .MuiCardContent-root {
+            padding: 16px;
+        }
+        
+        .MuiCardContent-root:last-child {
+            padding-bottom: 16px;
+        }
+        
+        /* Typography styles */
+        .MuiTypography-h4 {
+            font-size: 2.125rem;
+            font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+            font-weight: 400;
+            line-height: 1.235;
+            letter-spacing: 0.00735em;
+            margin-bottom: 0.35em;
+        }
+        
+        .MuiTypography-h6 {
+            font-size: 1.25rem;
+            font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+            font-weight: 500;
+            line-height: 1.6;
+            letter-spacing: 0.0075em;
+        }
+        
+        .MuiTypography-body1 {
+            font-size: 1rem;
+            font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+            font-weight: 400;
+            line-height: 1.5;
+            letter-spacing: 0.00938em;
+        }
+        
+        /* Avatar styles */
+        .MuiAvatar-root {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+            font-size: 1.25rem;
+            line-height: 1;
+            border-radius: 50%;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        .MuiAvatar-img {
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            object-fit: cover;
+            color: transparent;
+            text-indent: 10000px;
+        }
+        
+        /* Box and layout styles */
+        .MuiBox-root {
+            box-sizing: border-box;
+        }
+        
+        /* Responsive styles */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .welcome-card-container {
+                margin: 0;
+            }
+            
+            .MuiTypography-h4 {
+                font-size: 1.75rem;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            
+            .welcome-card-container {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-card-container">
+        ${cardHTML}
+    </div>
+</body>
+</html>`;
+
+    return fullHTML;
+  };
+
+  // Create email content with embedded card HTML
+  const createEmailWithCardHTML = (): string => {
+    // Generate the card HTML
+    const cardHTML = generateCardHTML();
+    
+    // Create a clean HTML email template with the card embedded directly
     const emailHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome Card</title>
+    <title>New Team Member Announcement</title>
     <style>
         body {
             margin: 0;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-color: #f5f5f5;
+            line-height: 1.6;
         }
         .email-container {
-            max-width: 800px;
+            max-width: 700px;
             margin: 0 auto;
-            background-color: white;
+            background-color: #ffffff;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -202,83 +530,89 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
         .email-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
+            padding: 30px 20px;
             text-align: center;
         }
+        .email-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
         .email-content {
-            padding: 20px;
+            padding: 30px 20px;
+        }
+        .email-content p {
+            margin: 0 0 15px 0;
+            color: #333333;
+            font-size: 16px;
         }
         .card-container {
-            background-color: #f8f9fa;
+            margin: 30px 0;
             padding: 20px;
+            background-color: #f8f9fa;
             border-radius: 8px;
-            margin: 20px 0;
+            text-align: center;
+        }
+        .embedded-card {
+            display: inline-block;
+            max-width: 100%;
+            margin: 0 auto;
         }
         .email-footer {
             background-color: #f8f9fa;
             padding: 20px;
             text-align: center;
-            color: #666;
+            border-top: 1px solid #e9ecef;
+        }
+        .email-footer p {
+            margin: 5px 0;
+            color: #6c757d;
             font-size: 14px;
         }
-        /* Inline all the Tailwind classes used in the card */
-        .bg-gradient-to-br { background: linear-gradient(to bottom right, var(--tw-gradient-stops)); }
-        .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
-        .rounded-lg { border-radius: 0.5rem; }
-        .p-8 { padding: 2rem; }
-        .text-center { text-align: center; }
-        .mb-6 { margin-bottom: 1.5rem; }
-        .mb-4 { margin-bottom: 1rem; }
-        .mb-2 { margin-bottom: 0.5rem; }
-        .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
-        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
-        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
-        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
-        .text-xs { font-size: 0.75rem; line-height: 1rem; }
-        .font-bold { font-weight: 700; }
-        .font-semibold { font-weight: 600; }
-        .font-medium { font-weight: 500; }
-        .w-28 { width: 7rem; }
-        .h-28 { height: 7rem; }
-        .w-8 { width: 2rem; }
-        .h-8 { height: 2rem; }
-        .w-auto { width: auto; }
-        .mx-auto { margin-left: auto; margin-right: auto; }
-        .object-cover { object-fit: cover; }
-        .rounded-full { border-radius: 9999px; }
-        .rounded { border-radius: 0.25rem; }
-        .border-4 { border-width: 4px; }
-        .border-2 { border-width: 2px; }
-        .border { border-width: 1px; }
-        .inline-block { display: inline-block; }
-        .flex { display: flex; }
-        .items-center { align-items: center; }
-        .justify-center { justify-content: center; }
-        .gap-3 { gap: 0.75rem; }
-        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
-        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        .leading-relaxed { line-height: 1.625; }
+        .highlight {
+            font-weight: 600;
+            color: #495057;
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            .email-content {
+                padding: 20px 15px;
+            }
+            .email-header {
+                padding: 20px 15px;
+            }
+            .card-container {
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="email-container">
         <div class="email-header">
-            <h1>Welcome to PT. Merdeka Tsingshan Indonesia!</h1>
-            <p>We're excited to have ${selectedHire?.name} join our team</p>
+            <h1>🎉 New Team Member Announcement</h1>
+            <p>PT. Merdeka Tsingshan Indonesia</p>
         </div>
         <div class="email-content">
-            <p>Dear ${selectedHire?.name},</p>
-            <p>Welcome to PT. Merdeka Tsingshan Indonesia! We've prepared a special welcome card for you:</p>
+            <p>Dear All,</p>
+            <p>Please welcome <span class="highlight">${selectedHire?.name}</span> to PT. Merdeka Tsingshan Indonesia! ${selectedHire?.name} joins us as our new <span class="highlight">${selectedHire?.title}</span> and brings valuable experience to our team.</p>
             
             <div class="card-container">
-                ${cardHTML}
+                <div class="embedded-card">
+                    ${cardRef.current?.outerHTML || ''}
+                </div>
             </div>
             
-            <p>We're thrilled to have you as our new ${selectedHire?.title} and look forward to working with you!</p>
-            <p>Best regards,<br>PT. Merdeka Tsingshan Indonesia Team</p>
+            <p>We're thrilled to have ${selectedHire?.name} as our new ${selectedHire?.title} and look forward to working with them!</p>
+            <p>Best regards,<br><span class="highlight">PT. Merdeka Tsingshan Indonesia Team</span></p>
         </div>
         <div class="email-footer">
             <p>This email was sent from PT. Merdeka Tsingshan Indonesia</p>
@@ -313,9 +647,10 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
 
     setIsSendingEmail(true);
     try {
-      const htmlContent = convertCardToHTML();
+      // Create email content with embedded card HTML
+      const htmlContent = createEmailWithCardHTML();
       
-      // Create email data for Microsoft Graph
+      // Create email data for Microsoft Graph API
       const emailData = {
         fromEmail: fromEmail,
         toEmail: toEmail,
@@ -337,16 +672,28 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
       if (response.ok && result.success) {
         toast({
           title: "Email Sent Successfully",
-          description: `Welcome card sent to ${toEmail}`,
+          description: `Welcome card email has been sent to ${toEmail}`,
         });
       } else {
-        throw new Error(result.message || 'Failed to send email');
+        throw new Error(result.error || 'Failed to send email');
       }
     } catch (error) {
       console.error('Error sending welcome card email:', error);
+      
+      let errorMessage = 'Failed to send welcome card email';
+      let errorDescription = 'Please try again or contact support if the issue persists.';
+      
+      if (error.message.includes('zero dimensions') || error.message.includes('Card element')) {
+        errorMessage = 'Card Rendering Issue';
+        errorDescription = 'The welcome card could not be captured. Please ensure the card is visible and try again.';
+      } else if (error.message.includes('Failed to capture')) {
+        errorMessage = 'Image Capture Failed';
+        errorDescription = 'Unable to generate card image. Please check your browser settings and try again.';
+      }
+      
       toast({
-        title: "Email Send Failed",
-        description: error instanceof Error ? error.message : "Failed to send welcome card email. Please try again.",
+        title: errorMessage,
+        description: errorDescription,
         variant: "destructive"
       });
     } finally {
@@ -500,11 +847,20 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
             <Button
               variant="outline"
               onClick={downloadCard}
-              disabled={!customMessage}
+              disabled={!customMessage || isDownloading}
               className="flex-1"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Download Card
+              {isDownloading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Card
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
@@ -602,7 +958,7 @@ export function WelcomeCardGenerator({ selectedHire, emailContent }: WelcomeCard
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div ref={cardRef} className="bg-gray-50 p-8 rounded-lg">
+          <div ref={cardRef} data-card-ref="welcome-card" className="bg-gray-50 p-8 rounded-lg">
             {SelectedTemplateComponent && (
               <SelectedTemplateComponent
                 name={selectedHire.name}

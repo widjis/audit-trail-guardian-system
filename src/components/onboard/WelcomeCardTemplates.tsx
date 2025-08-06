@@ -186,6 +186,9 @@ export const MinimalistTemplate = ({ name, position, message, photo }: TemplateP
         </div>
 
         <div className="text-center mb-8">
+          <div className="inline-block px-4 py-2 bg-gray-100 rounded text-sm font-medium text-gray-700 mb-4">
+            🎉 New Team Member
+          </div>
           {photo && (
             <div className="w-20 h-20 mx-auto mb-6">
               <img
@@ -195,8 +198,8 @@ export const MinimalistTemplate = ({ name, position, message, photo }: TemplateP
               />
             </div>
           )}
-          <h1 className="text-3xl font-light text-gray-900 mb-2">{name}</h1>
-          <p className="text-lg text-gray-500 font-light">{position}</p>
+          <h1 className="text-3xl font-light text-gray-900 mb-2">Welcome {name}!</h1>
+          <p className="text-lg text-gray-500 font-light">Please join us in welcoming our new {position}</p>
           <div className="w-12 h-px bg-gray-300 mx-auto mt-4"></div>
         </div>
         
