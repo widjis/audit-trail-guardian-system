@@ -1206,6 +1206,45 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       const attachmentInfo = attachments.length > 0 ? ` with ${attachments.length} SRF attachment(s)` : '';
       console.log(`✓ Email sent successfully to ${totalRecipients} recipient(s)${attachmentInfo}`);
       
+      // Create audit log entries for each hire's license request
+      try {
+        const db = getDatabase();
+        const performedBy = req.user?.username || 'system';
+        const timestamp = new Date().toISOString();
+        
+        for (const hire of hires) {
+          const auditDetails = {
+            action: 'LICENSE_REQUEST_EMAIL_SENT',
+            hire_name: hire.name,
+            hire_email: hire.email,
+            license_type: hire.microsoft_365_license,
+            recipients: {
+              to: finalToRecipients,
+              cc: finalCcRecipients,
+              bcc: finalBccRecipients
+            },
+            attachments_included: attachments.length > 0,
+            attachment_count: attachments.length,
+            email_subject: subject,
+            performed_by: performedBy,
+            timestamp: timestamp
+          };
+          
+          await db.run(
+            `INSERT INTO audit_logs (hire_id, action, details, performed_by, created_at) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [hire.id, 'LICENSE_REQUEST_EMAIL', JSON.stringify(auditDetails), performedBy, timestamp]
+          );
+          
+          console.log(`✓ Audit log created for license request: ${hire.name}`);
+        }
+        
+        console.log(`✓ Created ${hires.length} audit log entries for license requests`);
+      } catch (auditError) {
+        console.error('Failed to create audit logs for license requests:', auditError);
+        // Don't fail the entire request if audit logging fails
+      }
+      
       res.json({
         success: true,
         message: `License request email sent successfully to ${totalRecipients} recipient(s)${attachmentInfo}`,
@@ -1219,6 +1258,36 @@ router.post('/microsoft-graph/send-license-request', async (req, res) => {
       });
     } else {
       console.log('✗ Email sending failed:', result.message);
+      
+      // Create audit log entries for failed license requests
+      try {
+        const db = getDatabase();
+        const performedBy = req.user?.username || 'system';
+        const timestamp = new Date().toISOString();
+        
+        for (const hire of hires) {
+          const auditDetails = {
+            action: 'LICENSE_REQUEST_EMAIL_FAILED',
+            hire_name: hire.name,
+            hire_email: hire.email,
+            license_type: hire.microsoft_365_license,
+            error_message: result.message,
+            performed_by: performedBy,
+            timestamp: timestamp
+          };
+          
+          await db.run(
+            `INSERT INTO audit_logs (hire_id, action, details, performed_by, created_at) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [hire.id, 'LICENSE_REQUEST_EMAIL_FAILED', JSON.stringify(auditDetails), performedBy, timestamp]
+          );
+        }
+        
+        console.log(`✓ Created ${hires.length} audit log entries for failed license requests`);
+      } catch (auditError) {
+        console.error('Failed to create audit logs for failed license requests:', auditError);
+      }
+      
       res.json({
         success: false,
         message: result.message || 'Failed to send license request email'
