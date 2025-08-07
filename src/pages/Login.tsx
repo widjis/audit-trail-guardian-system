@@ -76,10 +76,25 @@ export default function Login() {
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+          backgroundImage: 'url(/blurry.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            zIndex: 0
+          }
         }}
       >
-        <CircularProgress sx={{ color: 'white' }} />
+        <CircularProgress sx={{ color: 'white', position: 'relative', zIndex: 1 }} />
       </Box>
     );
   }
@@ -90,9 +105,23 @@ export default function Login() {
         minHeight: '100vh',
         height: '100vh',
         display: 'flex',
-        background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+        backgroundImage: 'url(/blurry.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         position: 'relative',
-        overflow: 'auto'
+        overflow: 'auto',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backdropFilter: 'blur(8px)',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          zIndex: 0
+        }
       }}
     >
       {/* Background Pattern */}

@@ -130,6 +130,50 @@
 
 ---
 
+## Latest Updates
+
+### 2025-01-18: Background Image with Blurry Glass Effect
+- **Change**: Replaced blue gradient background with `blurry.png` image and added blurry glass effect
+- **Location**: `src/pages/Login.tsx` - Main container Box components
+- **Implementation**: 
+  - Added `backgroundImage: 'url(/blurry.png)'` with cover sizing and center positioning
+  - Applied `backdropFilter: 'blur(8px)'` with `rgba(0, 0, 0, 0.2)` overlay using `::before` pseudo-element
+  - Updated both loading state and main login containers
+- **Impact**: Modern blurry glass aesthetic with improved visual depth
+- **Files Modified**: 
+  - `src/pages/Login.tsx` (lines ~77-95, ~106-125)
+- **Quality Assurance**: 
+  - ✅ TypeScript compilation successful
+  - ✅ Development server running without errors
+  - ✅ Blurry glass effect applied correctly
+  - ✅ Content positioned above blur overlay with proper z-index
+
+### 2025-01-18: Enhanced Login Page Overlay Opacity
+- **Change**: Made the `MuiBox-root` overlay more solid by increasing opacity from `rgba(0, 0, 0, 0.5)` to `rgba(0, 0, 0, 0.8)`
+- **Location**: `src/pages/Login.tsx` - Left welcome section's `&::after` pseudo-element
+- **Impact**: Improved text readability and visual hierarchy on the welcome section
+- **Files Modified**: 
+  - `src/pages/Login.tsx` (lines ~280-290)
+- **Quality Assurance**: 
+  - ✅ TypeScript compilation successful
+  - ✅ Development server running without errors
+  - ✅ Visual consistency maintained
+  - ✅ Responsive design preserved
+
+### 2025-01-18: Login Form Background Solidification
+- **Change**: Updated login form `Paper` component background from `background.paper` to solid white `#ffffff`
+- **Location**: `src/pages/Login.tsx` - Main Paper component containing the login form
+- **Impact**: Eliminated transparency in login form background for better readability
+- **Files Modified**: 
+  - `src/pages/Login.tsx` (line ~220)
+- **Quality Assurance**: 
+  - ✅ TypeScript compilation successful
+  - ✅ Development server running without errors
+  - ✅ Login form now has solid white background
+  - ✅ Maintains responsive design and accessibility
+
+---
+
 # Update 5 - Default Landing Page Redirect
 
 ## Date
