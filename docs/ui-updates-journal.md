@@ -127,3 +127,47 @@
 - Test on various screen sizes and devices
 - Validate accessibility compliance
 - Consider adding animation transitions for better UX
+
+---
+
+# Update 5 - Default Landing Page Redirect
+
+## Date
+2024-12-19
+
+## Issue Addressed
+User requested to redirect the default landing page (root path "/") directly to the login page instead of showing the Index page.
+
+## Changes Made
+
+### 1. Routing Configuration Update
+- Modified `App.tsx` to redirect root path "/" to "/login"
+- Moved the original Index component to "/index" path for potential future access
+- Used React Router's `Navigate` component with `replace` prop for clean URL handling
+
+### 2. Route Structure Changes
+```jsx
+// Before
+<Route path="/" element={<Index />} />
+
+// After
+<Route path="/" element={<Navigate to="/login" replace />} />
+<Route path="/index" element={<Index />} />
+```
+
+## Technical Implementation
+- Used React Router's `Navigate` component for programmatic redirection
+- Added `replace` prop to prevent back button issues
+- Preserved original Index page at `/index` route for potential future use
+- Maintained all existing authentication logic and protected routes
+
+## Files Modified
+- `src/App.tsx` - Updated routing configuration
+- `docs/ui-updates-journal.md` - Documentation update
+
+## Testing Results
+- ✅ TypeScript compilation successful
+- ✅ Root path "/" now redirects to "/login"
+- ✅ All existing routes remain functional
+- ✅ Authentication flow preserved
+- ✅ No breaking changes to existing functionality
