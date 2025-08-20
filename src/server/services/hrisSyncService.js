@@ -209,7 +209,7 @@ export function fuzzyMatchAdUser(adUsers, targetName, threshold = 0.4, returnWit
 function computeDiffs(dbRow, adUser, wasFuzzyMatched = false) {
   const diffs = {};
   const fieldComparison = {
-    totalFields: 5, // Updated to include employeeID
+    totalFields: 6, // Updated to include employeeID and gender
     matchingFields: 0,
     discrepancies: 0,
     details: {},
@@ -300,6 +300,21 @@ function computeDiffs(dbRow, adUser, wasFuzzyMatched = false) {
     }
   }
 
+  // Gender comparison
+  const genderMatch = (dbRow.gender || '') === (adUser.gender || '');
+  if (genderMatch) {
+    fieldComparison.matchingFields++;
+    fieldComparison.details.gender = { status: 'match', hrisValue: dbRow.gender, adValue: adUser.gender };
+  } else {
+    fieldComparison.discrepancies++;
+    fieldComparison.details.gender = { status: 'discrepancy', hrisValue: dbRow.gender, adValue: adUser.gender };
+    diffs.gender = dbRow.gender;
+    if (!dbRow.gender) {
+      fieldComparison.highPriorityIssues.push('Missing gender in HRIS');
+    }
+    console.log(`[DIFF] Gender mismatch for ${dbRow.employee_id}: DB="${dbRow.gender}" AD="${adUser.gender}"`);
+  }
+
   // Manager comparison (will be completed in main sync function)
   // For now, mark as placeholder
   fieldComparison.details.manager = { status: 'pending', note: 'Will be checked separately' };
@@ -315,7 +330,8 @@ async function applyDiffs(adUser, diffs, adBaseDN) {
     'department': 'department',
     'title': 'title', 
     'mobile': 'mobile',
-    'manager': 'manager'
+    'manager': 'manager',
+    'gender': 'gender'
   };
 
   // 1) Build only the valid change entries with proper LDAP attribute names
