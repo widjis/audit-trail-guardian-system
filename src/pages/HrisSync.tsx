@@ -36,7 +36,7 @@ export default function HrisSync() {
   const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
   const [nextScheduledRun, setNextScheduledRun] = useState<string | null>(null);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.4);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.2);
   const { toast } = useToast();
 
   // — Only rows that have changes OR field discrepancies OR high priority issues
@@ -93,19 +93,28 @@ export default function HrisSync() {
     if (!selectedUsers.length) return;
     setManualSyncStatus("loading");
     try {
-      const res = await fetch("/api/hris-sync/manual", {
+      // 1. Perform the actual sync
+      const syncRes = await fetch("/api/hris-sync/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeIDs: selectedUsers })
+        body: JSON.stringify({ employeeIDs: selectedUsers, confidenceThreshold })
       });
-      if (!res.ok) throw new Error("Manual sync failed");
-      const { results } = await res.json();
-      setSyncResults(results || []);
+      if (!syncRes.ok) throw new Error("Manual sync failed");
+      const { results: syncResults } = await syncRes.json();
+      
+      // 2. Refresh the test data to show current state
+      const testRes = await fetch(`/api/hris-sync/test?confidenceThreshold=${confidenceThreshold}`);
+      if (testRes.ok) {
+        const { results: refreshedResults, summary: refreshedSummary } = await testRes.json();
+        setSyncResults(refreshedResults || []);
+        setSyncSummary(refreshedSummary || null);
+      }
+      
       setSelectedUsers([]);
       setManualSyncStatus("success");
       toast({
         title: "Manual sync completed",
-        description: `${results?.length || 0} users updated`,
+        description: `${syncResults?.length || 0} users updated. Table refreshed to show current state.`,
       });
     } catch (err) {
       setManualSyncStatus("error");
@@ -213,8 +222,8 @@ export default function HrisSync() {
                       max="1"
                       step="0.05"
                       value={confidenceThreshold}
-                      onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value) || 0.4)}
-                      placeholder="0.25"
+                      onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value) || 0.2)}
+                      placeholder="0.2"
                     />
                     <p className="text-xs text-muted-foreground">
                       Minimum confidence score for fuzzy matching (0.0 - 1.0)
@@ -437,6 +446,7 @@ export default function HrisSync() {
                           <th className="border px-2 py-1">Title</th>
                           <th className="border px-2 py-1">Manager</th>
                           <th className="border px-2 py-1">Mobile</th>
+                          <th className="border px-2 py-1">Gender</th>
                           <th className="border px-2 py-1">Issues</th>
                         </tr>
                       </thead>
@@ -499,6 +509,11 @@ export default function HrisSync() {
                             <td className="border px-2 py-1">
                               {row.diffs.mobile ? (
                                 <span className="bg-yellow-100 px-1 rounded text-xs">{row.diffs.mobile || "—"}</span>
+                              ) : "—"}
+                            </td>
+                            <td className="border px-2 py-1">
+                              {row.diffs.gender ? (
+                                <span className="bg-yellow-100 px-1 rounded text-xs">{row.diffs.gender || "—"}</span>
                               ) : "—"}
                             </td>
                             <td className="border px-2 py-1">

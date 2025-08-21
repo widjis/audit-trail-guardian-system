@@ -385,33 +385,20 @@ async function applyDiffs(adUser, diffs, adBaseDN) {
 }
 
 /**
- * Fetch HRIS rows from SQL Server
+ * Fetch HRIS rows from local MTIUsers table
  */
 export async function gatherEmployeeData() {
   const dbPool = getDbPool();
-  const systemConfig = new SystemConfigService(dbPool);
-  const hrisDbConfig = await systemConfig.getHrisConfig();
   
-  if (!hrisDbConfig.enabled) throw new Error('HRIS sync disabled in configuration');
-
-  const pool = await mssql.connect({
-    server: hrisDbConfig.server,
-    port:   parseInt(hrisDbConfig.port, 10),
-    database: hrisDbConfig.database,
-    user:     hrisDbConfig.username,
-    password: hrisDbConfig.password,
-    options: { encrypt: false, trustServerCertificate: true }
-  });
-  const schema = hrisDbConfig.schema || 'dbo';
+  // Query the local MTIUsers table instead of external HRIS database
   const sql = `
     SELECT *
-      FROM [${schema}].[it_mti_employee_database_tbl]
+      FROM [dbo].[MTIUsers]
       WHERE grade_interval <> 'Non Staff';`;
 
-  const { recordset } = await pool.request().query(sql);
-  await pool.close();
+  const { recordset } = await dbPool.request().query(sql);
   
-  console.log(`[HRIS] Found ${recordset.length} staff employees in database (Non Staff excluded)`);
+  console.log(`[HRIS] Found ${recordset.length} staff employees in MTIUsers table (Non Staff excluded)`);
   console.log(`[HRIS] Sample employee IDs: ${recordset.slice(0, 5).map(r => r.employee_id).join(', ')}`);
   
   return recordset;
@@ -427,7 +414,7 @@ export async function findUsersInAD(baseDN) {
 
   // refined fetch
   const filter = '(&(objectClass=user)(objectCategory=user))';
-  const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','distinguishedName'];
+  const attrs  = ['sAMAccountName','displayName','name','employeeID','department','title','manager','mobile','gender','distinguishedName'];
   const entries = await ldapSearch(baseDN, filter, attrs);
 
   // map into consistent shape with normalized mobile field
@@ -451,6 +438,7 @@ export async function findUsersInAD(baseDN) {
       title:          e.title,
       manager:        e.manager,
       mobile:         normalizedMobile,
+      gender:         e.gender,
       dn:             e.distinguishedName
     };
   });
@@ -698,7 +686,7 @@ export async function syncToActiveDirectory(testOnly = true, confidenceThreshold
     totalUsers: syncResults.length,
     usersWithChanges: syncResults.filter(r => r.hasChanges).length,
     usersWithoutChanges: syncResults.filter(r => !r.hasChanges).length,
-    totalFieldsAnalyzed: syncResults.length * 5, // Updated to include employeeID
+    totalFieldsAnalyzed: syncResults.length * 6, // Updated to include employeeID and gender
     totalMatches: syncResults.reduce((sum, r) => sum + r.fieldComparison.matchingFields, 0),
     totalDiscrepancies: syncResults.reduce((sum, r) => sum + r.fieldComparison.discrepancies, 0),
     highPriorityIssues: syncResults.reduce((sum, r) => sum + r.fieldComparison.highPriorityIssues.length, 0),
@@ -1072,51 +1060,34 @@ export async function debugDataCounts() {
   try {
     const dbPool = getDbPool();
     const systemConfig = new SystemConfigService(dbPool);
-    const hrisDbConfig = await systemConfig.getHrisConfig();
     const adConfig = await systemConfig.getActiveDirectoryConfig();
     
-    if (!hrisDbConfig.enabled) {
-      throw new Error('HRIS sync disabled in configuration');
-    }
-
-    // Connect to HRIS database
-    const pool = await mssql.connect({
-      server: hrisDbConfig.server,
-      port: parseInt(hrisDbConfig.port, 10),
-      database: hrisDbConfig.database,
-      user: hrisDbConfig.username,
-      password: hrisDbConfig.password,
-      options: { encrypt: false, trustServerCertificate: true }
-    });
-    
-    const schema = hrisDbConfig.schema || 'dbo';
-    
-    // Get database statistics
-    console.log('[DEBUG] Fetching database statistics...');
+    // Get database statistics from local MTIUsers table
+    console.log('[DEBUG] Fetching database statistics from MTIUsers table...');
     
     // Total employees
-    const totalResult = await pool.request().query(`
-      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl]
+    const totalResult = await dbPool.request().query(`
+      SELECT COUNT(*) as count FROM [dbo].[MTIUsers]
     `);
     const totalEmployees = totalResult.recordset[0].count;
     
     // Non-staff employees
-    const nonStaffResult = await pool.request().query(`
-      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+    const nonStaffResult = await dbPool.request().query(`
+      SELECT COUNT(*) as count FROM [dbo].[MTIUsers] 
       WHERE grade_interval = 'Non Staff'
     `);
     const nonStaffEmployees = nonStaffResult.recordset[0].count;
     
     // Staff employees (processed by sync)
-    const staffResult = await pool.request().query(`
-      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+    const staffResult = await dbPool.request().query(`
+      SELECT COUNT(*) as count FROM [dbo].[MTIUsers] 
       WHERE grade_interval <> 'Non Staff'
     `);
     const staffEmployees = staffResult.recordset[0].count;
     
     // Employees with valid names (actually processed)
-    const validNamesResult = await pool.request().query(`
-      SELECT COUNT(*) as count FROM [${schema}].[it_mti_employee_database_tbl] 
+    const validNamesResult = await dbPool.request().query(`
+      SELECT COUNT(*) as count FROM [dbo].[MTIUsers] 
       WHERE grade_interval <> 'Non Staff' 
       AND employee_name IS NOT NULL 
       AND LTRIM(RTRIM(employee_name)) <> ''
@@ -1124,15 +1095,13 @@ export async function debugDataCounts() {
     const processedBySync = validNamesResult.recordset[0].count;
     
     // Grade breakdown
-    const gradeResult = await pool.request().query(`
+    const gradeResult = await dbPool.request().query(`
       SELECT grade_interval, COUNT(*) as count 
-      FROM [${schema}].[it_mti_employee_database_tbl] 
+      FROM [dbo].[MTIUsers] 
       GROUP BY grade_interval 
       ORDER BY count DESC
     `);
     const gradeBreakdown = gradeResult.recordset;
-    
-    await pool.close();
     
     // Get Active Directory statistics
     console.log('[DEBUG] Fetching Active Directory statistics...');
@@ -1421,7 +1390,7 @@ function compareAdHrisFields(adUser, hrisEmployee) {
     matches,
     supervisorStatus,
     summary: {
-      totalFields: 4, // department, title, mobile, manager
+      totalFields: 6, // employeeID, department, title, mobile, gender, manager
       matchingFields: matches.length,
       discrepantFields: discrepancies.length,
       highSeverityIssues: discrepancies.filter(d => d.severity === 'high').length,

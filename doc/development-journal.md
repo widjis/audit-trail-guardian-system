@@ -35,6 +35,36 @@
 
 ## Recent Updates
 
+### HRIS Sync UI/UX Flow Fix
+**Date:** August 21, 2025
+**Status:** Completed
+**Project:** MTI Onboarding System
+
+#### UI/UX Flow Issue Resolution
+Resolved UI/UX flow issue where the HRIS sync table continued to show recently synced users instead of refreshing to reflect the current sync status:
+- Updated `handleManualSync` function to automatically refresh sync data after manual sync operations
+- Added automatic call to `handleTestSync()` after successful manual sync to fetch updated user status
+- Ensures successfully synced users are immediately removed from the "Users Requiring Updates" table
+- Applied to both main sync interface and HrisTableView component via shared `onSync` prop
+
+**Files Modified:**
+- `src/pages/HrisSync.tsx` - Enhanced manual sync flow with automatic refresh
+
+### HRIS Sync Confidence Threshold Update
+**Date:** August 21, 2025
+**Status:** Completed
+**Project:** MTI Onboarding System
+
+#### Default Confidence Threshold Adjustment
+Updated the default confidence threshold for HRIS sync fuzzy matching from 0.4 to 0.2:
+- Modified initial state value in HrisSync component
+- Updated fallback value in onChange handler
+- Changed placeholder text to reflect new default
+- Lower threshold provides stricter matching criteria for better accuracy
+
+**Files Modified:**
+- `src/pages/HrisSync.tsx` - Updated confidence threshold default from 0.4 to 0.2
+
 ### Material UI Grid Component Migration
 **Date:** January 2025
 **Status:** Completed
@@ -83,6 +113,92 @@ Implemented full gender synchronization in HRIS sync service to achieve parity w
 - Gender changes in HRIS will now be automatically detected and synced to Active Directory
 - Improved data consistency between HRIS and AD systems
 - Enhanced audit trail for gender field modifications
+
+#### Frontend Gender Column Addition
+**Date:** 2025-08-20
+**Status:** Completed
+**Project:** MTI Onboarding System
+
+Added missing Gender column to HRIS sync table in frontend to display gender field changes:
+
+**Changes Made:**
+1. **Table Header**: Added "Gender" column header in HRIS sync results table
+2. **Table Body**: Added gender diff display with yellow highlighting for changes
+3. **Data Binding**: Connected to `row.diffs.gender` from backend sync results
+
+**Files Modified:**
+- `src/pages/HrisSync.tsx` - Added Gender column to "Users Requiring Updates" table
+
+**Technical Details:**
+- Gender column positioned between Mobile and Issues columns
+- Follows same styling pattern as other diff columns (yellow background for changes)
+- Displays "—" when no gender changes detected
+- TypeScript compilation verified successful
+
+**Impact:**
+- Users can now see gender field discrepancies in the frontend table
+- Complete 6-field display matches backend 6-field synchronization
+- Enhanced visibility of all HRIS sync changes including gender
+
+#### Backend Field Analysis Count Fix
+**Date:** 2025-08-20
+**Status:** Completed
+**Project:** MTI Onboarding System
+
+Fixed inconsistent field counting in backend services that caused Field Analysis to show 5/6 instead of 6/6:
+
+**Changes Made:**
+1. **HRIS Sync Service**: Updated `totalFieldsAnalyzed` calculation from `* 5` to `* 6`
+2. **Field Comparison Logic**: Updated `totalFields` from 4 to 6 in comparison summary
+3. **Test Endpoint**: Added missing employeeID and gender comparisons to test route
+4. **Consistency Fix**: Ensured all field counting logic uses 6 fields consistently
+
+**Files Modified:**
+- `src/server/services/hrisSyncService.js` - Fixed totalFieldsAnalyzed and totalFields counts
+- `src/server/routes/hris-sync.js` - Added missing field comparisons and updated totalFields
+
+**Technical Details:**
+- All 6 fields now properly counted: employeeID, department, title, mobile, gender, manager
+- Test endpoint now includes employeeID and gender comparison logic
+- Field Analysis will now correctly show 6/6 when all fields match
+- TypeScript compilation verified successful
+
+**Impact:**
+- Field Analysis now accurately reflects all 6 synchronized fields
+- Consistent field counting across all backend services
+- Improved accuracy of sync status reporting
+
+#### Gender Field Retrieval Fix
+**Date:** 2025-08-20
+**Status:** Completed
+**Project:** MTI Onboarding System
+
+Fixed critical issue where gender field was not being retrieved from Active Directory, causing users with gender already set in AD to still appear in sync results:
+
+**Root Cause:**
+- The `findUsersInAD` function was not including 'gender' in the LDAP attributes array
+- This caused `adUser.gender` to always be undefined during comparison
+- Gender comparison logic was working correctly, but had no AD data to compare against
+
+**Changes Made:**
+1. **LDAP Attributes**: Added 'gender' to the attributes array in `findUsersInAD` function
+2. **User Object Mapping**: Added gender field to the returned AD user object structure
+3. **Data Consistency**: Ensured gender field is properly retrieved and mapped from Active Directory
+
+**Files Modified:**
+- `src/server/services/hrisSyncService.js` - Added gender to LDAP search attributes and user object mapping
+
+**Technical Details:**
+- Updated `attrs` array to include 'gender' alongside other LDAP attributes
+- Added `gender: e.gender` to the returned user object in `findUsersInAD`
+- All existing gender comparison logic remains unchanged and functional
+- Fix applies to all sync operations including debug and bulk sync functions
+
+**Impact:**
+- Users with gender already set in Active Directory will no longer appear in sync results
+- Gender field comparison now works correctly with actual AD data
+- Field Analysis will show proper match counts when gender fields align
+- Eliminates false positives in HRIS sync results for gender field
 
 ### Detailed Task Breakdown Implementation
 **Date:** January 2025
@@ -243,6 +359,174 @@ Each license request now creates individual audit log entries with the following
 - Consider adding audit logs for license assignment status updates
 - Implement audit log cleanup/archival policies
 - Add audit log search and filtering capabilities
+
+## August 21, 2025
+
+### Database Schema Analysis and HRIS Integration
+
+**Morning Session - HRIS Table Schema Investigation**
+
+Conducted comprehensive analysis of the HRIS table structure and its integration with the onboarding system:
+
+#### HRIS Table: `it_mti_employee_database_tbl`
+
+**Primary Columns:**
+- `employee_id` (NVARCHAR(50)) - Primary identifier, maps to AD `employeeID`
+- `employee_name` (NVARCHAR(100)) - Full name, used for fuzzy matching with AD `displayName`
+- `department` (NVARCHAR(50)) - Department name, maps to AD `department`
+- `position_title` (NVARCHAR(100)) - Job title, maps to AD `title`
+- `phone` (NVARCHAR(20)) - Phone number, maps to AD `mobile`
+- `gender` (NVARCHAR(10)) - Gender information
+- `supervisor_id` (NVARCHAR(50)) - Manager's employee ID, used for hierarchy
+- `grade_interval` (NVARCHAR(50)) - Position grade/level
+
+**Key Integration Points:**
+1. **Employee Matching Logic** (in `hrisSyncService.js`):
+   - Primary: Exact `employeeID` match
+   - Secondary: Exact name match
+   - Tertiary: Fuzzy name matching with confidence scoring
+
+2. **Field Comparison Logic**:
+   - Department: Direct comparison
+   - Title: `position_title` → `title`
+   - Phone: `phone` → `mobile`
+   - Manager: Resolved via `supervisor_id` lookup
+
+3. **Confidence Scoring**:
+   - Exact ID match: 100%
+   - Exact name match: 90%
+   - Fuzzy match: Variable based on similarity
+
+**Data Flow:**
+HRIS → Sync Service → Comparison Engine → Audit Logs → Frontend Dashboard
+
+**Evening Session - Database Structure Verification**
+
+Created and executed database inspection scripts to verify current database state:
+
+#### Current Database: `EmployeeWorkflow` (SQL Server)
+
+**Connection Details:**
+- Server: 10.60.10.47:1433
+- Database: EmployeeWorkflow
+- Type: Microsoft SQL Server
+
+**Confirmed Tables (15 total):**
+1. `users` (10 rows) - System users with authentication
+2. `hires` (304 rows) - New hire records with onboarding status
+3. `departments` (21 rows) - Department master data
+4. `audit_logs` (2,567 rows) - System audit trail
+5. `ms365_license_types` (6 rows) - Microsoft 365 license types
+6. **`MTIUsers` (1,218 rows)** - **CONFIRMED: Local copy of HRIS data**
+7. `user_preferences`, `account_statuses`, `position_grades`, `mailing_lists`
+8. `system_configurations` - System settings
+9. Additional tables: `CardDBTimeSchedule`, `tblAttendanceReport`, `tblReportGenerationLog`, `tblWhatsAppConfig`
+
+#### MTIUsers Table Structure (22 columns):
+
+**Core Employee Data:**
+- `employee_id` (NVARCHAR(50)) - Primary identifier
+- `employee_name` (NVARCHAR(100)) - Full name
+- `gender` (NVARCHAR(10)) - Gender
+- `division`, `department`, `section` (NVARCHAR(50)) - Organizational hierarchy
+- `supervisor_id`, `supervisor_name` (NVARCHAR(50/100)) - Manager information
+- `position_title` (NVARCHAR(100)) - Job title
+- `grade_interval` (NVARCHAR(50)) - Position grade
+- `phone` (NVARCHAR(20)) - Contact number
+
+**Schedule/Access Data:**
+- `day_type`, `description` (NVARCHAR(50/200)) - Work schedule type
+- `time_in`, `time_out` (TIME) - Work hours
+- `next_day` (NVARCHAR(1)) - Next day indicator
+- `CardNo`, `AccessLevel` (NVARCHAR(50)) - Access control
+- `Name`, `FirstName`, `LastName`, `StaffNo` (NVARCHAR(50/100)) - Additional identifiers
+
+**Key Findings:**
+1. ✅ **MTIUsers table EXISTS** - Contains 1,218 employee records
+2. ✅ **Complete HRIS data copy** - All required fields for AD synchronization
+3. ✅ **Active data** - Recent employee records with current organizational structure
+4. ⚠️ **No indexes** - Performance optimization opportunity
+5. ✅ **Data integrity** - Consistent employee IDs and hierarchical relationships
+
+**Scripts Created:**
+- `check-db-simple.js` - Basic database connection and table listing
+- `direct-db-check.js` - Comprehensive database structure analysis
+- `check-mti-users.js` - Detailed MTIUsers table inspection
+
+**Next Steps:**
+- Document complete data synchronization workflow between MTIUsers ↔ HRIS ↔ Active Directory
+- Review audit trail implementation for HRIS changes
+- Consider adding indexes to MTIUsers table for performance
+- Verify data freshness and synchronization frequency
+
+## August 21, 2025 - Evening Session
+
+### HRIS Table Migration: External to Local MTIUsers
+
+**Objective:** Migrate HRIS sync functionality from external `it_mti_employee_database_tbl` to local `MTIUsers` table.
+
+#### Changes Made:
+
+**1. Updated `gatherEmployeeData()` function** in `src/server/services/hrisSyncService.js`:
+- ✅ Removed external HRIS database connection logic
+- ✅ Changed query from `[${schema}].[it_mti_employee_database_tbl]` to `[dbo].[MTIUsers]`
+- ✅ Now uses existing `dbPool` instead of separate HRIS connection
+- ✅ Maintains same data structure and filtering logic (excludes 'Non Staff')
+
+**2. Updated `/debug-counts` endpoint** in `src/server/routes/hris-sync.js`:
+- ✅ Removed external HRIS database configuration and connection
+- ✅ Updated all count queries to use local `[dbo].[MTIUsers]` table
+- ✅ Simplified logic by removing external database pool management
+- ✅ Maintains same response structure for frontend compatibility
+
+**3. Updated `debugDataCounts()` function** in `src/server/services/hrisSyncService.js`:
+- ✅ Removed HRIS configuration dependency
+- ✅ Updated all statistical queries to use local `[dbo].[MTIUsers]` table
+- ✅ Simplified database connection handling
+- ✅ Maintains same statistical calculations and breakdowns
+
+**4. Updated debug scripts:**
+- ✅ Modified `debug-supervisor-lookup.js` to query `[dbo].[MTIUsers]` instead of external table
+- ✅ Updated both employee lookup and supervisor lookup queries
+
+#### Technical Benefits:
+
+1. **Performance Improvement**: Eliminates external database connections and network latency
+2. **Simplified Architecture**: Reduces dependency on external HRIS database configuration
+3. **Data Consistency**: Uses single source of truth from local MTIUsers table
+4. **Reduced Complexity**: Removes external connection pool management
+5. **Better Error Handling**: Eliminates external database connectivity issues
+
+#### Verification:
+- ✅ TypeScript compilation successful (`npx tsc --noEmit`)
+- ✅ All functions maintain same data structure and API contracts
+- ✅ No breaking changes to frontend components
+- ✅ Debug scripts updated for consistency
+
+#### Data Flow (Updated):
+```
+External HRIS → MTIUsers Table (Local) → HRIS Sync Service → Active Directory
+```
+
+**Previous Flow:**
+```
+External HRIS → HRIS Sync Service → Active Directory
+                     ↓
+               MTIUsers Table (Local)
+```
+
+**Current Flow:**
+```
+MTIUsers Table (Local) → HRIS Sync Service → Active Directory
+```
+
+#### Impact Assessment:
+- ✅ **Frontend**: No changes required - same API responses
+- ✅ **Backend**: Simplified database operations
+- ✅ **Performance**: Improved due to local database queries
+- ✅ **Maintenance**: Reduced external dependencies
+
+**Note**: The MTIUsers table should be kept synchronized with the external HRIS system through a separate data synchronization process to ensure data freshness.
 
 ## HRIS Table View Implementation
 

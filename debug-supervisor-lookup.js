@@ -48,7 +48,7 @@ async function debugSupervisorLookup() {
           supervisor_id,
           department,
           position_title
-        FROM [dbo].[it_mti_employee_database_tbl] 
+        FROM [dbo].[MTIUsers] 
         WHERE employee_id = @employeeId
       `;
 
@@ -133,7 +133,7 @@ async function debugSupervisorLookup() {
           // Get supervisor name from HRIS
           const supervisorQuery = `
             SELECT employee_name 
-            FROM [dbo].[it_mti_employee_database_tbl] 
+            FROM [dbo].[MTIUsers] 
             WHERE employee_id = @supervisorId
           `;
           

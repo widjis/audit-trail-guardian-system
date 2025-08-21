@@ -271,7 +271,12 @@ router.post('/schedule', (req, res) => {
  */
 router.get('/query', async (req, res) => {
   try {
-    const { activeDirectorySettings: ad } = loadSettings();
+    // Get database connection for AD settings
+    const dbPool = req.app.locals.dbPool;
+    const SystemConfigService = (await import('../services/system-config-service.js')).default;
+    const systemConfig = new SystemConfigService(dbPool);
+    const ad = await systemConfig.getActiveDirectoryConfig();
+    
     const users = await findUsersInAD(ad.baseDN);
     res.json({
       success: true,
@@ -303,48 +308,32 @@ router.get('/debug-counts', async (req, res) => {
     const dbUsers = await gatherEmployeeData();
     const adUsers = await findUsersInAD(adConfig.baseDN);
     
-    // Get HRIS database configuration
-    const hrisDbConfig = await systemConfig.getHrisConfig();
-    
-    // Check total employees in database (including Non Staff)
-    const mssql = (await import('mssql')).default;
-    const pool = await mssql.connect({
-      server: hrisDbConfig.server,
-      port: parseInt(hrisDbConfig.port, 10),
-      database: hrisDbConfig.database,
-      user: hrisDbConfig.username,
-      password: hrisDbConfig.password,
-      options: { encrypt: false, trustServerCertificate: true }
-    });
-    
-    const schema = hrisDbConfig.schema || 'dbo';
-    
-    // Total employees
-    const totalResult = await pool.request().query(`
-      SELECT COUNT(*) as total FROM [${schema}].[it_mti_employee_database_tbl]
-    `);
-    
-    // Non-staff count
-    const nonStaffResult = await pool.request().query(`
-      SELECT COUNT(*) as nonStaff FROM [${schema}].[it_mti_employee_database_tbl] 
-      WHERE grade_interval = 'Non Staff'
-    `);
-    
-    // Staff count (what we're actually processing)
-    const staffResult = await pool.request().query(`
-      SELECT COUNT(*) as staff FROM [${schema}].[it_mti_employee_database_tbl] 
-      WHERE grade_interval <> 'Non Staff'
-    `);
-    
-    // Grade intervals breakdown
-    const gradeBreakdown = await pool.request().query(`
-      SELECT grade_interval, COUNT(*) as count 
-      FROM [${schema}].[it_mti_employee_database_tbl] 
-      GROUP BY grade_interval 
-      ORDER BY count DESC
-    `);
-    
-    await pool.close();
+    // Query local MTIUsers table instead of external HRIS database
+  
+  // Total employees
+  const totalResult = await dbPool.request().query(`
+    SELECT COUNT(*) as total FROM [dbo].[MTIUsers]
+  `);
+  
+  // Non-staff count
+  const nonStaffResult = await dbPool.request().query(`
+    SELECT COUNT(*) as nonStaff FROM [dbo].[MTIUsers] 
+    WHERE grade_interval = 'Non Staff'
+  `);
+  
+  // Staff count (what we're actually processing)
+  const staffResult = await dbPool.request().query(`
+    SELECT COUNT(*) as staff FROM [dbo].[MTIUsers] 
+    WHERE grade_interval <> 'Non Staff'
+  `);
+  
+  // Grade intervals breakdown
+  const gradeBreakdown = await dbPool.request().query(`
+    SELECT grade_interval, COUNT(*) as count 
+    FROM [dbo].[MTIUsers] 
+    GROUP BY grade_interval 
+    ORDER BY count DESC
+  `);
     
     res.json({
       success: true,
@@ -517,6 +506,30 @@ router.get('/test-manager-comparison/:username', async (req, res) => {
       matches.push('mobile');
     }
     
+    // Compare employeeID
+    if (mockAdUser.employeeID !== mockHrisEmployee.employee_id) {
+      discrepancies.push({
+        field: 'employeeID',
+        adValue: mockAdUser.employeeID || 'Not set',
+        hrisValue: mockHrisEmployee.employee_id || 'Not set',
+        severity: 'high'
+      });
+    } else {
+      matches.push('employeeID');
+    }
+    
+    // Compare gender
+    if (mockAdUser.gender !== mockHrisEmployee.gender) {
+      discrepancies.push({
+        field: 'gender',
+        adValue: mockAdUser.gender || 'Not set',
+        hrisValue: mockHrisEmployee.gender || 'Not set',
+        severity: 'medium'
+      });
+    } else {
+      matches.push('gender');
+    }
+    
     // Check supervisor/manager - THIS IS THE KEY LOGIC WE'RE TESTING
     let supervisorStatus = 'unknown';
     console.log(`[DEBUG TEST] Manager comparison - AD manager: "${mockAdUser.manager}", HRIS supervisor_id: "${mockHrisEmployee.supervisor_id}"`);
@@ -565,7 +578,7 @@ router.get('/test-manager-comparison/:username', async (req, res) => {
       matches,
       supervisorStatus,
       summary: {
-        totalFields: 4, // department, title, mobile, manager
+        totalFields: 6, // employeeID, department, title, mobile, gender, manager
         matchingFields: matches.length,
         discrepantFields: discrepancies.length,
         highSeverityIssues: discrepancies.filter(d => d.severity === 'high').length,
