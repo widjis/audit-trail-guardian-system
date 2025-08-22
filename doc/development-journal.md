@@ -528,6 +528,43 @@ MTIUsers Table (Local) → HRIS Sync Service → Active Directory
 
 **Note**: The MTIUsers table should be kept synchronized with the external HRIS system through a separate data synchronization process to ensure data freshness.
 
+### Backend Server Startup Issue Resolution
+
+**Issue Identified:** HRIS Sync "Run Test" button was not working due to backend server not running.
+
+**Root Cause:**
+- Frontend (Vite dev server) was running on port 8081
+- Backend server was not started, causing API calls to fail
+- Vite proxy configuration was correct (`/api` → `http://localhost:3001`)
+
+**Resolution:**
+1. **Started Backend Server**: `node src/server/start.js`
+   - Server successfully started on port 3001
+   - Database connection established
+   - Schema initialization completed
+
+2. **Verified API Functionality**:
+   - Tested `/api/hris-sync/test` endpoint directly
+   - Confirmed 200 OK response with valid JSON data
+   - Frontend button now functional through Vite proxy
+
+**Technical Details:**
+- **Frontend**: http://localhost:8081 (Vite dev server)
+- **Backend**: http://localhost:3001 (Node.js Express server)
+- **Proxy**: Vite automatically forwards `/api/*` requests to backend
+- **API Response**: 474KB JSON with HRIS sync results
+
+**Files Involved:**
+- `src/server/start.js` - Backend server entry point
+- `vite.config.ts` - Proxy configuration (already correct)
+- `src/pages/HrisSync.tsx` - Frontend button functionality
+
+**Verification:**
+- ✅ Backend server running on port 3001
+- ✅ API endpoint responding correctly
+- ✅ Frontend-backend communication established
+- ✅ HRIS sync button functional
+
 ## HRIS Table View Implementation
 
 ### Date: 2024
