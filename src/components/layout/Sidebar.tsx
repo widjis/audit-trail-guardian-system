@@ -14,6 +14,9 @@ import SyncIcon from '@mui/icons-material/Sync';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MailIcon from '@mui/icons-material/Mail';
+import ApprovalIcon from '@mui/icons-material/CheckCircle';
+import AccountBoxIcon from '@mui/icons-material/AccountBox';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -25,8 +28,15 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
   const location = useLocation();
   const { logout, getCurrentUser } = useAuth();
   const user = getCurrentUser();
-  const isAdmin = user?.role === "admin";
-  const isAdminOrSupport = ["admin", "support"].includes(user?.role || "");
+  const userRole = user?.role || "";
+  const isAdmin = userRole === "admin";
+  const isAdminOrSupport = ["admin", "it_support"].includes(userRole);
+  const isRecruiter = userRole === "recruiter";
+  const isHRISSPV = userRole === "hris_spv";
+  const isITSuperintendent = userRole === "it_superintendent";
+  const isITSupport = userRole === "it_support";
+  const canApprove = ["hris_spv", "it_superintendent", "admin"].includes(userRole);
+  const canSetupAccounts = ["it_support", "admin"].includes(userRole);
 
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const { savePreference } = useUserPreferences();
@@ -98,22 +108,59 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
     path: string;
     icon: React.ReactNode;
   }
-  const commonNavItems: NavItem[] = [
+  // Base navigation items available to all authenticated users
+  const baseNavItems: NavItem[] = [
     { label: "Dashboard", path: "/dashboard", icon: <DashboardIcon /> },
+  ];
+
+  // Role-specific navigation items
+  const recruiterNavItems: NavItem[] = [
     { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
+  ];
+
+  const approverNavItems: NavItem[] = [
+    { label: "Pending Approvals", path: "/approvals", icon: <ApprovalIcon /> },
+    { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
+  ];
+
+  const itSupportNavItems: NavItem[] = [
+    { label: "Account Setup", path: "/account-setup", icon: <AccountBoxIcon /> },
+    { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
+  ];
+
+  const adminOrSupportNavItems: NavItem[] = [
     { label: "Import Data", path: "/import", icon: <CloudUploadIcon /> },
     { label: "Onboard Welcome Email", path: "/onboard-email", icon: <MailIcon /> },
-  ];
-  const adminOrSupportNavItems: NavItem[] = [
     { label: "HRIS Sync", path: "/hris-sync", icon: <SyncIcon /> },
   ];
+
   const adminOnlyNavItems: NavItem[] = [
     { label: "Settings", path: "/settings", icon: <SettingsIcon /> },
   ];
 
-  let navItems = [...commonNavItems];
-  if (isAdminOrSupport) navItems = [...navItems, ...adminOrSupportNavItems];
-  if (isAdmin) navItems = [...navItems, ...adminOnlyNavItems];
+  // Build navigation items based on user role
+  let navItems = [...baseNavItems];
+  
+  // Add role-specific navigation items
+  if (isRecruiter) {
+    navItems = [...navItems, ...recruiterNavItems];
+  }
+  
+  if (canApprove) {
+    navItems = [...navItems, ...approverNavItems];
+  }
+  
+  if (canSetupAccounts) {
+    navItems = [...navItems, ...itSupportNavItems];
+  }
+  
+  if (isAdminOrSupport) {
+    navItems = [...navItems, ...adminOrSupportNavItems];
+  }
+  
+  if (isAdmin) {
+    navItems = [...navItems, ...adminOnlyNavItems];
+  }
 
   const handleNavigation = (event: React.MouseEvent, path: string) => {
     // Close mobile drawer if open

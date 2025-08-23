@@ -49,6 +49,10 @@ export interface NewHire {
   srf_document_path?: string | null;
   srf_document_name?: string | null;
   srf_document_uploaded_at?: string | null;
+
+  // Add for RBAC workflow system
+  submitted_by?: string;
+  workflow_status?: 'draft' | 'submitted' | 'approved_hris' | 'approved_it_superintendent' | 'completed' | 'rejected';
 }
 
 // Add missing types for sorting

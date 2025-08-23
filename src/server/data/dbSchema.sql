@@ -216,3 +216,70 @@ BEGIN
       updated_at DATETIME DEFAULT GETDATE()
     );
 END
+
+-- Check if the workflow_approvals table already exists
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='workflow_approvals' AND xtype='U')
+BEGIN
+    -- Create the workflow_approvals table
+    CREATE TABLE workflow_approvals (
+      id VARCHAR(255) PRIMARY KEY,
+      hire_id NVARCHAR(255) NOT NULL,
+      step_name VARCHAR(100) NOT NULL, -- 'recruiter_submit', 'hris_spv_approve', 'it_superintendent_approve', 'it_support_setup'
+      step_order INT NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'completed'
+      approved_by NVARCHAR(255),
+      approved_at DATETIME,
+      rejection_reason TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT GETDATE(),
+      updated_at DATETIME DEFAULT GETDATE()
+    );
+END
+
+-- Add foreign key constraints for workflow_approvals table (only if table exists and constraints don't exist)
+IF EXISTS (SELECT * FROM sysobjects WHERE name='workflow_approvals' AND xtype='U')
+   AND EXISTS (SELECT * FROM sysobjects WHERE name='hires' AND xtype='U')
+   AND NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME = 'FK_workflow_approvals_hire_id')
+BEGIN
+    ALTER TABLE workflow_approvals ADD CONSTRAINT FK_workflow_approvals_hire_id FOREIGN KEY (hire_id) REFERENCES hires(id);
+END
+
+IF EXISTS (SELECT * FROM sysobjects WHERE name='workflow_approvals' AND xtype='U')
+   AND EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+   AND NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME = 'FK_workflow_approvals_approved_by')
+BEGIN
+    ALTER TABLE workflow_approvals ADD CONSTRAINT FK_workflow_approvals_approved_by FOREIGN KEY (approved_by) REFERENCES users(id);
+END
+
+-- Update users table role column to support new RBAC roles
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'role')
+BEGIN
+    -- Update existing role column to support longer role names
+    ALTER TABLE users ALTER COLUMN role VARCHAR(100) NOT NULL;
+END
+
+-- Add workflow status column to hires table (backward compatible - defaults to 'approved' for existing records)
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'workflow_status')
+BEGIN
+    ALTER TABLE hires ADD workflow_status VARCHAR(50) DEFAULT 'approved'; -- 'draft', 'submitted', 'hris_review', 'it_review', 'approved', 'rejected'
+END
+
+-- Add submitted_by column to hires table (nullable for backward compatibility)
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'submitted_by')
+BEGIN
+    ALTER TABLE hires ADD submitted_by NVARCHAR(255) NULL;
+END
+
+-- Add foreign key constraint for submitted_by (only if column exists and users table exists)
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'submitted_by')
+   AND EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+   AND NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME = 'FK_hires_submitted_by')
+BEGIN
+    ALTER TABLE hires ADD CONSTRAINT FK_hires_submitted_by FOREIGN KEY (submitted_by) REFERENCES users(id);
+END
+
+-- Add submitted_at column to hires table (nullable for backward compatibility)
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'hires' AND COLUMN_NAME = 'submitted_at')
+BEGIN
+    ALTER TABLE hires ADD submitted_at DATETIME NULL;
+END

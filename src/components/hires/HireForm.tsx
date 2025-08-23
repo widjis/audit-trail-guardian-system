@@ -74,6 +74,10 @@ export function HireForm({ currentUser }: HireFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showADDetails, setShowADDetails] = useState(false);
   const [showEmptyMailingListDialog, setShowEmptyMailingListDialog] = useState(false);
+  
+  // Check if current user is a recruiter
+  const isRecruiter = currentUser?.role === 'recruiter';
+  const canEditAccountInfo = !isRecruiter; // Only non-recruiters can edit account info
   const [adAccountDetails, setADAccountDetails] = useState<ADAccountDetails>({
     displayName: "",
     firstName: "",
@@ -469,12 +473,30 @@ export function HireForm({ currentUser }: HireFormProps) {
     // Create a copy of hire data for submission
     const hireToSubmit = { ...hire };
     
-    // Ensure the ICT Support PIC is set
-    if (currentUser?.username) {
-      hireToSubmit.ict_support_pic = currentUser.username;
-      logger.ui.info("HireForm", `Setting ICT Support PIC to ${currentUser.username}`);
+    // Set submitted_by for new hires
+    if (isNewHire && currentUser?.id) {
+      hireToSubmit.submitted_by = currentUser.id;
+    }
+    
+    // For recruiters, set workflow status and clear account-related fields
+    if (isRecruiter) {
+      hireToSubmit.workflow_status = 'submitted';
+      // Clear account setup fields that recruiters shouldn't set
+      hireToSubmit.username = '';
+      hireToSubmit.password = '';
+      hireToSubmit.account_creation_status = 'Pending';
+      hireToSubmit.license_assigned = false;
+      hireToSubmit.laptop_ready = 'Pending';
+      hireToSubmit.microsoft_365_license = 'None';
+      hireToSubmit.ict_support_pic = '';
     } else {
-      logger.ui.warn("HireForm", "No current user available to set ICT Support PIC");
+      // For non-recruiters, ensure the ICT Support PIC is set
+      if (currentUser?.username) {
+        hireToSubmit.ict_support_pic = currentUser.username;
+        logger.ui.info("HireForm", `Setting ICT Support PIC to ${currentUser.username}`);
+      } else {
+        logger.ui.warn("HireForm", "No current user available to set ICT Support PIC");
+      }
     }
     
     // Remove audit logs to prevent payload size issues
@@ -482,23 +504,53 @@ export function HireForm({ currentUser }: HireFormProps) {
     
     logger.ui.debug("HireForm", "About to save hire data:", JSON.stringify(hireToSubmit));
     logger.ui.debug("HireForm", "Is new hire?", isNewHire);
+    logger.ui.debug("HireForm", "Is recruiter?", isRecruiter);
   
     try {
       if (isNewHire) {
         logger.ui.info("HireForm", "Creating new hire");
         logger.ui.debug("HireForm", "Create data:", JSON.stringify(hireToSubmit));
-        const result = await hiresApi.create(hireToSubmit);
+        
+        // Use RBAC API for recruiters, regular API for others
+        const apiEndpoint = isRecruiter ? '/api/hires-rbac' : '/api/hires';
+        const result = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(hireToSubmit)
+        });
+        
+        if (!result.ok) {
+          const errorData = await result.json();
+          throw new Error(errorData.error || 'Failed to create hire');
+        }
+        
         logger.ui.info("HireForm", "Create hire API call completed!");
-        logger.ui.debug("HireForm", "Create hire result:", result);
         toast({
           title: "Success",
-          description: "New hire added successfully",
+          description: isRecruiter ? "New hire submitted for approval" : "New hire added successfully",
         });
       } else if (id) {
         logger.ui.info("HireForm", "Updating hire with ID:", id);
         logger.ui.debug("HireForm", "Update data:", JSON.stringify(hireToSubmit));
-        const result = await hiresApi.update(id, hireToSubmit);
-        logger.ui.debug("HireForm", "Update hire result:", result);
+        
+        // Use RBAC API for recruiters, regular API for others
+        const apiEndpoint = isRecruiter ? `/api/hires-rbac/${id}` : `/api/hires/${id}`;
+        const result = await fetch(apiEndpoint, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(hireToSubmit)
+        });
+        
+        if (!result.ok) {
+          const errorData = await result.json();
+          throw new Error(errorData.error || 'Failed to update hire');
+        }
         
         // Invalidate the query cache to refresh the data across all components
         queryClient.invalidateQueries({ queryKey: ['hire', id] });
@@ -722,6 +774,7 @@ export function HireForm({ currentUser }: HireFormProps) {
           </CardContent>
         </Card>
 
+        {canEditAccountInfo && (
         <Card>
           <CardHeader>
             <CardTitle>Account & Setup Information</CardTitle>
@@ -1170,6 +1223,7 @@ export function HireForm({ currentUser }: HireFormProps) {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Documents Section - Only show for existing hires */}
         {!isNewHire && hireData && (
@@ -1186,7 +1240,7 @@ export function HireForm({ currentUser }: HireFormProps) {
             Cancel
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Saving..." : isNewHire ? "Create" : "Update"}
+            {isLoading ? "Saving..." : isNewHire ? (isRecruiter ? "Submit for Approval" : "Create") : "Update"}
           </Button>
         </div>
       </form>

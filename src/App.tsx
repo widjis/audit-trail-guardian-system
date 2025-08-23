@@ -16,6 +16,7 @@ import Settings from "./pages/Settings";
 import HrisSync from "./pages/HrisSync";
 import OnboardEmail from "./pages/OnboardEmail";
 import WorkflowDemo from "./pages/WorkflowDemo";
+import AccountSetup from "./pages/AccountSetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,12 +33,48 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Protected route that checks for admin or support role
+// Protected route that checks for admin or IT support role
 const AdminOrSupportRoute = ({ children }: { children: React.ReactNode }) => {
   const { getCurrentUser } = useAuth();
   const user = getCurrentUser();
   
-  if (!["admin", "support"].includes(user?.role || "")) {
+  if (!["admin", "it_support"].includes(user?.role || "")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Protected route that checks for IT Support or Admin role
+const ITSupportRoute = ({ children }: { children: React.ReactNode }) => {
+  const { getCurrentUser } = useAuth();
+  const user = getCurrentUser();
+  
+  if (!["admin", "it_support"].includes(user?.role || "")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Protected route that checks for approval roles (HRIS SPV, IT Superintendent, Admin)
+const ApprovalRoute = ({ children }: { children: React.ReactNode }) => {
+  const { getCurrentUser } = useAuth();
+  const user = getCurrentUser();
+  
+  if (!["admin", "hris_spv", "it_superintendent"].includes(user?.role || "")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Protected route that checks for roles that can access hires (Recruiter, Approvers, IT Support, Admin)
+const HiresRoute = ({ children }: { children: React.ReactNode }) => {
+  const { getCurrentUser } = useAuth();
+  const user = getCurrentUser();
+  
+  if (!["admin", "recruiter", "hris_spv", "it_superintendent", "it_support"].includes(user?.role || "")) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -56,11 +93,37 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/hires" element={<Hires />} />
-          <Route path="/hires/:id" element={<HireDetail />} />
-          <Route path="/import" element={<Import />} />
-          <Route path="/onboard-email" element={<OnboardEmail />} />
+          <Route path="/hires" element={
+            <HiresRoute>
+              <Hires />
+            </HiresRoute>
+          } />
+          <Route path="/hires/:id" element={
+            <HiresRoute>
+              <HireDetail />
+            </HiresRoute>
+          } />
+          <Route path="/import" element={
+            <AdminOrSupportRoute>
+              <Import />
+            </AdminOrSupportRoute>
+          } />
+          <Route path="/onboard-email" element={
+            <AdminOrSupportRoute>
+              <OnboardEmail />
+            </AdminOrSupportRoute>
+          } />
           <Route path="/workflow-demo" element={<WorkflowDemo />} />
+          <Route path="/account-setup" element={
+            <ITSupportRoute>
+              <AccountSetup />
+            </ITSupportRoute>
+          } />
+          <Route path="/approvals" element={
+            <ApprovalRoute>
+              <Hires />
+            </ApprovalRoute>
+          } />
           <Route path="/hris-sync" element={
             <AdminOrSupportRoute>
               <HrisSync />

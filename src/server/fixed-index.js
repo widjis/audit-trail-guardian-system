@@ -34,6 +34,7 @@ app.use(getCurrentUser);
 // Import routes
 import authRoutes from './routes/auth.js';
 import hiresRoutes from './routes/hires.js';
+import hiresRbacRoutes from './routes/hires-rbac.js';
 import settingsRoutes from './routes/settings.js';
 import databaseRoutes from './routes/database.js';
 import usersRoutes from './routes/users.js';
@@ -45,7 +46,8 @@ import userPreferencesRoutes from './routes/user-preferences.js';
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/hires', hiresRoutes);
+app.use('/api/hires', hiresRoutes); // Legacy routes for backward compatibility
+app.use('/api/hires-rbac', hiresRbacRoutes); // New RBAC-enabled routes
 app.use('/api/settings', settingsRoutes);
 app.use('/api/database', databaseRoutes);
 app.use('/api/users', usersRoutes);
