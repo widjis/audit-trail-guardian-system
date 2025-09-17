@@ -3,6 +3,79 @@ import apiClient from "./api-client";
 import logger from "@/utils/logger";
 import { AxiosError } from 'axios';
 
+// Enhanced error type definitions to match backend structure
+interface EnhancedLdapError {
+  name?: string;
+  message?: string;
+  code?: string;
+  errno?: number;
+  syscall?: string;
+  stack?: string;
+}
+
+interface ErrorContext {
+  server?: string;
+  port?: number;
+  protocol?: string;
+  baseDN?: string;
+  operation?: string;
+}
+
+interface NetworkInfo {
+  host?: string;
+  port?: number;
+  protocol?: string;
+}
+
+interface QuickDiagnosis {
+  errorType?: string;
+  likelyRootCause?: string;
+  immediateAction?: string;
+}
+
+interface DetailedErrorInfo {
+  timestamp?: string;
+  context?: ErrorContext;
+  error?: EnhancedLdapError;
+  network?: NetworkInfo;
+  troubleshooting?: string[];
+}
+
+interface EnhancedErrorResponse {
+  summary?: string;
+  details?: DetailedErrorInfo;
+  quickDiagnosis?: QuickDiagnosis;
+  connectionAttempt?: {
+    server?: string;
+    port?: number;
+    protocol?: string;
+    timeoutSettings?: {
+      client?: number;
+      connection?: number;
+    };
+  };
+  nextSteps?: string[];
+}
+
+// Legacy error interfaces for backward compatibility
+interface LdapError {
+  code?: string;
+  errno?: number;
+  syscall?: string;
+  message?: string;
+  details?: string;
+  server?: string;
+}
+
+interface SqlError {
+  code?: string;
+  errno?: number;
+  sqlState?: string;
+  sqlMessage?: string;
+  message?: string;
+  query?: string;
+}
+
 interface ActiveDirectorySettings {
   server: string;
   username: string;
@@ -57,10 +130,31 @@ interface ADUserSearchResult {
   error?: string;
 }
 
-// The API client already includes /api in its baseURL
+// API Error Response types
+interface ADTestConnectionErrorResponse {
+  ldapError?: LdapError;
+  error?: string;
+  // Enhanced error response fields
+  enhancedError?: EnhancedErrorResponse;
+  errorCode?: string;
+  troubleshootingHints?: string[];
+  timestamp?: string;
+}
+
+interface ADUserCreationErrorResponse {
+  sqlError?: SqlError;
+  ldapError?: LdapError;
+  error?: string;
+  // Enhanced error response fields
+  enhancedError?: EnhancedErrorResponse;
+  errorCode?: string;
+  troubleshootingHints?: string[];
+  timestamp?: string;
+}
+
 const AD_ENDPOINT = "/active-directory";
 
-// Add in-memory cache for sensitive information that shouldn't be in localStorage
+// The API client already includes /api in its baseURL
 const memoryCache = {
   actualPassword: "" // Store the actual password in memory (not persisted)
 };
@@ -109,27 +203,61 @@ export const activeDirectoryService = {
       }
       
       const response = await apiClient.post<{ success: boolean; message: string }>(
-        `${AD_ENDPOINT}/test-connection`,
+        `${AD_ENDPOINT}/test`,
         testSettings
       );
+      
       logger.api.info('Active Directory connection test successful:', response.data.message);
       return response.data;
     } catch (error: unknown) {
       logger.api.error('AD connection test failed:', error);
       
-      const axiosError = error as AxiosError<{ ldapError?: any; error?: string }>;
+      const axiosError = error as AxiosError<ADTestConnectionErrorResponse>;
       
-      // Use the enhanced LDAP error logging if available
-      if (axiosError.response?.data?.ldapError) {
-        logger.ldap.errorDetail(axiosError.response.data.ldapError);
+      // Handle enhanced error response structure
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data;
+        
+        // Log enhanced error details if available
+        if (errorData.enhancedError) {
+          logger.api.error('Enhanced LDAP error details:', {
+            summary: errorData.enhancedError.summary,
+            errorType: errorData.enhancedError.quickDiagnosis?.errorType,
+            rootCause: errorData.enhancedError.quickDiagnosis?.likelyRootCause,
+            immediateAction: errorData.enhancedError.quickDiagnosis?.immediateAction,
+            troubleshooting: errorData.enhancedError.details?.troubleshooting,
+            nextSteps: errorData.enhancedError.nextSteps
+          });
+        }
+        
+        // Use legacy LDAP error logging for backward compatibility
+        if (errorData.ldapError) {
+          logger.api.error('Legacy LDAP error:', errorData.ldapError);
+        }
+        
+        // Log troubleshooting hints if available
+        if (errorData.troubleshootingHints?.length) {
+          logger.api.info('Troubleshooting hints:', errorData.troubleshootingHints);
+        }
       }
       
-      // Extract error message from response if available and provide more context
+      // Extract error message from response with enhanced context
       let errorMessage = "Connection test failed";
       
-      // Check if we have a more specific error from the server
-      if (axiosError.response?.data?.error) {
-        errorMessage = axiosError.response.data.error;
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data;
+        
+        // Prioritize enhanced error summary
+        if (errorData.enhancedError?.summary) {
+          errorMessage = errorData.enhancedError.summary;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        
+        // Add quick diagnosis if available
+        if (errorData.enhancedError?.quickDiagnosis?.immediateAction) {
+          errorMessage += ` - ${errorData.enhancedError.quickDiagnosis.immediateAction}`;
+        }
       } else if (axiosError.message) {
         errorMessage = axiosError.message;
       }
@@ -139,7 +267,7 @@ export const activeDirectoryService = {
     }
   },
 
-  // Create AD user with additional error handling and logging
+  // Create AD user with enhanced error handling and meaningful error messages
   createUser: async (hireId: string, userData: ADUserData): Promise<ADUserCreationResult> => {
     logger.api.debug('Creating AD user for hire ID:', hireId);
     
@@ -177,16 +305,8 @@ export const activeDirectoryService = {
         userData
       );
       
-      if (!response.data.success && response.data.error) {
-        logger.api.error('AD user creation failed with error:', response.data.error);
-        throw new Error(response.data.error);
-      }
-      
-      if (response.data.warning) {
-        logger.api.warn('AD user created with warning:', response.data.warning);
-      }
-      
-      logger.api.info('AD user created successfully:', {
+      logger.api.info('AD user creation successful:', {
+        hireId,
         username: userData.username,
         displayName: userData.displayName
       });
@@ -195,7 +315,7 @@ export const activeDirectoryService = {
     } catch (error: unknown) {
       logger.api.error('Failed to create AD user:', error);
       
-      const axiosError = error as AxiosError<{ sqlError?: any; ldapError?: any; error?: string }>;
+      const axiosError = error as AxiosError<ADUserCreationErrorResponse>;
       
       // Log database errors with detail if available
       if (axiosError.response?.data?.sqlError) {
@@ -207,10 +327,56 @@ export const activeDirectoryService = {
         logger.ldap.errorDetail(axiosError.response.data.ldapError);
       }
       
+      // Enhanced error message handling for different AD constraint errors
+      let userFriendlyMessage = "Failed to create Active Directory account";
+      
       if (axiosError.response?.data?.error) {
-        throw new Error(axiosError.response.data.error);
+        const errorMessage = axiosError.response.data.error.toLowerCase();
+        
+        // Handle specific AD constraint errors with meaningful messages
+        if (errorMessage.includes('constraint_att_type') || errorMessage.includes('000021c8')) {
+          if (errorMessage.includes('userprincipalname')) {
+            userFriendlyMessage = "Username format is invalid or already exists in the domain. Please try a different username.";
+          } else if (errorMessage.includes('samaccountname')) {
+            userFriendlyMessage = "Username already exists or contains invalid characters. Please choose a different username.";
+          } else {
+            userFriendlyMessage = "User account information contains invalid data. Please check the username and email format.";
+          }
+        } else if (errorMessage.includes('already exists') || errorMessage.includes('object already exists')) {
+          userFriendlyMessage = "A user with this username already exists in Active Directory. Please choose a different username.";
+        } else if (errorMessage.includes('invalid credentials') || errorMessage.includes('authentication')) {
+          userFriendlyMessage = "Unable to connect to Active Directory. Please check the AD service account credentials.";
+        } else if (errorMessage.includes('connection') || errorMessage.includes('timeout')) {
+          userFriendlyMessage = "Unable to connect to Active Directory server. Please check network connectivity and server settings.";
+        } else if (errorMessage.includes('password') || errorMessage.includes('pwd')) {
+          userFriendlyMessage = "Password does not meet Active Directory complexity requirements. Please ensure it contains uppercase, lowercase, numbers, and special characters.";
+        } else if (errorMessage.includes('organizational unit') || errorMessage.includes('ou')) {
+          userFriendlyMessage = "The specified organizational unit does not exist or is inaccessible. Please check the OU configuration.";
+        } else if (errorMessage.includes('permission') || errorMessage.includes('access denied')) {
+          userFriendlyMessage = "Insufficient permissions to create user accounts. Please check the AD service account permissions.";
+        } else {
+          // Use the original error message if it's already user-friendly
+          userFriendlyMessage = axiosError.response.data.error;
+        }
+        
+        throw new Error(userFriendlyMessage);
       }
-      throw error;
+      
+      // Handle network and other errors
+      if (axiosError.code === 'NETWORK_ERROR' || axiosError.code === 'ECONNREFUSED') {
+        throw new Error("Unable to connect to the server. Please check your network connection and try again.");
+      }
+      
+      if (axiosError.response?.status === 500) {
+        throw new Error("Server error occurred while creating the AD account. Please contact your system administrator.");
+      }
+      
+      if (axiosError.response?.status === 400) {
+        throw new Error("Invalid user data provided. Please check all required fields and try again.");
+      }
+      
+      // Fallback to generic error message
+      throw new Error(userFriendlyMessage);
     }
   },
 
@@ -228,52 +394,29 @@ export const activeDirectoryService = {
         `${AD_ENDPOINT}/search-users?query=${encodeURIComponent(query)}`
       );
       
-      // Initialize users array to ensure it's always an array, even if the response is invalid
-      let users: ADUser[] = [];
+      logger.api.info('AD user search successful:', {
+        query,
+        userCount: response.data.users.length
+      });
       
-      // Validate response format and structure with comprehensive null checks
-      if (response?.data) {
-        if (Array.isArray(response.data.users)) {
-          // Make sure each user object has the required properties
-          users = response.data.users.map(user => ({
-            displayName: user?.displayName || '',
-            username: user?.username || '',
-            email: user?.email || '',
-            title: user?.title || '',
-            department: user?.department || '',
-            dn: user?.dn || ''
-          }));
-        } else {
-          logger.api.warn(`Invalid users data format received from server for query: ${query}`);
-        }
-      } else {
-        logger.api.warn(`Invalid response format from server for query: ${query}`);
-      }
-        
-      logger.api.info(`Found ${users.length} AD users matching "${query}"`);
-      
-      return {
-        success: true,
-        users: users
-      };
+      return response.data;
     } catch (error: unknown) {
       logger.api.error('Failed to search AD users:', error);
       
       const axiosError = error as AxiosError<{ error?: string }>;
       
-      // Check for specific error messages from the server
       if (axiosError.response?.data?.error) {
-        return { 
-          success: false, 
-          users: [], 
-          error: axiosError.response.data.error 
+        return {
+          success: false,
+          users: [],
+          error: axiosError.response.data.error
         };
       }
       
-      return { 
-        success: false, 
-        users: [], 
-        error: axiosError.message || 'Failed to search Active Directory users' 
+      return {
+        success: false,
+        users: [],
+        error: 'Failed to search users'
       };
     }
   }
