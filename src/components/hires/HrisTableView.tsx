@@ -284,7 +284,12 @@ export const HrisTableView: React.FC<HrisTableViewProps> = ({
               <Button
                 variant="contained"
                 startIcon={<Refresh />}
-                onClick={() => onSync(selectedRows)}
+                onClick={() => {
+                  console.log('Sync Selected button clicked');
+                  console.log('selectedRows:', selectedRows);
+                  console.log('onSync function:', onSync);
+                  onSync(selectedRows);
+                }}
                 size="small"
               >
                 Sync Selected ({selectedRows.length})

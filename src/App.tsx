@@ -18,6 +18,7 @@ import OnboardEmail from "./pages/OnboardEmail";
 import WorkflowDemo from "./pages/WorkflowDemo";
 import AccountSetup from "./pages/AccountSetup";
 import NotFound from "./pages/NotFound";
+import { RecruiterHireForm } from "./components/hires/RecruiterHireForm";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,24 @@ const HiresRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Route for new hire form - shows different components based on role
+const NewHireRoute = () => {
+  const { getCurrentUser } = useAuth();
+  const user = getCurrentUser();
+  
+  if (!["admin", "recruiter", "hris_spv", "it_superintendent", "it_support"].includes(user?.role || "")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // Recruiters get the simplified form
+  if (user?.role === "recruiter") {
+    return <RecruiterHireForm />;
+  }
+  
+  // Other roles get redirected to the full hires page
+  return <Navigate to="/hires" replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -98,6 +117,7 @@ const App = () => (
               <Hires />
             </HiresRoute>
           } />
+          <Route path="/hires/new" element={<NewHireRoute />} />
           <Route path="/hires/:id" element={
             <HiresRoute>
               <HireDetail />

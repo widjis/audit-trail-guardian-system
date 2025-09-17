@@ -89,32 +89,87 @@ export default function HrisSync() {
   };
 
   // — Manual sync
-  const handleManualSync = async () => {
-    if (!selectedUsers.length) return;
+  const handleManualSync = async (employeeIDs?: string[]) => {
+    console.log('handleManualSync called with:', employeeIDs);
+    console.log('Type of employeeIDs:', typeof employeeIDs);
+    console.log('Is array:', Array.isArray(employeeIDs));
+    
+    // Handle case where employeeIDs might be an event object
+    let idsToSync: string[];
+    if (Array.isArray(employeeIDs)) {
+      idsToSync = employeeIDs;
+    } else {
+      // Fallback to selectedUsers if employeeIDs is not an array
+      idsToSync = selectedUsers;
+    }
+    
+    console.log('idsToSync:', idsToSync);
+    if (!idsToSync.length) {
+      console.log('No IDs to sync, returning early');
+      return;
+    }
+    console.log('Starting manual sync for:', idsToSync);
     setManualSyncStatus("loading");
     try {
       // 1. Perform the actual sync
       const syncRes = await fetch("/api/hris-sync/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeIDs: selectedUsers, confidenceThreshold })
+        body: JSON.stringify({ employeeIDs: idsToSync, confidenceThreshold })
       });
       if (!syncRes.ok) throw new Error("Manual sync failed");
       const { results: syncResults } = await syncRes.json();
       
-      // 2. Refresh the test data to show current state
-      const testRes = await fetch(`/api/hris-sync/test?confidenceThreshold=${confidenceThreshold}`);
-      if (testRes.ok) {
-        const { results: refreshedResults, summary: refreshedSummary } = await testRes.json();
-        setSyncResults(refreshedResults || []);
-        setSyncSummary(refreshedSummary || null);
+      // 2. Optimized update: Only update the synced users in the current results
+      // instead of rescanning all users
+      if (syncResults && syncResults.length > 0) {
+        setSyncResults(prevResults => {
+          const updatedResults = [...prevResults];
+          
+          // Update each synced user in the results
+          syncResults.forEach(syncedUser => {
+            const index = updatedResults.findIndex(r => r.employeeID === syncedUser.employeeID);
+            if (index !== -1) {
+              // Update the existing result with synced data
+              updatedResults[index] = {
+                ...updatedResults[index],
+                ...syncedUser,
+                // Mark as no longer having changes since it was just synced
+                hasChanges: false,
+                fieldComparison: {
+                  ...syncedUser.fieldComparison,
+                  discrepancies: 0,
+                  matchingFields: 6 // All fields should match after sync
+                }
+              };
+            }
+          });
+          
+          return updatedResults;
+        });
+        
+        // Update summary to reflect the changes
+        setSyncSummary(prevSummary => {
+          if (!prevSummary) return null;
+          
+          const syncedCount = syncResults.length;
+          return {
+            ...prevSummary,
+            usersWithChanges: Math.max(0, prevSummary.usersWithChanges - syncedCount),
+            usersWithoutChanges: prevSummary.usersWithoutChanges + syncedCount,
+            totalDiscrepancies: Math.max(0, prevSummary.totalDiscrepancies - syncResults.reduce((sum, r) => sum + (r.fieldComparison?.discrepancies || 0), 0))
+          };
+        });
       }
       
-      setSelectedUsers([]);
+      // Clear selected users only if using the main selectedUsers state
+      if (!employeeIDs) {
+        setSelectedUsers([]);
+      }
       setManualSyncStatus("success");
       toast({
         title: "Manual sync completed",
-        description: `${syncResults?.length || 0} users updated. Table refreshed to show current state.`,
+        description: `${syncResults?.length || 0} users updated. No full rescan needed.`,
       });
     } catch (err) {
       setManualSyncStatus("error");
@@ -147,10 +202,11 @@ export default function HrisSync() {
     }
   };
 
-  // — Load schedule settings on mount
+  // — Load schedule settings and initial data on mount
   useEffect(() => {
     (async () => {
       try {
+        // Load schedule settings
         const res = await fetch("/api/hris-sync/schedule");
         if (!res.ok) return;
         const { settings, nextRun } = await res.json();
@@ -159,6 +215,19 @@ export default function HrisSync() {
         setNextScheduledRun(nextRun);
       } catch {
         /* ignore */
+      }
+      
+      // Load initial test data
+      try {
+        console.log('Loading initial test data...');
+        const res = await fetch(`/api/hris-sync/test?confidenceThreshold=${confidenceThreshold}`);
+        if (!res.ok) throw new Error("Failed to fetch test sync results");
+        const { results, summary } = await res.json();
+        setSyncResults(results || []);
+        setSyncSummary(summary || null);
+        console.log('Initial data loaded:', results?.length || 0, 'users');
+      } catch (err) {
+        console.error('Failed to load initial data:', err);
       }
     })();
   }, []);
@@ -534,7 +603,7 @@ export default function HrisSync() {
                   {selectedUsers.length > 0 && (
                     <div className="mt-4">
                       <Button
-                        onClick={handleManualSync}
+                        onClick={() => handleManualSync()}
                         disabled={manualSyncStatus === "loading"}
                         className="w-full"
                       >

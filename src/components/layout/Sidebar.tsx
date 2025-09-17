@@ -115,16 +115,18 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
 
   // Role-specific navigation items
   const recruiterNavItems: NavItem[] = [
-    { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
+    { label: "New Hire", path: "/hires/new", icon: <GroupIcon /> },
   ];
 
   const approverNavItems: NavItem[] = [
     { label: "Pending Approvals", path: "/approvals", icon: <ApprovalIcon /> },
-    { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
   ];
 
   const itSupportNavItems: NavItem[] = [
     { label: "Account Setup", path: "/account-setup", icon: <AccountBoxIcon /> },
+  ];
+
+  const generalHireNavItems: NavItem[] = [
     { label: "New Hires", path: "/hires", icon: <GroupIcon /> },
   ];
 
@@ -144,6 +146,9 @@ export function Sidebar({ onClose, onCollapseChange, collapsed }: SidebarProps) 
   // Add role-specific navigation items
   if (isRecruiter) {
     navItems = [...navItems, ...recruiterNavItems];
+  } else {
+    // Non-recruiters get access to general hire management
+    navItems = [...navItems, ...generalHireNavItems];
   }
   
   if (canApprove) {
