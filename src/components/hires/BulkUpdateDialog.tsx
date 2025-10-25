@@ -214,7 +214,20 @@ export function BulkUpdateDialog({
         } catch (error) {
           errorCount++;
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          errors.push(`${hire.name}: ${errorMessage}`);
+          
+          // Categorize error for better user understanding
+          let categorizedError = errorMessage;
+          if (errorMessage.includes("already exists")) {
+            categorizedError = "Account already exists";
+          } else if (errorMessage.includes("constraint") || errorMessage.includes("UPN")) {
+            categorizedError = "Configuration error - " + errorMessage;
+          } else if (errorMessage.includes("permission") || errorMessage.includes("access")) {
+            categorizedError = "Permission denied";
+          } else if (errorMessage.includes("network") || errorMessage.includes("connection")) {
+            categorizedError = "Network connection error";
+          }
+          
+          errors.push(`${hire.name}: ${categorizedError}`);
           console.error(`Error creating AD account for ${hire.name}:`, error);
         }
       }
@@ -228,9 +241,13 @@ export function BulkUpdateDialog({
       }
       
       if (errorCount > 0) {
+        // Show detailed error information
+        const errorSummary = errors.slice(0, 3).join('\n'); // Show first 3 errors
+        const moreErrors = errors.length > 3 ? `\n... and ${errors.length - 3} more errors` : '';
+        
         toast({
           title: "AD Account Creation Errors",
-          description: `${errorCount} accounts failed to create. Check console for details.`,
+          description: `${errorCount} accounts failed to create:\n${errorSummary}${moreErrors}`,
           variant: "destructive",
         });
       }
@@ -273,7 +290,7 @@ export function BulkUpdateDialog({
     setIsSubmitting(true);
     
     try {
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       
       // Build the update data based on the selected field
       switch (updateFields.field) {

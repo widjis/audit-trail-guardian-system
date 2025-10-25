@@ -152,22 +152,52 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
         }
       } else {
         console.error("AD account creation failed:", result.error || result.message);
+        
+        // Enhanced error display with more specific titles and descriptions
+        const errorMessage = result.message || result.error || "Failed to create Active Directory account";
+        let errorTitle = "AD Account Creation Failed";
+        
+        // Customize error title based on error type
+        if (errorMessage.includes("already exists")) {
+          errorTitle = "Account Already Exists";
+        } else if (errorMessage.includes("constraint") || errorMessage.includes("UPN")) {
+          errorTitle = "Account Configuration Error";
+        } else if (errorMessage.includes("permission") || errorMessage.includes("access")) {
+          errorTitle = "Permission Error";
+        } else if (errorMessage.includes("network") || errorMessage.includes("connection")) {
+          errorTitle = "Connection Error";
+        }
+        
         toast({
-          title: "Error",
-          description: result.message || result.error || "Failed to create Active Directory account",
+          title: errorTitle,
+          description: errorMessage,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error creating AD account:", error);
+      
+      // Enhanced error handling for caught exceptions
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      let errorTitle = "AD Account Creation Failed";
+      
+      // Customize error title based on error type
+      if (errorMessage.includes("Network Error")) {
+        errorTitle = "Network Connection Error";
+      } else if (errorMessage.includes("timeout")) {
+        errorTitle = "Request Timeout";
+      } else if (errorMessage.includes("Server Error")) {
+        errorTitle = "Server Error";
+      }
+      
       setResult({
         success: false,
-        error: error instanceof Error ? error.message : "An unknown error occurred"
+        error: errorMessage
       });
       
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create Active Directory account",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -205,7 +235,21 @@ export function CreateADAccountDialog({ hire, onClose, onSuccess }: CreateADAcco
             ) : (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
+                <AlertTitle>
+                  {(() => {
+                    const errorMessage = result.error || result.message || "Failed to create account";
+                    if (errorMessage.includes("already exists")) {
+                      return "Account Already Exists";
+                    } else if (errorMessage.includes("constraint") || errorMessage.includes("UPN")) {
+                      return "Account Configuration Error";
+                    } else if (errorMessage.includes("permission") || errorMessage.includes("access")) {
+                      return "Permission Error";
+                    } else if (errorMessage.includes("network") || errorMessage.includes("connection")) {
+                      return "Connection Error";
+                    }
+                    return "Account Creation Failed";
+                  })()}
+                </AlertTitle>
                 <AlertDescription>
                   {result.error || result.message || "Failed to create account"}
                 </AlertDescription>

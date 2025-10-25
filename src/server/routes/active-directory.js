@@ -191,25 +191,78 @@ const testLdapConnection = async (settings) => {
         }
       };
     } catch (bindErr) {
-      logger.api.error('LDAP bind failed:', bindErr);
+      const errorContext = {
+        server: settings.server,
+        port: settings.port || (settings.protocol === 'ldaps' ? 636 : 389),
+        protocol: settings.protocol || 'ldap',
+        bindDN: settings.bindDN,
+        baseDN: settings.baseDN,
+        operation: 'LDAP_BIND'
+      };
+      
+      const detailedError = analyzeError(bindErr, errorContext);
+      
+      logger.api.error('LDAP bind failed with detailed analysis:', {
+        summary: `${bindErr.code || 'UNKNOWN_ERROR'}: ${bindErr.message}`,
+        details: detailedError,
+        quickDiagnosis: {
+          errorType: bindErr.code || 'UNKNOWN',
+          likelyRootCause: bindErr.code === 'ECONNRESET' ? 'Authentication/Authorization Issue' :
+                          bindErr.code === 'ECONNREFUSED' ? 'Service Not Running' :
+                          bindErr.code === 'ETIMEDOUT' ? 'Network/Performance Issue' :
+                          bindErr.code === 'ENOTFOUND' ? 'DNS Resolution Issue' : 'Unknown Issue',
+          immediateAction: bindErr.code === 'ECONNRESET' ? 'Verify credentials and account status' :
+                          bindErr.code === 'ECONNREFUSED' ? 'Check LDAP service status' :
+                          bindErr.code === 'ETIMEDOUT' ? 'Check network connectivity' :
+                          bindErr.code === 'ENOTFOUND' ? 'Verify server hostname' : 'Check LDAP server logs'
+        }
+      });
       
       // Try to unbind even if bind failed
       try {
         await client.unbind();
       } catch (unbindErr) {
-        // Ignore unbind errors after failed bind
+        logger.api.debug('Unbind after failed bind also failed (expected):', unbindErr.message);
       }
       
       throw new Error(`Authentication failed: ${bindErr.message}`);
     }
   } catch (err) {
-    logger.api.error('LDAP connection test failed:', err);
+    const errorContext = {
+      server: settings.server,
+      port: settings.port || (settings.protocol === 'ldaps' ? 636 : 389),
+      protocol: settings.protocol || 'ldap',
+      operation: 'LDAP_CONNECTION_TEST'
+    };
+    
+    const detailedError = analyzeError(err, errorContext);
+    
+    logger.api.error('LDAP connection test failed with comprehensive details:', {
+      summary: `${err.code || 'UNKNOWN_ERROR'}: ${err.message}`,
+      details: detailedError,
+      connectionAttempt: {
+        server: settings.server,
+        port: settings.port || (settings.protocol === 'ldaps' ? 636 : 389),
+        protocol: settings.protocol || 'ldap',
+        tlsEnabled: settings.protocol === 'ldaps' || settings.startTLS,
+        timeoutSettings: {
+          client: 10000,
+          connection: 15000
+        }
+      },
+      nextSteps: detailedError.troubleshooting
+    });
+    
     return {
       success: false,
       message: err.message,
       details: {
         server: settings.server,
-        error: err.toString()
+        error: err.toString(),
+        errorCode: err.code,
+        errorType: err.name,
+        troubleshooting: detailedError.troubleshooting,
+        timestamp: detailedError.timestamp
       }
     };
   }
@@ -495,14 +548,54 @@ router.post('/create-user/:id', async (req, res) => {
     
     res.json(result);
   } catch (err) {
-    // Using the correct logger format for the server with enhanced error details
-    logger.api.error('Error creating AD user:', err);
+    // Enhanced error analysis for user creation
+    const errorContext = {
+      operation: 'AD_USER_CREATION',
+      hireId: req.params.id,
+      timestamp: new Date().toISOString()
+    };
+    
+    const detailedError = analyzeError(err, errorContext);
+    
+    // Using the correct logger format for the server with comprehensive error details
+    logger.api.error('AD user creation failed with detailed analysis:', {
+      summary: `${err.code || 'UNKNOWN_ERROR'}: ${err.message}`,
+      hireId: req.params.id,
+      details: detailedError,
+      errorClassification: {
+        type: err.originalError?.info ? 'DATABASE_ERROR' : 
+              err.code === 'ECONNRESET' ? 'LDAP_CONNECTION_ERROR' :
+              err.message?.includes('Invalid Credentials') ? 'AUTHENTICATION_ERROR' :
+              err.message?.includes('already exists') ? 'USER_EXISTS_ERROR' :
+              err.message?.includes('OU') ? 'ORGANIZATIONAL_UNIT_ERROR' : 'UNKNOWN_ERROR',
+        severity: err.code === 'ECONNRESET' ? 'HIGH' : 
+                 err.originalError?.info ? 'MEDIUM' : 'HIGH',
+        recoverable: err.message?.includes('already exists') ? true : false
+      },
+      systemState: {
+        ldapConnectionAvailable: 'unknown',
+        databaseConnectionAvailable: err.originalError?.info ? false : 'unknown',
+        adServiceStatus: 'unknown'
+      }
+    });
+    
+    // Log SQL error details if present
     if (err.originalError?.info) {
-      logger.api.error('SQL error details:', err.originalError.info);
+      logger.api.error('SQL error details for AD user creation:', {
+        errorNumber: err.originalError.info.number,
+        errorState: err.originalError.info.state,
+        errorMessage: err.originalError.info.message,
+        procedure: err.originalError.info.procName || 'N/A',
+        lineNumber: err.originalError.info.lineNumber || 'N/A'
+      });
     }
+    
     res.status(500).json({ 
       success: false, 
-      error: `Failed to create AD user: ${err.message}` 
+      error: `Failed to create AD user: ${err.message}`,
+      errorCode: err.code,
+      troubleshooting: detailedError.troubleshooting,
+      timestamp: detailedError.timestamp
     });
   }
 });
@@ -657,14 +750,11 @@ const createLdapUser = async (settings, userData) => {
       if (userData.email && userData.email.includes('@')) {
         entry.mail = userData.email;
         entry.userPrincipalName = userData.email;
-        logger.api.info(`Setting UPN to email: ${userData.email}`);
-      } else {
-        // Fallback UPN logic - use merdekabattery.com suffix if email is missing/invalid
-        const fallbackUPN = `${userData.username}@merdekabattery.com`;
-        entry.userPrincipalName = fallbackUPN;
-        logger.api.warn(`Email missing or invalid, using fallback UPN: ${fallbackUPN}`);
-        logger.api.warn(`Original email value was: ${userData.email}`);
       }
+      
+      // Set userPrincipalName using AD domain to avoid constraint errors
+      // UPN format: username@domain (using AD domain, not email domain)
+      entry.userPrincipalName = `${userData.username}@${settings.domain}`;
       
       if (userData.title) entry.title = userData.title;
       if (userData.department) entry.department = userData.department;
@@ -678,6 +768,7 @@ const createLdapUser = async (settings, userData) => {
       const debugEntry = { ...entry };
       delete debugEntry.unicodePwd;
       logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
+      logger.api.debug(`UPN constructed as: ${entry.userPrincipalName} (using AD domain: ${settings.domain})`);
       
       // Create the user with enhanced error logging
       try {
@@ -687,20 +778,29 @@ const createLdapUser = async (settings, userData) => {
       } catch (err) {
         logger.api.error(`Error creating user: ${err.message}`);
         if (err.code) {
-          logger.api.error(`LDAP add error code: ${err.code}, name: ${err.name}`);
+          logger.api.error(`LDAP add error code: ${err.code} (0x${err.code.toString(16)}), name: ${err.name}`);
         }
-        // Enhanced logging for attribute syntax errors
-        if (err.name === 'InvalidAttributeSyntaxError') {
-          logger.api.error('Invalid attribute syntax. Check all attribute formats, especially:');
-          logger.api.error('- unicodePwd (password encoding)');
-          logger.api.error('- userPrincipalName and mail (must be valid email formats)');
-          logger.api.error('- sAMAccountName (must be unique and <=20 characters)');
+        
+        // Enhanced logging for specific error types
+        if (err.name === 'InvalidAttributeSyntaxError' || err.code === 19) {
+          logger.api.error('CONSTRAINT_ATT_TYPE error detected. Common causes:');
+          logger.api.error('- userPrincipalName format invalid or domain not accepted');
+          logger.api.error('- userPrincipalName already exists in domain');
+          logger.api.error('- sAMAccountName already exists or invalid format');
+          logger.api.error('- unicodePwd encoding issues');
           
           // Log each attribute separately to help identify the problematic one
-          logger.api.debug('Checking individual attributes for syntax issues:');
+          logger.api.debug('Checking individual attributes for constraint issues:');
           for (const [key, value] of Object.entries(debugEntry)) {
             logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
           }
+          
+          // Specific UPN validation logging
+          logger.api.debug(`UPN Analysis:`);
+          logger.api.debug(`- Constructed UPN: ${entry.userPrincipalName}`);
+          logger.api.debug(`- AD Domain: ${settings.domain}`);
+          logger.api.debug(`- Username: ${userData.username}`);
+          logger.api.debug(`- Email: ${userData.email || 'not provided'}`);
         }
         throw err;
       }
@@ -998,6 +1098,70 @@ export const getAdUserInfo = async (settings, username) => {
 function escapeLdapFilterValue(value) {
   // Replace special characters that need to be escaped in LDAP filter
   return value.replace(/[\\()*]/g, (char) => `\\${char.charCodeAt(0).toString(16)}`);
+}
+
+// Enhanced error analysis function
+function analyzeError(error, context = {}) {
+  const errorDetails = {
+    timestamp: new Date().toISOString(),
+    context: context,
+    error: {
+      name: error.name || 'Unknown',
+      message: error.message || 'No message provided',
+      code: error.code || 'NO_CODE',
+      errno: error.errno || null,
+      syscall: error.syscall || null,
+      stack: error.stack || 'No stack trace available'
+    },
+    network: {
+      host: context.server || 'unknown',
+      port: context.port || 'unknown',
+      protocol: context.protocol || 'unknown'
+    },
+    troubleshooting: getTroubleshootingHints(error)
+  };
+
+  return errorDetails;
+}
+
+// Get specific troubleshooting hints based on error type
+function getTroubleshootingHints(error) {
+  const hints = [];
+  
+  if (error.code === 'ECONNRESET') {
+    hints.push('Connection was forcibly closed by the remote server');
+    hints.push('Check LDAP server logs for authentication failures');
+    hints.push('Verify credentials are correct and account is not locked');
+    hints.push('Ensure firewall allows LDAP traffic on the specified port');
+    hints.push('Test connectivity with: telnet <server> <port>');
+  } else if (error.code === 'ECONNREFUSED') {
+    hints.push('LDAP service is not running on the target server');
+    hints.push('Check if the port number is correct (389 for LDAP, 636 for LDAPS)');
+    hints.push('Verify server hostname/IP address is reachable');
+  } else if (error.code === 'ETIMEDOUT') {
+    hints.push('Connection timed out - server may be overloaded');
+    hints.push('Check network latency and firewall rules');
+    hints.push('Consider increasing timeout values');
+  } else if (error.code === 'ENOTFOUND') {
+    hints.push('DNS resolution failed for the server hostname');
+    hints.push('Verify the server hostname is correct');
+    hints.push('Check DNS configuration');
+  } else if (error.message && error.message.includes('Invalid Credentials')) {
+    hints.push('Username or password is incorrect');
+    hints.push('Check if account is locked or disabled');
+    hints.push('Verify the correct authentication format (UPN vs DN)');
+  } else if (error.message && error.message.includes('TLS')) {
+    hints.push('SSL/TLS certificate validation failed');
+    hints.push('Check certificate validity and trust chain');
+    hints.push('Consider using rejectUnauthorized: false for testing');
+  }
+  
+  if (hints.length === 0) {
+    hints.push('Unknown error type - check LDAP server logs');
+    hints.push('Verify all connection parameters are correct');
+  }
+  
+  return hints;
 }
 
 export default router;

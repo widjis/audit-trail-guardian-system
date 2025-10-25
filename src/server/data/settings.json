@@ -355,5 +355,15 @@
     "tenantId": "b428d519-22b4-458f-af45-f020150f5839",
     "useLoggedInUserAsSender": true,
     "lastConnectionTest": "2025-07-23T02:31:37.493Z"
+  },
+  "activeDirectorySettings": {
+    "server": "10.60.10.56",
+    "username": "CN=MTI SysAdmin,OU=Testing Environment,OU=Merdeka Tsingshan Indonesia,DC=mbma,DC=com",
+    "password": "Sy54dm1n@#Mb25",
+    "domain": "mbma.com",
+    "baseDN": "DC=mbma,DC=com",
+    "protocol": "ldaps",
+    "enabled": true,
+    "authFormat": "dn"
   }
 }
