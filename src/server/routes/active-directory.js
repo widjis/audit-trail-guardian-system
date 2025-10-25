@@ -649,9 +649,21 @@ const createLdapUser = async (settings, userData) => {
       };
       
       // Only add non-empty attributes to avoid syntax errors
+      logger.api.debug(`Processing email for user ${userData.username}:`);
+      logger.api.debug(`- userData.email: ${userData.email}`);
+      logger.api.debug(`- email exists: ${!!userData.email}`);
+      logger.api.debug(`- email includes @: ${userData.email && userData.email.includes('@')}`);
+      
       if (userData.email && userData.email.includes('@')) {
         entry.mail = userData.email;
         entry.userPrincipalName = userData.email;
+        logger.api.info(`Setting UPN to email: ${userData.email}`);
+      } else {
+        // Fallback UPN logic - use merdekabattery.com suffix if email is missing/invalid
+        const fallbackUPN = `${userData.username}@merdekabattery.com`;
+        entry.userPrincipalName = fallbackUPN;
+        logger.api.warn(`Email missing or invalid, using fallback UPN: ${fallbackUPN}`);
+        logger.api.warn(`Original email value was: ${userData.email}`);
       }
       
       if (userData.title) entry.title = userData.title;
