@@ -903,43 +903,55 @@ const createLdapUser = async (settings, userData) => {
     // Always attempt to add to security groups (regardless of whether user was created or already existed)
     const groupResults = [];
     
+    logger.api.info(`=== SECURITY GROUP ASSIGNMENT FOR ${userData.username} ===`);
+    logger.api.info(`User DN for group operations: ${userDN}`);
+    
     if (userData.acl) {
       try {
+        logger.api.info(`🔄 Adding user to ACL group: ${userData.acl}`);
         await addUserToGroup(client, userDN, userData.acl, settings);
-        logger.api.debug(`Added user to ${userData.acl} group`);
+        logger.api.info(`✅ Successfully added user to ${userData.acl} group`);
         groupResults.push(userData.acl);
       } catch (groupErr) {
-        logger.api.warn(`Failed to add user to ${userData.acl} group:`, groupErr);
+        logger.api.warn(`⚠️ Failed to add user to ${userData.acl} group:`, groupErr);
         // Continue even if group add fails
       }
+    } else {
+      logger.api.info(`ℹ️ No ACL group specified for user ${userData.username}`);
     }
     
     // Always add to VPN-USERS group
     try {
+      logger.api.info(`🔄 Adding user to VPN-USERS group`);
       await addUserToGroup(client, userDN, 'VPN-USERS', settings);
-      logger.api.debug(`Added user to VPN-USERS group`);
+      logger.api.info(`✅ Successfully added user to VPN-USERS group`);
       groupResults.push('VPN-USERS');
     } catch (vpnErr) {
-      logger.api.warn(`Failed to add user to VPN-USERS group:`, vpnErr);
+      logger.api.warn(`⚠️ Failed to add user to VPN-USERS group:`, vpnErr);
       // Continue even if group add fails
     }
     
     // Unbind when done
     await client.unbind();
-    logger.api.debug('Successfully unbound from AD server');
+    logger.api.info('✅ Successfully unbound from AD server');
     
     // Return success with information about what was done
     const successMessage = userCreated 
       ? "Active Directory account created successfully"
       : "User already exists in Active Directory, groups updated successfully";
       
-    return {
+    const result = {
       success: true,
       message: successMessage,
       userCreated: userCreated,
       userDN: userDN,
       groups: groupResults
     };
+    
+    logger.api.info(`=== AD OPERATION COMPLETED FOR ${userData.username} ===`);
+    logger.api.info(`Final result:`, JSON.stringify(result, null, 2));
+    
+    return result;
     
   } catch (err) {
     logger.api.error('Error in createLdapUser:', err);
