@@ -677,58 +677,93 @@ const createLdapUser = async (settings, userData) => {
   const client = createLdapClient(settings);
   
   try {
+    // ===== COMPREHENSIVE LOGGING START =====
+    logger.api.info(`=== STARTING AD USER CREATION FOR: ${userData.username} ===`);
+    
+    // Log complete userData structure (excluding password)
+    const userDataForLogging = { ...userData };
+    delete userDataForLogging.password;
+    logger.api.info('Complete userData object:', JSON.stringify(userDataForLogging, null, 2));
+    
+    // Log AD settings (excluding password)
+    const settingsForLogging = { ...settings };
+    delete settingsForLogging.password;
+    logger.api.info('AD Settings:', JSON.stringify(settingsForLogging, null, 2));
+    
     // Verify we have a password
     if (!userData.password) {
+      logger.api.error('CRITICAL: Missing password for user account');
       throw new Error("Missing password for user account");
     }
+    logger.api.debug(`Password provided: ${userData.password ? 'YES' : 'NO'}, Length: ${userData.password ? userData.password.length : 0}`);
     
     // Format the bind credentials based on settings
     const bindDN = formatBindCredential(settings, settings.username);
-    logger.api.debug(`Binding to AD with DN: ${bindDN}`);
+    logger.api.info(`Binding to AD with DN: ${bindDN}`);
+    logger.api.debug(`AD Server: ${settings.server}:${settings.port}`);
+    logger.api.debug(`Base DN: ${settings.baseDN}`);
+    logger.api.debug(`Domain: ${settings.domain}`);
     
     // Bind with service account
     await client.bind(bindDN, settings.password);
     
-    logger.api.debug('Successfully bound to AD, checking if user exists');
+    logger.api.info('✅ Successfully bound to AD, checking if user exists');
     
     // Check if user already exists
     const userCheck = await checkUserExists(settings, userData.username);
     let userDN;
     let userCreated = false;
     
+    logger.api.info(`User existence check result for ${userData.username}:`);
+    logger.api.info(`- Exists: ${userCheck.exists}`);
+    logger.api.info(`- DN: ${userCheck.dn || 'N/A'}`);
+    
     if (userCheck.exists) {
-      logger.api.info(`User ${userData.username} already exists, skipping creation`);
+      logger.api.info(`✅ User ${userData.username} already exists, skipping creation`);
       userDN = userCheck.dn;
       userCreated = false;
     } else {
-      logger.api.debug('User does not exist, creating new user');
+      logger.api.info(`🔄 User ${userData.username} does not exist, creating new user`);
       
       // Create user DN and ensure OU exists
       userDN = `CN=${userData.displayName},${userData.ou}`;
-      logger.api.debug(`User DN will be: ${userDN}`);
+      logger.api.info(`Constructed User DN: ${userDN}`);
+      logger.api.debug(`- Display Name: ${userData.displayName}`);
+      logger.api.debug(`- Target OU: ${userData.ou}`);
 
       // Ensure the OU exists before creating user
       try {
-        logger.api.debug(`Ensuring OU exists: ${userData.ou}`);
+        logger.api.debug(`🔍 Ensuring OU exists: ${userData.ou}`);
         await ensureOUExists(client, userData.ou, settings);
-        logger.api.info(`OU verified or created: ${userData.ou}`);
+        logger.api.info(`✅ OU verified or created: ${userData.ou}`);
       } catch (ouErr) {
-        logger.api.error(`Failed to verify/create OU: ${ouErr}`);
+        logger.api.error(`❌ Failed to verify/create OU: ${ouErr}`);
         // If OU creation fails, fall back to Users container using dynamic DN
         const defaultUsersDN = getDefaultUsersDN(settings.baseDN);
         userDN = `CN=${userData.displayName},${defaultUsersDN}`;
-        logger.api.warn(`Falling back to default Users container: ${userDN}`);
+        logger.api.warn(`⚠️ Falling back to default Users container: ${userDN}`);
       }
 
       // Encode password for AD - with enhanced error handling
       let unicodePwd;
       try {
         unicodePwd = encodeUnicodePwd(userData.password);
-        logger.api.debug(`Successfully encoded password for user ${userData.username}`);
+        logger.api.info(`✅ Successfully encoded password for user ${userData.username}`);
+        logger.api.debug(`Password encoding details: Length after encoding: ${unicodePwd ? unicodePwd.length : 0}`);
       } catch (pwdError) {
-        logger.api.error('Failed to encode password:', pwdError);
+        logger.api.error(`❌ Failed to encode password for ${userData.username}:`, pwdError);
         throw new Error(`Password encoding failed: ${pwdError.message}`);
       }
+      
+      // ===== DETAILED EMAIL AND UPN PROCESSING =====
+      logger.api.info(`=== EMAIL AND UPN PROCESSING FOR ${userData.username} ===`);
+      logger.api.info(`Raw email data analysis:`);
+      logger.api.info(`- userData.email: "${userData.email}"`);
+      logger.api.info(`- Type: ${typeof userData.email}`);
+      logger.api.info(`- Is truthy: ${!!userData.email}`);
+      logger.api.info(`- Length: ${userData.email ? userData.email.length : 0}`);
+      logger.api.info(`- Contains @: ${userData.email && userData.email.includes('@')}`);
+      logger.api.info(`- Trimmed: "${userData.email ? userData.email.trim() : 'N/A'}"`);
       
       // Create user entry object with careful attribute typing
       const entry = {
@@ -741,25 +776,67 @@ const createLdapUser = async (settings, userData) => {
         userAccountControl: '512', // Enable account
       };
       
-      // Only add non-empty attributes to avoid syntax errors
-      logger.api.debug(`Processing email for user ${userData.username}:`);
-      logger.api.debug(`- userData.email: ${userData.email}`);
-      logger.api.debug(`- email exists: ${!!userData.email}`);
-      logger.api.debug(`- email includes @: ${userData.email && userData.email.includes('@')}`);
+      logger.api.info(`Base user entry created with core attributes:`);
+      logger.api.info(`- cn: ${entry.cn}`);
+      logger.api.info(`- sn: ${entry.sn}`);
+      logger.api.info(`- givenName: ${entry.givenName}`);
+      logger.api.info(`- displayName: ${entry.displayName}`);
+      logger.api.info(`- sAMAccountName: ${entry.sAMAccountName}`);
       
-      if (userData.email && userData.email.includes('@')) {
-        entry.mail = userData.email;
-        entry.userPrincipalName = userData.email;
+      // Email and UPN assignment logic with detailed logging
+      if (userData.email && userData.email.trim() && userData.email.includes('@')) {
+        logger.api.info(`✅ Valid email found: "${userData.email}"`);
+        entry.mail = userData.email.trim();
+        logger.api.info(`✅ Set entry.mail = "${entry.mail}"`);
+        
+        // Check if email domain matches AD domain
+        const emailDomain = userData.email.split('@')[1];
+        logger.api.info(`Email domain analysis:`);
+        logger.api.info(`- Email domain: ${emailDomain}`);
+        logger.api.info(`- AD domain: ${settings.domain}`);
+        logger.api.info(`- Domains match: ${emailDomain === settings.domain}`);
+        
+        // Use email as UPN if it's from a valid domain
+        if (emailDomain === settings.domain || emailDomain === 'merdekabattery.com') {
+          entry.userPrincipalName = userData.email.trim();
+          logger.api.info(`✅ Using email as UPN: "${entry.userPrincipalName}" (domain matches or is merdekabattery.com)`);
+        } else {
+          entry.userPrincipalName = `${userData.username}@merdekabattery.com`;
+          logger.api.info(`⚠️ Email domain doesn't match, using fallback UPN: "${entry.userPrincipalName}"`);
+        }
+      } else {
+        logger.api.warn(`❌ No valid email provided for ${userData.username}`);
+        logger.api.warn(`Email validation failed:`);
+        logger.api.warn(`- Email exists: ${!!userData.email}`);
+        logger.api.warn(`- Email after trim: "${userData.email ? userData.email.trim() : 'N/A'}"`);
+        logger.api.warn(`- Contains @: ${userData.email && userData.email.includes('@')}`);
+        
+        // Fallback UPN using merdekabattery.com
+        entry.userPrincipalName = `${userData.username}@merdekabattery.com`;
+        logger.api.info(`🔄 Using fallback UPN: "${entry.userPrincipalName}"`);
       }
       
-      // Set userPrincipalName using AD domain to avoid constraint errors
-      // UPN format: username@domain (using AD domain, not email domain)
-      entry.userPrincipalName = `${userData.username}@${settings.domain}`;
+      logger.api.info(`=== FINAL UPN DECISION ===`);
+      logger.api.info(`Final UPN: "${entry.userPrincipalName}"`);
+      logger.api.info(`Mail attribute: "${entry.mail || 'NOT SET'}"`);
       
-      if (userData.title) entry.title = userData.title;
-      if (userData.department) entry.department = userData.department;
-      if (userData.company) entry.company = userData.company;
-      if (userData.office) entry.physicalDeliveryOfficeName = userData.office;
+      // Add other optional attributes
+      if (userData.title) {
+        entry.title = userData.title;
+        logger.api.debug(`Added title: ${userData.title}`);
+      }
+      if (userData.department) {
+        entry.department = userData.department;
+        logger.api.debug(`Added department: ${userData.department}`);
+      }
+      if (userData.company) {
+        entry.company = userData.company;
+        logger.api.debug(`Added company: ${userData.company}`);
+      }
+      if (userData.office) {
+        entry.physicalDeliveryOfficeName = userData.office;
+        logger.api.debug(`Added office: ${userData.office}`);
+      }
       
       // Add password as a separate property to ensure correct typing
       entry.unicodePwd = unicodePwd;
@@ -767,41 +844,58 @@ const createLdapUser = async (settings, userData) => {
       // Log the entry object for debugging (without the password)
       const debugEntry = { ...entry };
       delete debugEntry.unicodePwd;
-      logger.api.debug('Creating user with attributes:', JSON.stringify(debugEntry));
-      logger.api.debug(`UPN constructed as: ${entry.userPrincipalName} (using AD domain: ${settings.domain})`);
+      logger.api.info('=== COMPLETE LDAP ENTRY FOR USER CREATION ===');
+      logger.api.info('Entry attributes (excluding password):', JSON.stringify(debugEntry, null, 2));
+      logger.api.info(`Password included: ${!!entry.unicodePwd}`);
+      logger.api.info(`Target DN: ${userDN}`);
       
       // Create the user with enhanced error logging
       try {
+        logger.api.info(`🚀 Attempting to create user in AD...`);
+        logger.api.info(`- Target DN: ${userDN}`);
+        logger.api.info(`- UPN: ${entry.userPrincipalName}`);
+        logger.api.info(`- Mail: ${entry.mail || 'NOT SET'}`);
+        logger.api.info(`- sAMAccountName: ${entry.sAMAccountName}`);
+        
         await client.add(userDN, entry);
-        logger.api.info(`User ${userData.username} created successfully with DN: ${userDN}`);
+        logger.api.info(`🎉 SUCCESS: User ${userData.username} created successfully with DN: ${userDN}`);
+        logger.api.info(`✅ Final UPN assigned: ${entry.userPrincipalName}`);
+        logger.api.info(`✅ Final Mail assigned: ${entry.mail || 'NOT SET'}`);
         userCreated = true;
       } catch (err) {
-        logger.api.error(`Error creating user: ${err.message}`);
+        logger.api.error(`💥 LDAP ADD OPERATION FAILED for user ${userData.username}`);
+        logger.api.error(`Error message: ${err.message}`);
+        logger.api.error(`Error name: ${err.name}`);
         if (err.code) {
-          logger.api.error(`LDAP add error code: ${err.code} (0x${err.code.toString(16)}), name: ${err.name}`);
+          logger.api.error(`LDAP error code: ${err.code} (0x${err.code.toString(16)})`);
         }
         
         // Enhanced logging for specific error types
         if (err.name === 'InvalidAttributeSyntaxError' || err.code === 19) {
-          logger.api.error('CONSTRAINT_ATT_TYPE error detected. Common causes:');
+          logger.api.error('🔍 CONSTRAINT_ATT_TYPE ERROR ANALYSIS:');
+          logger.api.error('Common causes:');
           logger.api.error('- userPrincipalName format invalid or domain not accepted');
           logger.api.error('- userPrincipalName already exists in domain');
           logger.api.error('- sAMAccountName already exists or invalid format');
           logger.api.error('- unicodePwd encoding issues');
           
           // Log each attribute separately to help identify the problematic one
-          logger.api.debug('Checking individual attributes for constraint issues:');
+          logger.api.error('🔍 DETAILED ATTRIBUTE ANALYSIS:');
           for (const [key, value] of Object.entries(debugEntry)) {
-            logger.api.debug(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+            logger.api.error(`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value} (type: ${typeof value})`);
           }
           
           // Specific UPN validation logging
-          logger.api.debug(`UPN Analysis:`);
-          logger.api.debug(`- Constructed UPN: ${entry.userPrincipalName}`);
-          logger.api.debug(`- AD Domain: ${settings.domain}`);
-          logger.api.debug(`- Username: ${userData.username}`);
-          logger.api.debug(`- Email: ${userData.email || 'not provided'}`);
+          logger.api.error(`🔍 UPN VALIDATION ANALYSIS:`);
+          logger.api.error(`- Constructed UPN: "${entry.userPrincipalName}"`);
+          logger.api.error(`- UPN Length: ${entry.userPrincipalName ? entry.userPrincipalName.length : 0}`);
+          logger.api.error(`- AD Domain: "${settings.domain}"`);
+          logger.api.error(`- Username: "${userData.username}"`);
+          logger.api.error(`- Original Email: "${userData.email || 'not provided'}"`);
+          logger.api.error(`- UPN Domain: "${entry.userPrincipalName ? entry.userPrincipalName.split('@')[1] : 'N/A'}"`);
         }
+        
+        logger.api.error('🔍 FULL ERROR OBJECT:', JSON.stringify(err, null, 2));
         throw err;
       }
     }
