@@ -27,6 +27,7 @@ const settingsPath = path.join(process.cwd(), 'src', 'server', 'data', 'settings
 class MicrosoftGraphService {
   constructor() {
     this.msalClient = null;
+    this.msalConfigKey = null;
     this.graphClient = null;
   }
 
@@ -61,29 +62,42 @@ class MicrosoftGraphService {
 
   // Initialize MSAL client with settings
   initializeMsalClient(settings) {
+    const authority = settings.authority || `https://login.microsoftonline.com/${settings.tenantId}`;
+    const configKey = JSON.stringify([
+      settings.clientId,
+      settings.clientSecret,
+      authority
+    ]);
+
+    if (this.msalClient && this.msalConfigKey === configKey) {
+      return this.msalClient;
+    }
+
     const clientConfig = {
       auth: {
         clientId: settings.clientId,
         clientSecret: settings.clientSecret,
-        authority: settings.authority || `https://login.microsoftonline.com/${settings.tenantId}`
+        authority
       }
     };
 
     this.msalClient = new ConfidentialClientApplication(clientConfig);
+    this.msalConfigKey = configKey;
+    return this.msalClient;
   }
 
   // Get access token using client credentials flow
   async getAccessToken(settings) {
-    if (!this.msalClient) {
-      this.initializeMsalClient(settings);
-    }
+    // Recreate the client whenever credentials change so saved settings take
+    // effect immediately, while retaining MSAL's token cache otherwise.
+    const msalClient = this.initializeMsalClient(settings);
 
     const clientCredentialRequest = {
       scopes: settings.scope || ['https://graph.microsoft.com/.default'],
     };
 
     try {
-      const response = await this.msalClient.acquireTokenByClientCredential(clientCredentialRequest);
+      const response = await msalClient.acquireTokenByClientCredential(clientCredentialRequest);
       return response.accessToken;
     } catch (error) {
       console.error('Error acquiring access token:', error);
@@ -302,19 +316,12 @@ class MicrosoftGraphService {
       }
       
       console.log('Testing Microsoft Graph connection...');
-      const graphClient = await this.initializeGraphClient(settings);
-      
-      // Test by getting organization info instead of /me since we're using application authentication
-      // This endpoint works with application permissions
-      const result = await graphClient.api('/organization').get();
-      console.log('Microsoft Graph connection test successful:', 
-        result.value && result.value.length > 0 ? 
-          result.value[0].displayName : 'Organization');
+      await this.getAccessToken(settings);
+      console.log('Microsoft Graph authentication test successful');
       
       return {
         success: true,
-        message: `Successfully connected to Microsoft Graph for ${result.value && result.value.length > 0 ? 
-          result.value[0].displayName : 'your organization'}`
+        message: 'Successfully authenticated with Microsoft Graph'
       };
     } catch (error) {
       console.error('Microsoft Graph connection test failed:', error);
@@ -324,26 +331,6 @@ class MicrosoftGraphService {
         errorMessage = 'Authentication failed. Please verify your Client ID, Client Secret, and Tenant ID.';
       } else if (error.message.includes('AADSTS')) {
         errorMessage = 'Azure AD authentication error. Please check your app registration and permissions.';
-      } else if (error.message.includes('delegated authentication flow')) {
-        errorMessage = 'This endpoint requires delegated authentication. Using organization endpoint instead.';
-        
-        try {
-          // Try with organization endpoint as fallback
-          const graphClient = await this.initializeGraphClient(settings);
-          const result = await graphClient.api('/organization').get();
-          
-          console.log('Microsoft Graph connection test successful with fallback:', 
-            result.value && result.value.length > 0 ? result.value[0].displayName : 'Organization');
-          
-          return {
-            success: true,
-            message: `Successfully connected to Microsoft Graph for ${result.value && result.value.length > 0 ? 
-              result.value[0].displayName : 'your organization'}`
-          };
-        } catch (fallbackError) {
-          console.error('Fallback connection test also failed:', fallbackError);
-          errorMessage = `Connection failed: ${fallbackError.message}`;
-        }
       } else {
         errorMessage = `Connection failed: ${error.message}`;
       }
