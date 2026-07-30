@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 // Types for WhatsApp settings
 interface WhatsAppSettings {
   apiUrl: string;
+  testNumber: string;
   defaultMessage: string;
   defaultRecipient: "userNumber" | "testNumber";
   newHireNotificationEnabled: boolean;
@@ -35,6 +36,7 @@ export function WhatsAppSettings() {
   // State for settings
   const [settings, setSettings] = useState<WhatsAppSettings>({
     apiUrl: "",
+    testNumber: "",
     defaultMessage: "",
     defaultRecipient: "userNumber" as "userNumber" | "testNumber",
     newHireNotificationEnabled: false,
@@ -49,7 +51,6 @@ export function WhatsAppSettings() {
   // State for loading states and test number
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testNumber, setTestNumber] = useState("");
   const [testNumberError, setTestNumberError] = useState("");
   const [newRecipient, setNewRecipient] = useState("");
   const [recipientError, setRecipientError] = useState("");
@@ -67,6 +68,7 @@ export function WhatsAppSettings() {
         const whatsappSettings = await whatsappService.getSettings();
         setSettings({
           apiUrl: whatsappSettings.apiUrl,
+          testNumber: whatsappSettings.testNumber || "",
           defaultMessage: whatsappSettings.defaultMessage,
           defaultRecipient: (whatsappSettings.defaultRecipient as "userNumber" | "testNumber") || "userNumber",
           newHireNotificationEnabled: whatsappSettings.newHireNotificationEnabled || false,
@@ -181,6 +183,20 @@ export function WhatsAppSettings() {
     setIsSaving(true);
     try {
       await whatsappService.saveSettings(settings);
+      const persistedSettings = await whatsappService.getSettings();
+      setSettings({
+        apiUrl: persistedSettings.apiUrl,
+        testNumber: persistedSettings.testNumber || "",
+        defaultMessage: persistedSettings.defaultMessage,
+        defaultRecipient: persistedSettings.defaultRecipient || "userNumber",
+        newHireNotificationEnabled: persistedSettings.newHireNotificationEnabled || false,
+        newHireNotificationTemplate: persistedSettings.newHireNotificationTemplate || "",
+        newHireNotificationRecipients: persistedSettings.newHireNotificationRecipients || [],
+        groupNotificationEnabled: persistedSettings.groupNotificationEnabled || false,
+        groupId: persistedSettings.groupId || "",
+        groupName: persistedSettings.groupName || "",
+        groupMentions: persistedSettings.groupMentions || [],
+      });
       toast({
         title: "Success",
         description: "WhatsApp settings saved successfully",
@@ -199,7 +215,7 @@ export function WhatsAppSettings() {
 
   // Test connection
   const handleTestConnection = async () => {
-    if (!testNumber) {
+    if (!settings.testNumber) {
       setTestNumberError("Please enter a test phone number");
       return;
     }
@@ -207,9 +223,7 @@ export function WhatsAppSettings() {
     setTestNumberError("");
     setIsTesting(true);
     try {
-      // Example message with placeholder variables for testing
-      const testMessage = "This is a test message from the MTI Onboarding System.";
-      await whatsappService.sendMessage(testNumber, testMessage);
+      await whatsappService.testConnection(settings.apiUrl, settings.testNumber);
       toast({
         title: "Success",
         description: "Test message sent successfully",
@@ -259,9 +273,9 @@ export function WhatsAppSettings() {
               id="testNumber"
               name="testNumber"
               placeholder="6281234567890"
-              value={testNumber}
+              value={settings.testNumber}
               onChange={(e) => {
-                setTestNumber(e.target.value);
+                setSettings({ ...settings, testNumber: e.target.value });
                 setTestNumberError("");
               }}
             />
@@ -296,8 +310,8 @@ export function WhatsAppSettings() {
                 <Label htmlFor="userNumber" className="font-normal cursor-pointer">User's phone number</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="testNumber" id="testNumber" />
-                <Label htmlFor="testNumber" className="font-normal cursor-pointer">Test number from settings</Label>
+                <RadioGroupItem value="testNumber" id="default-test-number" />
+                <Label htmlFor="default-test-number" className="font-normal cursor-pointer">Test number from settings</Label>
               </div>
             </RadioGroup>
             <p className="text-xs text-muted-foreground">

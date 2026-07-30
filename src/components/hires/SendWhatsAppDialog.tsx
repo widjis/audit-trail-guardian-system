@@ -44,6 +44,9 @@ export function SendWhatsAppDialog({ hire, onClose }: SendWhatsAppDialogProps) {
         // Set phone number based on recipient type
         if (recipientType === "userNumber" && hire.phone_number) {
           setPhoneNumber(hire.phone_number.replace(/\D/g, ''));
+        } else if (recipientType === "testNumber") {
+          const testNumber = await whatsappService.getTestNumber();
+          setPhoneNumber(testNumber.replace(/\D/g, ''));
         }
         
         setIsGenerating(false);
