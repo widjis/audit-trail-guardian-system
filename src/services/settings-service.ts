@@ -25,6 +25,7 @@ interface Department {
 
 interface WhatsAppSettings {
   apiUrl: string;
+  testNumber: string;
   defaultMessage: string;
   defaultRecipient: "userNumber" | "testNumber";
 }

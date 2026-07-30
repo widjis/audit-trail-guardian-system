@@ -533,6 +533,7 @@ router.get('/whatsapp', async (req, res) => {
       // Return default values if no settings found
       const defaultSettings = {
         apiUrl: '',
+        testNumber: '',
         defaultMessage: `Welcome aboard to PT. Merdeka Tsingshan Indonesia. 
 By this message, we inform you regarding your account information for the email address: {{email}}
 Name: {{name}}
@@ -571,6 +572,7 @@ router.put('/whatsapp', async (req, res) => {
   try {
     const { 
       apiUrl, 
+      testNumber,
       defaultMessage, 
       defaultRecipient,
       newHireNotificationEnabled,
@@ -586,26 +588,36 @@ router.put('/whatsapp', async (req, res) => {
     
     // Update each WhatsApp configuration item
     const configUpdates = [
-      { key: 'whatsapp.api_url', value: apiUrl || '' },
-      { key: 'whatsapp.default_message', value: defaultMessage || '' },
-      { key: 'whatsapp.default_recipient', value: defaultRecipient || 'userNumber' },
-      { key: 'whatsapp.new_hire_notification_enabled', value: newHireNotificationEnabled || false },
-      { key: 'whatsapp.new_hire_notification_template', value: newHireNotificationTemplate || '' },
-      { key: 'whatsapp.new_hire_notification_recipients', value: JSON.stringify(newHireNotificationRecipients || []) },
-      { key: 'whatsapp.group_notification_enabled', value: groupNotificationEnabled || false },
-      { key: 'whatsapp.group_id', value: groupId || '' },
-      { key: 'whatsapp.group_name', value: groupName || '' },
-      { key: 'whatsapp.group_mentions', value: JSON.stringify(groupMentions || []) }
+      { key: 'whatsapp.api_url', name: 'WhatsApp API URL', value: apiUrl || '' },
+      { key: 'whatsapp.test_number', name: 'WhatsApp Test Number', value: testNumber || '' },
+      { key: 'whatsapp.default_message', name: 'WhatsApp Default Message', value: defaultMessage || '' },
+      { key: 'whatsapp.default_recipient', name: 'WhatsApp Default Recipient', value: defaultRecipient || 'userNumber' },
+      { key: 'whatsapp.new_hire_notification_enabled', name: 'New Hire Notification Enabled', value: newHireNotificationEnabled || false },
+      { key: 'whatsapp.new_hire_notification_template', name: 'New Hire Notification Template', value: newHireNotificationTemplate || '' },
+      { key: 'whatsapp.new_hire_notification_recipients', name: 'New Hire Notification Recipients', value: JSON.stringify(newHireNotificationRecipients || []) },
+      { key: 'whatsapp.group_notification_enabled', name: 'Group Notification Enabled', value: groupNotificationEnabled || false },
+      { key: 'whatsapp.group_id', name: 'WhatsApp Group ID', value: groupId || '' },
+      { key: 'whatsapp.group_name', name: 'WhatsApp Group Name', value: groupName || '' },
+      { key: 'whatsapp.group_mentions', name: 'WhatsApp Group Mentions', value: JSON.stringify(groupMentions || []) }
     ];
     
     // Update all configurations
     for (const update of configUpdates) {
-      await systemConfigService.updateConfig(update.key, update.value, 'settings_api');
+      await systemConfigService.setConfig(
+        update.key,
+        update.value,
+        update.name,
+        'whatsapp',
+        false,
+        false,
+        req.user?.username || 'settings_api'
+      );
     }
     
     // Return the updated settings
     const updatedSettings = {
       apiUrl,
+      testNumber: testNumber || '',
       defaultMessage,
       defaultRecipient: defaultRecipient || 'userNumber',
       newHireNotificationEnabled: newHireNotificationEnabled || false,

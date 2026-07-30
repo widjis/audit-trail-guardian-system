@@ -92,6 +92,7 @@ Thank you for your assistance.
     setIsSaving(true);
     try {
       await settingsService.updateMicrosoftGraphSettings(settings);
+      await loadSettings();
       toast.success("Microsoft Graph settings updated successfully");
     } catch (error) {
       console.error('Error updating Microsoft Graph settings:', error);

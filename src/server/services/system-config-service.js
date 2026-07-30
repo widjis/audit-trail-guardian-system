@@ -429,6 +429,7 @@ class SystemConfigService {
         // Convert key names to match original format
         let configKey = key;
         if (key === 'api_url') configKey = 'apiUrl';
+        if (key === 'test_number') configKey = 'testNumber';
         if (key === 'default_message') configKey = 'defaultMessage';
         if (key === 'default_recipient') configKey = 'defaultRecipient';
         if (key === 'new_hire_notification_enabled') configKey = 'newHireNotificationEnabled';

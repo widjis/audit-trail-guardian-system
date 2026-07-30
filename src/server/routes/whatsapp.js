@@ -12,6 +12,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+const WHATSAPP_API_TIMEOUT_MS = 15000;
+
+const buildApiEndpoint = (baseUrl, endpoint) => {
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(baseUrl);
+  } catch {
+    throw new Error('WhatsApp API URL must be a valid absolute URL');
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('WhatsApp API URL must use HTTP or HTTPS');
+  }
+
+  if (parsedUrl.username || parsedUrl.password) {
+    throw new Error('WhatsApp API URL must not contain embedded credentials');
+  }
+
+  const normalizedPath = parsedUrl.pathname.replace(/\/+$/, '');
+  if (!normalizedPath.endsWith(`/${endpoint}`)) {
+    parsedUrl.pathname = `${normalizedPath}/${endpoint}`;
+  }
+
+  return parsedUrl.toString();
+};
+
+const postToWhatsAppApi = (apiUrl, endpoint, body) => {
+  return axios.post(buildApiEndpoint(apiUrl, endpoint), body, {
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    timeout: WHATSAPP_API_TIMEOUT_MS
+  });
+};
 
 // Get WhatsApp settings endpoint
 router.get('/settings', async (req, res) => {
@@ -67,6 +102,50 @@ const getWhatsAppSettings = async () => {
   }
 };
 
+// Test the API URL currently entered in the settings form.
+router.post('/test-connection', async (req, res) => {
+  try {
+    const { apiUrl, number } = req.body;
+
+    if (!apiUrl || !number) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters',
+        details: 'Both API URL and test number are required'
+      });
+    }
+
+    if (!/^\d{8,15}$/.test(number)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid test number',
+        details: 'Use 8-15 digits including the country code'
+      });
+    }
+
+    await postToWhatsAppApi(apiUrl, 'send-message', {
+      number,
+      message: 'This is a test message from the MTI Onboarding System.'
+    });
+
+    return res.json({
+      success: true,
+      message: 'WhatsApp API connection test succeeded'
+    });
+  } catch (error) {
+    logger.api.error('WhatsApp connection test failed:', error);
+    const status = error.response?.status || 502;
+
+    return res.status(status).json({
+      success: false,
+      error: 'WhatsApp connection test failed',
+      details: error.code === 'ECONNABORTED'
+        ? `WhatsApp API did not respond within ${WHATSAPP_API_TIMEOUT_MS / 1000} seconds`
+        : error.message
+    });
+  }
+});
+
 // Proxy endpoint for sending WhatsApp messages
 router.post('/send', async (req, res) => {
   try {
@@ -88,25 +167,14 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    // Format the full URL
-    let apiUrl = settings.apiUrl;
-    if (!apiUrl.endsWith('/')) {
-      apiUrl += '/';
-    }
-    apiUrl += 'send-message';
+    const apiUrl = buildApiEndpoint(settings.apiUrl, 'send-message');
 
     logger.api.info(`Proxying WhatsApp message to ${apiUrl} for number: ${number}`);
     
     // Make the request to the WhatsApp API
-    const response = await axios.post(apiUrl, {
+    const response = await postToWhatsAppApi(settings.apiUrl, 'send-message', {
       number,
       message
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      // Bypass SSL verification only if necessary (for self-signed certs)
-      // httpsAgent: new https.Agent({ rejectUnauthorized: false })
     });
 
     // Return the response from the WhatsApp API
@@ -153,12 +221,7 @@ router.post('/send-group', async (req, res) => {
       });
     }
 
-    // Format the full URL
-    let apiUrl = settings.apiUrl;
-    if (!apiUrl.endsWith('/')) {
-      apiUrl += '/';
-    }
-    apiUrl += 'send-group-message';
+    const apiUrl = buildApiEndpoint(settings.apiUrl, 'send-group-message');
 
     logger.api.info(`Proxying WhatsApp group message to ${apiUrl} for group: ${id || name}`);
     
@@ -167,7 +230,9 @@ router.post('/send-group', async (req, res) => {
       id,
       name,
       message,
-      mention
+      mention,
+      document,
+      image
     };
 
     // Remove undefined fields
@@ -178,13 +243,11 @@ router.post('/send-group', async (req, res) => {
     });
     
     // Make the request to the WhatsApp API
-    const response = await axios.post(apiUrl, requestBody, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      // Bypass SSL verification only if necessary (for self-signed certs)
-      // httpsAgent: new https.Agent({ rejectUnauthorized: false })
-    });
+    const response = await postToWhatsAppApi(
+      settings.apiUrl,
+      'send-group-message',
+      requestBody
+    );
 
     // Return the response from the WhatsApp API
     logger.api.info('WhatsApp group API response:', response.data);

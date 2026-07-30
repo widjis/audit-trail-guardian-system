@@ -5,6 +5,7 @@ import logger from "@/utils/logger";
 
 interface WhatsAppSettings {
   apiUrl: string;
+  testNumber: string;
   defaultMessage: string;
   defaultRecipient: "userNumber" | "testNumber";
   newHireNotificationEnabled: boolean;
@@ -16,72 +17,27 @@ interface WhatsAppSettings {
   groupMentions?: string[];
 }
 
-const WHATSAPP_SETTINGS_KEY = "whatsapp_settings";
-
 // Service for WhatsApp integration
 export const whatsappService = {
   // Get WhatsApp API settings
   getSettings: async (): Promise<WhatsAppSettings> => {
-    try {
-      // Attempt to get from API
-      const response = await apiClient.get("/settings/whatsapp");
-      return response.data;
-    } catch (error) {
-      // If API fails, try to get from localStorage
-      const localSettings = localStorage.getItem(WHATSAPP_SETTINGS_KEY);
-      if (localSettings) {
-        return JSON.parse(localSettings);
-      }
-      
-      // Default settings if nothing is available
-      return {
-        apiUrl: "",
-        defaultMessage: `Welcome aboard to PT. Merdeka Tsingshan Indonesia. 
-By this message, we inform you regarding your account information for the email address: {{email}}
-Name: {{name}}
-Title: {{title}}
-Department: {{department}}
-Email: {{email}}
-Password: {{password}}
-
-Please don't hesitate to contact IT for any question.`,
-        defaultRecipient: "userNumber",
-        newHireNotificationEnabled: false,
-        newHireNotificationTemplate: `🎉 New Hire Alert!
-
-A new employee is joining us:
-
-Name: {{name}}
-Title: {{title}}
-Department: {{department}}
-Start Date: {{startDate}}
-Email: {{email}}
-
-License request has been successfully sent to the IT team.
-
-Please prepare the necessary equipment and access for this new team member.`,
-        newHireNotificationRecipients: [],
-        groupNotificationEnabled: false,
-        groupId: "",
-        groupName: "",
-        groupMentions: []
-      };
-    }
+    const response = await apiClient.get("/settings/whatsapp");
+    return response.data;
   },
 
   // Save WhatsApp API settings
   saveSettings: async (settings: WhatsAppSettings): Promise<WhatsAppSettings> => {
-    try {
-      // Try to save to API
-      const response = await apiClient.put("/settings/whatsapp", settings);
-      // Also save to localStorage as backup
-      localStorage.setItem(WHATSAPP_SETTINGS_KEY, JSON.stringify(settings));
-      return response.data;
-    } catch (error) {
-      // If API fails, just save to localStorage
-      localStorage.setItem(WHATSAPP_SETTINGS_KEY, JSON.stringify(settings));
-      return settings;
-    }
+    const response = await apiClient.put("/settings/whatsapp", settings);
+    return response.data;
+  },
+
+  // Test the URL currently entered in the settings form.
+  testConnection: async (apiUrl: string, number: string): Promise<unknown> => {
+    const response = await apiClient.post("/whatsapp/test-connection", {
+      apiUrl,
+      number
+    });
+    return response.data;
   },
 
   // Send WhatsApp message - UPDATED to use our proxy endpoint
@@ -117,7 +73,12 @@ Please prepare the necessary equipment and access for this new team member.`,
       logger.ui.debug("WhatsApp Service", "Sending group message to proxy endpoint");
       
       // Prepare request body
-      const requestBody: any = {
+      const requestBody: {
+        message: string;
+        id?: string;
+        name?: string;
+        mention?: string;
+      } = {
         message: message || "Hello from Audit Trail Guardian System"
       };
 
@@ -161,6 +122,11 @@ Please prepare the necessary equipment and access for this new team member.`,
   getDefaultRecipient: async (): Promise<"userNumber" | "testNumber"> => {
     const settings = await whatsappService.getSettings();
     return settings.defaultRecipient || "userNumber";
+  },
+
+  getTestNumber: async (): Promise<string> => {
+    const settings = await whatsappService.getSettings();
+    return settings.testNumber || "";
   },
 
   // Send new hire notification (supports single hire or batch)
