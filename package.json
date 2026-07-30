@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "node scripts/dev-full.js",
     "build": "tsc && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
