@@ -12,68 +12,146 @@ class ExchangeService {
   }
 
   /**
-   * Check if PowerShell is available
+   * Get PowerShell version and availability details for a command
    */
-  async checkPowerShellAvailability() {
+  async getPowerShellInfo(command) {
     return new Promise((resolve) => {
-      // Try pwsh first (PowerShell Core)
-      const ps = spawn('pwsh', ['--version'], { stdio: 'pipe' });
-      
+      const ps = spawn(command, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+
+      ps.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
       ps.on('close', (code) => {
         if (code === 0) {
-          resolve({ available: true, command: 'pwsh', type: 'PowerShell Core' });
+          resolve({
+            available: true,
+            command,
+            type: command === 'powershell' ? 'Windows PowerShell' : 'PowerShell Core',
+            version: stdout.trim()
+          });
         } else {
-          // Try powershell (Windows PowerShell)
-          const ps2 = spawn('powershell', ['$PSVersionTable.PSVersion'], { stdio: 'pipe' });
-          
-          ps2.on('close', (code2) => {
-            if (code2 === 0) {
-              resolve({ available: true, command: 'powershell', type: 'Windows PowerShell' });
-            } else {
-              resolve({ available: false, command: null, type: null });
-            }
-          });
-          
-          ps2.on('error', () => {
-            resolve({ available: false, command: null, type: null });
-          });
+          resolve({ available: false, command, type: null, version: null });
         }
       });
-      
+
       ps.on('error', () => {
-        // Try powershell (Windows PowerShell)
-        const ps2 = spawn('powershell', ['$PSVersionTable.PSVersion'], { stdio: 'pipe' });
-        
-        ps2.on('close', (code2) => {
-          if (code2 === 0) {
-            resolve({ available: true, command: 'powershell', type: 'Windows PowerShell' });
-          } else {
-            resolve({ available: false, command: null, type: null });
-          }
-        });
-        
-        ps2.on('error', () => {
-          resolve({ available: false, command: null, type: null });
-        });
+        resolve({ available: false, command, type: null, version: null });
       });
     });
   }
 
   /**
+   * Check whether ExchangeOnlineManagement can be imported in a shell
+   */
+  async canImportExchangeModule(command) {
+    return new Promise((resolve) => {
+      const ps = spawn(command, ['-NoProfile', '-Command', 'Import-Module ExchangeOnlineManagement -ErrorAction Stop; Write-Output "OK"'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stderr = '';
+
+      ps.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ps.on('close', (code) => {
+        resolve({ available: code === 0, error: stderr.trim() });
+      });
+
+      ps.on('error', (error) => {
+        resolve({ available: false, error: error.message });
+      });
+    });
+  }
+
+  /**
+   * Check if PowerShell is available and select the best host
+   */
+  async checkPowerShellAvailability(options = {}) {
+    const { forExchange = false } = options;
+    const candidateCommands = [];
+    const preferredCommand = process.env.EXO_POWERSHELL_COMMAND?.trim();
+
+    if (preferredCommand) {
+      candidateCommands.push(preferredCommand);
+    }
+
+    if (forExchange && process.platform === 'win32') {
+      candidateCommands.push('powershell', 'pwsh');
+    } else {
+      candidateCommands.push('pwsh', 'powershell');
+    }
+
+    const uniqueCandidates = [...new Set(candidateCommands.filter(Boolean))];
+    const moduleErrors = [];
+
+    for (const command of uniqueCandidates) {
+      const psInfo = await this.getPowerShellInfo(command);
+      if (!psInfo.available) {
+        continue;
+      }
+
+      if (!forExchange) {
+        return psInfo;
+      }
+
+      const moduleCheck = await this.canImportExchangeModule(command);
+      if (moduleCheck.available) {
+        return psInfo;
+      }
+
+      moduleErrors.push(`${command}: ${moduleCheck.error || 'ExchangeOnlineManagement import failed'}`);
+    }
+
+    if (forExchange) {
+      return {
+        available: false,
+        command: null,
+        type: null,
+        version: null,
+        reason: moduleErrors.join(' | ')
+      };
+    }
+
+    return { available: false, command: null, type: null, version: null };
+  }
+
+  /**
+   * Build a helpful error message for Exchange PowerShell selection
+   */
+  buildExchangePowerShellError(psInfo) {
+    if (psInfo.reason) {
+      return `No compatible PowerShell host could import ExchangeOnlineManagement. ${psInfo.reason}`;
+    }
+
+    return 'PowerShell is not installed or not available in the system PATH.';
+  }
+
+  /**
    * Execute PowerShell command and return result
    */
-  async executePowerShellCommand(command) {
-    // Check PowerShell availability first
-    const psInfo = await this.checkPowerShellAvailability();
-    
+  async executePowerShellCommand(command, options = {}) {
+    const { forExchange = false } = options;
+    const psInfo = await this.checkPowerShellAvailability({ forExchange });
+
     if (!psInfo.available) {
+      if (forExchange) {
+        throw new Error(`${this.buildExchangePowerShellError(psInfo)} Please use Windows PowerShell 5.1 or PowerShell 7.4.x for Exchange Online, or set EXO_POWERSHELL_COMMAND to a compatible shell.`);
+      }
+
       throw new Error('PowerShell is not installed or not available in the system PATH. Please install PowerShell Core (pwsh) or ensure Windows PowerShell is available.');
     }
 
     return new Promise((resolve, reject) => {
-      console.log(`Executing PowerShell command using ${psInfo.type}: ${command}`);
-      
-      const ps = spawn(psInfo.command, ['-Command', command], {
+      console.log(`Executing PowerShell command using ${psInfo.type} ${psInfo.version || ''}: ${command}`);
+
+      const ps = spawn(psInfo.command, ['-NoProfile', '-Command', command], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -171,6 +249,7 @@ class ExchangeService {
         $cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword)
         
         # Connect to Exchange Online
+        Import-Module ExchangeOnlineManagement -ErrorAction Stop
         Connect-ExchangeOnline -Credential $cred -ShowProgress:$false -ErrorAction Stop
         Write-Output "Connected successfully to Exchange Online"
       `;
@@ -271,7 +350,7 @@ class ExchangeService {
         }
       `;
 
-      const result = await this.executePowerShellCommand(command);
+      const result = await this.executePowerShellCommand(command, { forExchange: true });
       if (result.includes("ALREADY_MEMBER")) {
         return { success: true, message: `User is already a member of ${groupEmail}`, alreadyMember: true };
       }
@@ -326,7 +405,7 @@ class ExchangeService {
         Disconnect-ExchangeOnline -Confirm:$false
         Write-Output $resultMsg
       `;
-      const result = await this.executePowerShellCommand(command);
+      const result = await this.executePowerShellCommand(command, { forExchange: true });
       return { success: true, message: `User removed from distribution group ${groupEmail}` };
     } catch (error) {
       if (error.message.includes('is not a member') || error.message.includes('is not present in the specified links')) {
@@ -400,7 +479,7 @@ class ExchangeService {
   async disconnect() {
     try {
       if (this.isConnected) {
-        await this.executePowerShellCommand('Disconnect-ExchangeOnline -Confirm:$false');
+        await this.executePowerShellCommand('Disconnect-ExchangeOnline -Confirm:$false', { forExchange: true });
         this.isConnected = false;
         console.log('Disconnected from Exchange Online');
       }

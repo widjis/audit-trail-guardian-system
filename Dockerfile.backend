@@ -10,7 +10,9 @@ RUN npm ci --only=production --legacy-peer-deps
 COPY . .
 
 # ── Stage 2: Runtime on PowerShell + Node 18 ─────────────────────
-FROM mcr.microsoft.com/powershell:latest AS runtime
+# ExchangeOnlineManagement is more reliable on the PowerShell 7.4 LTS track
+# than on the latest 7.6 runtime.
+FROM mcr.microsoft.com/powershell:7.4-debian-12 AS runtime
 WORKDIR /app
 
 # 1) Install Node 18 from NodeSource
