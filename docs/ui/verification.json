@@ -1,0 +1,31 @@
+{
+  "build": "passed",
+  "app_typescript": "passed",
+  "changed_file_eslint": "passed",
+  "tests": {
+    "suites": 2,
+    "passed": 51
+  },
+  "repository_lint": {
+    "baseline_errors": 52,
+    "baseline_warnings": 13,
+    "current_errors": 52,
+    "current_warnings": 12
+  },
+  "repository_formatter": "existing ESM/CommonJS config mismatch",
+  "assets": {
+    "hashes_verified": 78,
+    "css_resources_resolved": 86
+  },
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "backend_validation": "isolated localhost fixture only"
+}

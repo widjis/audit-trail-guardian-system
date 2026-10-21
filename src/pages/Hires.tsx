@@ -1,14 +1,16 @@
-
-import { HiresTable } from "@/components/hires/HiresTable";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { HiresTable } from '@/components/hires/HiresTable';
+import { MainLayout } from '@/components/layout/MainLayout';
 
 export default function Hires() {
   return (
     <MainLayout>
-      <div className="space-y-6 w-full max-w-full overflow-hidden">
-        <h1 className="text-3xl font-bold">New Hires</h1>
+      <section className="merdeka-hires" aria-labelledby="hires-title">
+        <div className="merdeka-page-heading">
+          <h1 id="hires-title">New Hires</h1>
+          <p>Track onboarding, account provisioning and equipment readiness.</p>
+        </div>
         <HiresTable />
-      </div>
+      </section>
     </MainLayout>
   );
 }

@@ -1,0 +1,187 @@
+/* HRIS Sync business variant: source Merdeka tokens, existing operational controls. */
+.merdeka-hris {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 24px;
+  min-width: 0;
+  color: var(--mdka-gray-800);
+}
+.merdeka-hris-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.merdeka-hris > div:first-child > p {
+  font-size: 13px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-hris .merdeka-hris-connection {
+  border: 1px solid var(--mdka-blue-100);
+  background: var(--mdka-blue-50);
+  border-radius: 8px;
+  color: var(--mdka-gray-700);
+  padding: 16px;
+}
+.merdeka-hris .merdeka-hris-connection h5 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.merdeka-hris .merdeka-hris-connection > div {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.merdeka-hris .merdeka-hris-tabs {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--mdka-gray-100);
+}
+.merdeka-hris .merdeka-hris-tabs > button {
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--mdka-gray-600);
+  border-radius: 6px;
+}
+.merdeka-hris .merdeka-hris-tabs > button[data-state='active'] {
+  color: var(--mdka-blue-600);
+  background: white;
+  box-shadow: 0 1px 2px #0f172a08;
+}
+.merdeka-hris .bg-card.border {
+  min-width: 0;
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 8px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.merdeka-hris .bg-card.border > .flex.flex-col {
+  padding: 16px 20px;
+  background: var(--mdka-gray-50);
+  border-bottom: 1px solid var(--mdka-gray-100);
+  gap: 4px;
+}
+.merdeka-hris .bg-card.border > .flex.flex-col h3 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+.merdeka-hris .bg-card.border > .flex.flex-col p {
+  font-size: 12px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-hris .bg-card.border > .p-6:not(.flex-col) {
+  padding: 20px;
+}
+.merdeka-hris .bg-card.border > .flex.items-center {
+  padding: 16px 20px;
+  border-top: 1px solid var(--mdka-gray-100);
+}
+.merdeka-hris-controls > .bg-card {
+  display: flex;
+  flex-direction: column;
+}
+.merdeka-hris-controls > .bg-card > .p-6:not(.flex) {
+  flex: 1;
+}
+.merdeka-hris label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mdka-gray-600);
+}
+.merdeka-hris input:not([type='checkbox']),
+.merdeka-hris button[role='combobox'] {
+  height: 36px;
+  min-height: 36px;
+  font-size: 13px;
+  border-radius: 6px;
+  border-color: var(--mdka-gray-300);
+  background: white;
+}
+.merdeka-hris .merdeka-hris-frequency-label {
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.merdeka-hris button {
+  font-size: 12px;
+  border-radius: 6px;
+}
+.merdeka-hris button > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.merdeka-hris-empty {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 20px;
+  border: 1px dashed var(--mdka-gray-300);
+  border-radius: 8px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-hris-empty strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mdka-gray-700);
+}
+.merdeka-hris-empty p {
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.6;
+}
+.merdeka-hris table {
+  min-width: 700px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.merdeka-hris table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--mdka-gray-50);
+  color: var(--mdka-gray-600);
+}
+.merdeka-hris table td,
+.merdeka-hris table th {
+  padding: 10px 12px;
+  border-color: var(--mdka-gray-200);
+  vertical-align: top;
+}
+.merdeka-hris [role='tabpanel'] {
+  min-width: 0;
+}
+.merdeka-hris .merdeka-hris-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+@media (max-width: 767.98px) {
+  .merdeka-hris .merdeka-hris-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .merdeka-hris .merdeka-hris-tabs > button {
+    justify-content: flex-start;
+    padding: 8px 10px;
+  }
+  .merdeka-hris .bg-card.border > .flex.flex-col,
+  .merdeka-hris .bg-card.border > .p-6:not(.flex-col),
+  .merdeka-hris .bg-card.border > .flex.items-center {
+    padding: 16px;
+  }
+  .merdeka-hris .grid.grid-cols-2 {
+    gap: 12px;
+  }
+}

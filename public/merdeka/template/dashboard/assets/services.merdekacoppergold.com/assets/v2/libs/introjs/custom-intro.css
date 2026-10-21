@@ -1,0 +1,135 @@
+@import url("../../css/constant.css");
+
+.mdka-tooltip {
+    width: 500px;
+    max-width: 90dvw;
+}
+.mdka-tooltip .introjs-tooltip-header {
+    padding: 10px 20px;
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+}
+.mdka-tooltip .introjs-tooltip-header .introjs-skipbutton {
+    font-size: 16px;
+    width: 20px;
+    height: 20px;
+    position: relative;
+    line-height: normal;
+}
+
+.mdka-tooltip .introjs-tooltip-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.mdka-tooltip .introjs-tooltiptext {
+    font-size: 10px;
+    padding: 10px 20px;
+}
+
+.mdka-tooltip .introjs-bullets {
+    padding-top: 0;
+}
+
+.mdka-tooltip .introjs-bullets a {
+    width: 4px;
+    height: 4px;
+}
+
+.mdka-tooltip .introjs-tooltipbuttons {
+    border-top: 1px solid #e0e0e0;
+    padding: 10px;
+    text-align: right;
+    white-space: nowrap;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.mdka-tooltip .introjs-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 4px 16px;
+    gap: 4px;
+    border-radius: 4px;
+    color: white;
+    text-decoration: none;
+    text-shadow: none;
+    font-size: 12px;
+}
+
+.mdka-tooltip .introjs-button:active,
+.mdka-tooltip .introjs-button:focus {
+    outline: 0;
+    text-decoration: none;
+}
+
+.mdka-tooltip .introjs-prevbutton {
+    background-color: white;
+    color: var(--mdka-gray-600);
+    border: 1px solid var(--mdka-gray-500);
+}
+.mdka-tooltip .introjs-prevbutton:hover {
+    background-color: var(--mdka-gray-200);
+    color: var(--mdka-gray-600);
+    border: 1px solid var(--mdka-gray-500);
+    box-shadow: none;
+}
+.mdka-tooltip .introjs-prevbutton:active {
+    background-color: var(--mdka-gray-200);
+    color: var(--mdka-gray-600);
+    border: 1px solid var(--mdka-gray-500);
+    box-shadow: none;
+}
+.mdka-tooltip .introjs-prevbutton:focus {
+    background-color: var(--mdka-gray-200);
+    color: var(--mdka-gray-600);
+    border: 1px solid var(--mdka-gray-500);
+    box-shadow: none;
+}
+
+.mdka-tooltip .introjs-nextbutton {
+    float: right;
+    background-color: var(--mdka-brand-500);
+    border: none;
+}
+
+.mdka-tooltip .introjs-nextbutton:hover {
+    outline: 0;
+    text-shadow: none;
+    text-decoration: none;
+    box-shadow: none;
+    float: right;
+    background-color: var(--mdka-brand-500);
+    border: none;
+    color: white;
+}
+.mdka-tooltip .introjs-nextbutton:focus {
+    background-color: var(--mdka-brand-500);
+    border: none;
+    color: white;
+    box-shadow: none;
+}
+.mdka-tooltip .introjs-nextbutton:active {
+    background-color: var(--mdka-brand-500);
+    border: none;
+    color: white;
+    box-shadow: none;
+}
+.mdka-tooltip .introjs-disabled {
+    background-color: var(--mdka-gray-100);
+    color: var(--mdka-gray-300);
+    border: none;
+}
+
+.mdka-tooltip .introjs-disabled:hover {
+    color: var(--mdka-gray-300);
+    border: none;
+}
+.mdka-tooltip .introjs-disabled:focus {
+    color: var(--mdka-gray-300);
+    border: none;
+}

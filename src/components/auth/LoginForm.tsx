@@ -1,13 +1,12 @@
-
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/services/auth-service";
-import { authService } from "@/services/auth-service";
-import { useNavigate } from "react-router-dom";
-import { 
-  Typography, 
-  TextField, 
-  Button, 
+import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/services/auth-service';
+import { authService } from '@/services/auth-service';
+import { useNavigate } from 'react-router-dom';
+import {
+  Typography,
+  TextField,
+  Button,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -16,23 +15,26 @@ import {
   Box,
   InputAdornment,
   Divider,
-  Alert
+  Alert,
 } from '@mui/material';
-import { 
-  Computer, 
-  Domain, 
-  VpnKey, 
-  Email, 
+import {
+  Computer,
+  Domain,
+  VpnKey,
+  Email,
   Lock,
-  AutoAwesome
+  AutoAwesome,
 } from '@mui/icons-material';
 
 export function LoginForm() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [authMethod, setAuthMethod] = useState("auto");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMethod, setAuthMethod] = useState('auto');
   const [isLoading, setIsLoading] = useState(false);
-  const [authConfig, setAuthConfig] = useState<{ authMode: string; ldapFallbackEnabled: boolean } | null>(null);
+  const [authConfig, setAuthConfig] = useState<{
+    authMode: string;
+    ldapFallbackEnabled: boolean;
+  } | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const { toast } = useToast();
   const { login } = useAuth();
@@ -46,7 +48,7 @@ export function LoginForm() {
     try {
       const config = await authService.getAuthConfig();
       setAuthConfig(config);
-      
+
       // Set default auth method based on config
       if (config.authMode === 'local') {
         setAuthMethod('local');
@@ -70,20 +72,20 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      const credentials = { 
-        username, 
+      const credentials = {
+        username,
         password,
-        authMethod: authMethod === 'auto' ? undefined : authMethod
+        authMethod: authMethod === 'auto' ? undefined : authMethod,
       };
-      
+
       await login(credentials);
       toast({
-        title: "Login Successful",
-        description: "Welcome back!",
+        title: 'Login Successful',
+        description: 'Welcome back!',
       });
-      navigate("/dashboard");
+      navigate('/dashboard');
     } catch (error) {
-      console.error("Login error:", error);
+      console.error('Login error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +132,14 @@ export function LoginForm() {
 
   if (configLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          py: 4,
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -139,17 +148,22 @@ export function LoginForm() {
   const showAuthMethodSelection = authConfig?.authMode === 'hybrid';
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: { xs: 2.5, sm: 3 },
-      width: '100%'
-    }}>
+    <Box
+      className="merdeka-login-form"
+      component="form"
+      onSubmit={handleSubmit}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: { xs: 2.5, sm: 3 },
+        width: '100%',
+      }}
+    >
       {/* Authentication Method Dropdown */}
       {showAuthMethodSelection && (
         <>
           <FormControl fullWidth>
-            <InputLabel 
+            <InputLabel
               id="auth-method-label"
               sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
             >
@@ -171,27 +185,34 @@ export function LoginForm() {
                   alignItems: 'center',
                   gap: 1,
                   fontSize: { xs: '0.875rem', sm: '1rem' },
-                  py: { xs: 1.5, sm: 2 }
+                  py: { xs: 1.5, sm: 2 },
                 },
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 2,
-                }
+                },
               }}
             >
               <MenuItem value="auto">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    width: '100%',
+                  }}
+                >
                   <AutoAwesome fontSize="small" />
                   <Box sx={{ flex: 1 }}>
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       fontWeight="medium"
                       sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                     >
                       Auto-detect
                     </Typography>
-                    <Typography 
-                      variant="caption" 
-                      color="text.secondary" 
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
                       display="block"
                       sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     >
@@ -201,19 +222,26 @@ export function LoginForm() {
                 </Box>
               </MenuItem>
               <MenuItem value="local">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    width: '100%',
+                  }}
+                >
                   <Computer fontSize="small" />
                   <Box sx={{ flex: 1 }}>
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       fontWeight="medium"
                       sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                     >
                       Local Account
                     </Typography>
-                    <Typography 
-                      variant="caption" 
-                      color="text.secondary" 
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
                       display="block"
                       sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     >
@@ -223,19 +251,26 @@ export function LoginForm() {
                 </Box>
               </MenuItem>
               <MenuItem value="ldap">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    width: '100%',
+                  }}
+                >
                   <Domain fontSize="small" />
                   <Box sx={{ flex: 1 }}>
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       fontWeight="medium"
                       sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                     >
                       Active Directory
                     </Typography>
-                    <Typography 
-                      variant="caption" 
-                      color="text.secondary" 
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
                       display="block"
                       sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     >
@@ -248,23 +283,23 @@ export function LoginForm() {
           </FormControl>
 
           {/* Method Description */}
-          <Alert 
-            severity="info" 
+          <Alert
+            severity="info"
             icon={getAuthMethodIcon(authMethod)}
-            sx={{ 
+            sx={{
               bgcolor: 'primary.50',
               border: 1,
               borderColor: 'primary.200',
               borderRadius: 2,
               '& .MuiAlert-icon': {
-                color: 'primary.main'
+                color: 'primary.main',
               },
               '& .MuiAlert-message': {
-                fontSize: { xs: '0.8rem', sm: '0.875rem' }
-              }
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
+              },
             }}
           >
-            <Typography 
+            <Typography
               variant="body2"
               sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
             >
@@ -275,10 +310,10 @@ export function LoginForm() {
           <Divider />
         </>
       )}
-      
+
       {/* Email/Username Field */}
       <TextField
-        label={authMethod === 'ldap' ? "Domain Username" : "Email"}
+        label={authMethod === 'ldap' ? 'Domain Username' : 'Email'}
         variant="outlined"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
@@ -286,9 +321,9 @@ export function LoginForm() {
         disabled={isLoading}
         fullWidth
         placeholder={
-          authMethod === 'ldap' 
-            ? "mti.user@merdekabattery.com" 
-            : "mti.user@merdekabattery.com"
+          authMethod === 'ldap'
+            ? 'mti.user@merdekabattery.com'
+            : 'mti.user@merdekabattery.com'
         }
         InputProps={{
           startAdornment: (
@@ -298,24 +333,24 @@ export function LoginForm() {
           ),
           sx: {
             fontSize: { xs: '0.875rem', sm: '1rem' },
-            py: { xs: 0.5, sm: 0 }
-          }
+            py: { xs: 0.5, sm: 0 },
+          },
         }}
         InputLabelProps={{
-          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } }
+          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } },
         }}
         helperText={
-          authMethod === 'ldap' 
-            ? "Use your domain username (e.g., john.doe or DOMAIN\\john.doe)"
-            : "Enter your email address"
+          authMethod === 'ldap'
+            ? 'Use your domain username (e.g., john.doe or DOMAIN\\john.doe)'
+            : 'Enter your email address'
         }
         FormHelperTextProps={{
-          sx: { fontSize: { xs: '0.7rem', sm: '0.75rem' } }
+          sx: { fontSize: { xs: '0.7rem', sm: '0.75rem' } },
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
             borderRadius: 2,
-          }
+          },
         }}
       />
 
@@ -338,29 +373,29 @@ export function LoginForm() {
           ),
           sx: {
             fontSize: { xs: '0.875rem', sm: '1rem' },
-            py: { xs: 0.5, sm: 0 }
-          }
+            py: { xs: 0.5, sm: 0 },
+          },
         }}
         InputLabelProps={{
-          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } }
+          sx: { fontSize: { xs: '0.875rem', sm: '1rem' } },
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
             borderRadius: 2,
-          }
+          },
         }}
       />
 
       {/* Forgot Password Link */}
       <Box sx={{ textAlign: 'right' }}>
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: 'primary.main', 
+        <Typography
+          variant="body2"
+          sx={{
+            color: 'primary.main',
             cursor: 'pointer',
             textDecoration: 'underline',
             '&:hover': { color: 'primary.dark' },
-            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+            fontSize: { xs: '0.8rem', sm: '0.875rem' },
           }}
         >
           Forgot Password?
@@ -368,10 +403,10 @@ export function LoginForm() {
       </Box>
 
       {/* Login Button */}
-      <Button 
-        type="submit" 
-        variant="contained" 
-        disabled={isLoading} 
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={isLoading}
         fullWidth
         size="large"
         sx={{
@@ -384,7 +419,7 @@ export function LoginForm() {
           '&:hover': {
             boxShadow: 4,
           },
-          minHeight: { xs: '48px', sm: '56px' }
+          minHeight: { xs: '48px', sm: '56px' },
         }}
       >
         {isLoading ? (
@@ -393,7 +428,7 @@ export function LoginForm() {
             <span>Signing in...</span>
           </Box>
         ) : (
-          "Log In"
+          'Log In'
         )}
       </Button>
     </Box>

@@ -1,0 +1,138 @@
+/* Application adapters; canonical Merdeka assets and generated welcome-card artwork stay unchanged. */
+.merdeka-onboard {
+  padding-bottom: 24px;
+  color: var(--mdka-gray-800);
+}
+.merdeka-onboard-heading {
+  margin-bottom: 20px;
+}
+.merdeka-onboard-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.merdeka-onboard-heading p {
+  font-size: 13px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-onboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.merdeka-onboard-layout > div {
+  min-width: 0;
+}
+.merdeka-onboard .merdeka-onboard-card {
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 8px;
+  box-shadow: none;
+  min-width: 0;
+  overflow: hidden;
+}
+.merdeka-onboard .merdeka-onboard-card-header {
+  padding: 16px 20px;
+  background: var(--mdka-gray-50);
+  border-bottom: 1px solid var(--mdka-gray-100);
+}
+.merdeka-onboard .merdeka-onboard-card-header h3 {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.merdeka-onboard .merdeka-onboard-card-header svg {
+  width: 18px;
+  height: 18px;
+  color: var(--mdka-blue-600);
+  flex: none;
+}
+.merdeka-onboard .merdeka-onboard-card-body {
+  padding: 20px;
+}
+.merdeka-onboard .merdeka-hire-search {
+  margin-bottom: 16px;
+  height: 36px;
+  font-size: 12px;
+  border-color: var(--mdka-gray-300);
+}
+.merdeka-onboard button.merdeka-hire-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  background: white;
+  font-size: 13px;
+  padding: 12px;
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 6px;
+}
+.merdeka-onboard button.merdeka-hire-option[aria-pressed='true'] {
+  background: var(--mdka-blue-50);
+  border-color: var(--mdka-blue-500);
+}
+.merdeka-onboard .merdeka-hire-option > div {
+  align-items: flex-start;
+  gap: 12px;
+}
+.merdeka-onboard .merdeka-hire-option > div > div {
+  min-width: 0;
+  align-items: flex-start;
+}
+.merdeka-onboard .merdeka-hire-option svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-onboard .merdeka-hire-option p {
+  overflow-wrap: anywhere;
+}
+.merdeka-onboard .merdeka-hire-option p + p {
+  font-size: 12px;
+  margin-top: 2px;
+}
+.merdeka-onboard .merdeka-hire-option [data-slot='badge'] {
+  flex: none;
+}
+.merdeka-onboard-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--mdka-gray-500);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.merdeka-onboard-empty svg {
+  margin: 0 auto 12px;
+  color: var(--mdka-gray-400);
+}
+.merdeka-onboard label {
+  font-size: 12px;
+  color: var(--mdka-gray-600);
+}
+.merdeka-onboard textarea {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  border-color: var(--mdka-gray-300);
+}
+.merdeka-onboard .merdeka-onboard-card-body > .space-y-4 > button {
+  min-height: 36px;
+  height: auto;
+  white-space: normal;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .merdeka-onboard-layout {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 575.98px) {
+  .merdeka-onboard .merdeka-onboard-card-header,
+  .merdeka-onboard .merdeka-onboard-card-body {
+    padding: 16px;
+  }
+  .merdeka-onboard .merdeka-hire-option > div {
+    flex-wrap: wrap;
+  }
+}

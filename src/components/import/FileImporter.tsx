@@ -1,13 +1,27 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { hiresApi } from "@/services/api";
-import { useToast } from "@/components/ui/use-toast";
-import { Upload, AlertCircle, CheckCircle2, Download, FileText, X } from "lucide-react";
-import { ImportResponse, ImportError } from "@/types/types";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { hiresApi } from '@/services/api';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  Upload,
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  FileText,
+  X,
+} from 'lucide-react';
+import { ImportResponse } from '@/types/types';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function FileImporter() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,15 +34,15 @@ export function FileImporter() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
-      
+
       if (fileExt === 'csv' || fileExt === 'xlsx' || fileExt === 'xls') {
         setFile(selectedFile);
         setResult(null);
       } else {
         toast({
-          title: "Invalid File Type",
-          description: "Please upload a CSV or Excel file (.csv, .xlsx, .xls)",
-          variant: "destructive",
+          title: 'Invalid File Type',
+          description: 'Please upload a CSV or Excel file (.csv, .xlsx, .xls)',
+          variant: 'destructive',
         });
         e.target.value = '';
       }
@@ -38,9 +52,9 @@ export function FileImporter() {
   const handleImport = async () => {
     if (!file) {
       toast({
-        title: "No File Selected",
-        description: "Please select a file to import",
-        variant: "destructive",
+        title: 'No File Selected',
+        description: 'Please select a file to import',
+        variant: 'destructive',
       });
       return;
     }
@@ -49,29 +63,30 @@ export function FileImporter() {
     try {
       const response = await hiresApi.import(file);
       setResult(response);
-      
+
       if (response.success) {
         toast({
-          title: "Import Successful",
+          title: 'Import Successful',
           description: `Successfully imported ${response.imported || response.rowsImported} of ${response.totalRows || 'all'} records`,
         });
       } else {
         toast({
-          title: "Import Failed",
+          title: 'Import Failed',
           description: response.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       }
     } catch (error) {
-      console.error("Import error:", error);
+      console.error('Import error:', error);
       setResult({
         success: false,
-        message: error instanceof Error ? error.message : "An unknown error occurred",
+        message:
+          error instanceof Error ? error.message : 'An unknown error occurred',
       });
       toast({
-        title: "Import Failed",
-        description: "An error occurred during import",
-        variant: "destructive",
+        title: 'Import Failed',
+        description: 'An error occurred during import',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -83,15 +98,15 @@ export function FileImporter() {
     try {
       await hiresApi.downloadTemplate();
       toast({
-        title: "Template Downloaded",
-        description: "CSV template has been downloaded successfully",
+        title: 'Template Downloaded',
+        description: 'CSV template has been downloaded successfully',
       });
     } catch (error) {
-      console.error("Download template error:", error);
+      console.error('Download template error:', error);
       toast({
-        title: "Download Failed",
-        description: "Failed to download CSV template",
-        variant: "destructive",
+        title: 'Download Failed',
+        description: 'Failed to download CSV template',
+        variant: 'destructive',
       });
     } finally {
       setIsDownloading(false);
@@ -102,30 +117,32 @@ export function FileImporter() {
     setFile(null);
     setResult(null);
     // Reset file input
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    const fileInput = document.getElementById(
+      'file-upload',
+    ) as HTMLInputElement;
     if (fileInput) {
       fileInput.value = '';
     }
   };
 
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="text-xl">Import Data</CardTitle>
+    <Card className="merdeka-import-card merdeka-import-upload">
+      <CardHeader className="merdeka-import-card-header">
+        <CardTitle>Upload New Hire Data</CardTitle>
         <CardDescription>
           Upload CSV or Excel files containing new hire records
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex items-center justify-between">
+      <CardContent className="merdeka-import-card-body space-y-6">
+        <div className="merdeka-import-template">
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Template</h3>
             <p className="text-xs text-muted-foreground">
               Download a CSV template with the required columns
             </p>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="gap-2"
             onClick={handleDownloadTemplate}
@@ -142,22 +159,26 @@ export function FileImporter() {
           </Button>
         </div>
 
-        <div className="space-y-2">
+        <div className="merdeka-import-file-field space-y-2">
           <label htmlFor="file-upload" className="text-sm font-medium">
             Select File
           </label>
-          <Input 
-            id="file-upload" 
-            type="file" 
+          <Input
+            id="file-upload"
+            aria-describedby="import-file-help"
+            type="file"
             accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
             disabled={isLoading}
           />
-          <p className="text-xs text-muted-foreground mt-1">
+          <p
+            id="import-file-help"
+            className="text-xs text-muted-foreground mt-1"
+          >
             Accepted formats: .csv, .xlsx, .xls
           </p>
         </div>
-        
+
         {file && (
           <div className="p-4 border rounded flex items-center gap-2 bg-muted/50">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
@@ -169,39 +190,52 @@ export function FileImporter() {
                 {(file.size / 1024).toFixed(2)} KB
               </p>
             </div>
-            <Button variant="ghost" size="icon" onClick={resetForm} className="h-8 w-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={resetForm}
+              aria-label="Remove selected file"
+              disabled={isLoading}
+              className="h-8 w-8"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
         )}
 
         {result && (
-          <Alert variant={result.success ? "default" : "destructive"}>
+          <Alert variant={result.success ? 'default' : 'destructive'}>
             {result.success ? (
               <CheckCircle2 className="h-4 w-4" />
             ) : (
               <AlertCircle className="h-4 w-4" />
             )}
             <AlertTitle>
-              {result.success ? "Import Successful" : "Import Failed"}
+              {result.success ? 'Import Successful' : 'Import Failed'}
             </AlertTitle>
-            <AlertDescription>
-              {result.message}
-            </AlertDescription>
+            <AlertDescription>{result.message}</AlertDescription>
           </Alert>
         )}
 
         {result && result.errors && result.errors.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-destructive">Import Errors</h3>
+            <h3 className="text-sm font-medium text-destructive">
+              Import Errors
+            </h3>
             <ScrollArea className="h-[200px] w-full border rounded p-2">
               <div className="space-y-2">
                 {result.errors.map((error, index) => (
-                  <div key={index} className="text-xs border-l-2 border-destructive pl-2 py-1">
-                    <p><strong>Row {error.row}:</strong> {error.error}</p>
+                  <div
+                    key={index}
+                    className="text-xs border-l-2 border-destructive pl-2 py-1"
+                  >
+                    <p>
+                      <strong>Row {error.row}:</strong> {error.error}
+                    </p>
                     {error.data && (
                       <p className="text-muted-foreground mt-1">
-                        Data: {Object.entries(error.data)
+                        Data:{' '}
+                        {Object.entries(error.data)
                           .filter(([k, v]) => v)
                           .map(([k, v]) => `${k}=${v}`)
                           .join(', ')}
@@ -214,8 +248,8 @@ export function FileImporter() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium">Required Column Mapping</h3>
+        <details className="merdeka-import-columns" open>
+          <summary>Column Reference</summary>
           <div className="text-xs text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1">
             <div>name*</div>
             <div>title*</div>
@@ -237,11 +271,12 @@ export function FileImporter() {
             <div>note</div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            * Required fields. Column headers in your file should match these names (case-insensitive)
+            * Required fields. Column headers in your file should match these
+            names (case-insensitive)
           </p>
-        </div>
+        </details>
       </CardContent>
-      <CardFooter className="flex justify-between">
+      <CardFooter className="merdeka-import-card-footer flex justify-between">
         <Button
           variant="outline"
           onClick={resetForm}
@@ -249,7 +284,11 @@ export function FileImporter() {
         >
           Reset
         </Button>
-        <Button onClick={handleImport} disabled={!file || isLoading} className="gap-2">
+        <Button
+          onClick={handleImport}
+          disabled={!file || isLoading}
+          className="gap-2"
+        >
           {isLoading ? (
             <>Importing...</>
           ) : (

@@ -1,22 +1,22 @@
-import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
-import { hiresApi } from "@/services/api";
-import { settingsService } from "@/services/settings-service";
-import { NewHire } from "@/types/types";
-import { WelcomeCardGenerator } from "./WelcomeCardGenerator";
-import { 
-  FileText, 
-  Users, 
-  Mail, 
+import { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { hiresApi } from '@/services/api';
+import { settingsService } from '@/services/settings-service';
+import { NewHire } from '@/types/types';
+import { WelcomeCardGenerator } from './WelcomeCardGenerator';
+import {
+  FileText,
+  Users,
+  Mail,
   Sparkles,
   Eye,
   RefreshCw,
@@ -28,19 +28,20 @@ import {
   Settings,
   AlertCircle,
   Save,
-  Send
-} from "lucide-react";
+  Send,
+} from 'lucide-react';
 
 export function OnboardEmailGenerator() {
   const { toast } = useToast();
+  const [hireSearch, setHireSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedHire, setSelectedHire] = useState<NewHire | null>(null);
-  const [cvInsights, setCvInsights] = useState<string>("");
-  const [emailContent, setEmailContent] = useState<string>("");
+  const [cvInsights, setCvInsights] = useState<string>('');
+  const [emailContent, setEmailContent] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string>("");
+  const [filePreview, setFilePreview] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -48,32 +49,34 @@ export function OnboardEmailGenerator() {
   // Query to get all hires
   const { data: hires = [], isLoading } = useQuery({
     queryKey: ['hires'],
-    queryFn: hiresApi.getAll
+    queryFn: hiresApi.getAll,
   });
 
   // Query to get AI services settings
   const { data: aiSettings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ['ai-services-settings'],
-    queryFn: settingsService.getAIServicesSettings
+    queryFn: settingsService.getAIServicesSettings,
   });
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
-    if (!file) return;  
+    if (!file) return;
 
     // Validate file type
     const allowedTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain'
+      'text/plain',
     ];
 
     if (!allowedTypes.includes(file.type)) {
       toast({
-        title: "Invalid File Type",
-        description: "Please upload a PDF, DOC, DOCX, or TXT file",
-        variant: "destructive"
+        title: 'Invalid File Type',
+        description: 'Please upload a PDF, DOC, DOCX, or TXT file',
+        variant: 'destructive',
       });
       return;
     }
@@ -81,9 +84,9 @@ export function OnboardEmailGenerator() {
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast({
-        title: "File Too Large",
-        description: "Please upload a file smaller than 10MB",
-        variant: "destructive"
+        title: 'File Too Large',
+        description: 'Please upload a file smaller than 10MB',
+        variant: 'destructive',
       });
       return;
     }
@@ -91,24 +94,28 @@ export function OnboardEmailGenerator() {
     setIsUploading(true);
     try {
       setUploadedFile(file);
-      
+
       // Create file preview for text files
       if (file.type === 'text/plain') {
         const text = await file.text();
-        setFilePreview(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        setFilePreview(
+          text.substring(0, 500) + (text.length > 500 ? '...' : ''),
+        );
       } else {
-        setFilePreview(`${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+        setFilePreview(
+          `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+        );
       }
 
       toast({
-        title: "File Uploaded",
+        title: 'File Uploaded',
         description: `Successfully uploaded ${file.name}`,
       });
     } catch (error) {
       toast({
-        title: "Upload Failed",
-        description: "Failed to upload file. Please try again.",
-        variant: "destructive"
+        title: 'Upload Failed',
+        description: 'Failed to upload file. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsUploading(false);
@@ -117,10 +124,10 @@ export function OnboardEmailGenerator() {
 
   const removeUploadedFile = () => {
     setUploadedFile(null);
-    setFilePreview("");
-    setCvInsights("");
+    setFilePreview('');
+    setCvInsights('');
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   };
 
@@ -138,10 +145,14 @@ export function OnboardEmailGenerator() {
     });
   };
 
-  const analyzeWithGeminiVision = async (file: File, apiKey: string, customPrompt?: string): Promise<string> => {
+  const analyzeWithGeminiVision = async (
+    file: File,
+    apiKey: string,
+    customPrompt?: string,
+  ): Promise<string> => {
     try {
       const base64Data = await convertFileToBase64(file);
-      
+
       // Use custom prompt if provided, otherwise fall back to default
       const defaultPrompt = `Please analyze this CV/Resume document and provide detailed insights in the following structured format:
 
@@ -181,30 +192,31 @@ export function OnboardEmailGenerator() {
 
 Please format the response clearly with bullet points and be specific about skills, experiences, and achievements mentioned in the CV.`;
 
-      const promptToUse = customPrompt && customPrompt.trim() ? customPrompt : defaultPrompt;
-      
+      const promptToUse =
+        customPrompt && customPrompt.trim() ? customPrompt : defaultPrompt;
+
       const requestBody = {
         contents: [
           {
             parts: [
               {
-                text: promptToUse
+                text: promptToUse,
               },
               {
                 inline_data: {
                   mime_type: file.type,
-                  data: base64Data
-                }
-              }
-            ]
-          }
+                  data: base64Data,
+                },
+              },
+            ],
+          },
         ],
         generationConfig: {
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 3000,
-        }
+        },
       };
 
       const response = await fetch(
@@ -214,8 +226,8 @@ Please format the response clearly with bullet points and be specific about skil
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(requestBody)
-        }
+          body: JSON.stringify(requestBody),
+        },
       );
 
       if (!response.ok) {
@@ -224,7 +236,10 @@ Please format the response clearly with bullet points and be specific about skil
       }
 
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No analysis available';
+      return (
+        data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        'No analysis available'
+      );
     } catch (error) {
       console.error('Gemini API Error:', error);
       throw error;
@@ -234,27 +249,27 @@ Please format the response clearly with bullet points and be specific about skil
   const handleAnalyzeCV = async () => {
     if (!selectedHire) {
       toast({
-        title: "Missing Information",
-        description: "Please select a hire first",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Please select a hire first',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!uploadedFile) {
       toast({
-        title: "No CV File",
-        description: "Please upload a CV file first",
-        variant: "destructive"
+        title: 'No CV File',
+        description: 'Please upload a CV file first',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!aiSettings?.geminiApiKey || !aiSettings?.enabled) {
       toast({
-        title: "AI Service Not Configured",
-        description: "Please configure Gemini AI in Settings first",
-        variant: "destructive"
+        title: 'AI Service Not Configured',
+        description: 'Please configure Gemini AI in Settings first',
+        variant: 'destructive',
       });
       return;
     }
@@ -263,11 +278,11 @@ Please format the response clearly with bullet points and be specific about skil
     try {
       // Use real Gemini Vision API to analyze the uploaded CV
       const insights = await analyzeWithGeminiVision(
-        uploadedFile, 
-        aiSettings.geminiApiKey, 
-        aiSettings.cvAnalysisPrompt
+        uploadedFile,
+        aiSettings.geminiApiKey,
+        aiSettings.cvAnalysisPrompt,
       );
-      
+
       const formattedInsights = `
 **CV Analysis for ${selectedHire.name}**
 **File:** ${uploadedFile.name}
@@ -280,17 +295,19 @@ ${insights}
       `;
 
       setCvInsights(formattedInsights);
-      
+
       toast({
-        title: "CV Analysis Complete",
-        description: "Successfully analyzed the CV using Gemini AI"
+        title: 'CV Analysis Complete',
+        description: 'Successfully analyzed the CV using Gemini AI',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('CV Analysis Error:', error);
       toast({
-        title: "Analysis Failed",
-        description: error.message || "Failed to analyze CV. Please check your API configuration in Settings.",
-        variant: "destructive"
+        title: 'Analysis Failed',
+        description:
+          (error instanceof Error ? error.message : '') ||
+          'Failed to analyze CV. Please check your API configuration in Settings.',
+        variant: 'destructive',
       });
     } finally {
       setIsAnalyzing(false);
@@ -300,18 +317,18 @@ ${insights}
   const handleGenerateEmail = async () => {
     if (!selectedHire || !cvInsights) {
       toast({
-        title: "Missing Information",
-        description: "Please analyze a CV first before generating the email",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Please analyze a CV first before generating the email',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!aiSettings?.geminiApiKey || !aiSettings?.enabled) {
       toast({
-        title: "AI Service Not Configured",
-        description: "Please configure Gemini AI in Settings first",
-        variant: "destructive"
+        title: 'AI Service Not Configured',
+        description: 'Please configure Gemini AI in Settings first',
+        variant: 'destructive',
       });
       return;
     }
@@ -350,10 +367,11 @@ Start Date: ${selectedHire.on_site_date ? new Date(selectedHire.on_site_date).to
 Please generate a complete email that feels personal and genuine, not templated.`;
 
       // Replace placeholders in prompt (custom or default)
-      let emailPrompt = aiSettings.emailComposerPrompt && aiSettings.emailComposerPrompt.trim() 
-        ? aiSettings.emailComposerPrompt 
-        : defaultEmailPrompt;
-      
+      let emailPrompt =
+        aiSettings.emailComposerPrompt && aiSettings.emailComposerPrompt.trim()
+          ? aiSettings.emailComposerPrompt
+          : defaultEmailPrompt;
+
       emailPrompt = emailPrompt
         .replace('{newHireInfo}', newHireInfo)
         .replace('{cvAnalysis}', cvInsights);
@@ -363,17 +381,17 @@ Please generate a complete email that feels personal and genuine, not templated.
           {
             parts: [
               {
-                text: emailPrompt
-              }
-            ]
-          }
+                text: emailPrompt,
+              },
+            ],
+          },
         ],
         generationConfig: {
           temperature: 0.8,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 2000,
-        }
+        },
       };
 
       const response = await fetch(
@@ -383,8 +401,8 @@ Please generate a complete email that feels personal and genuine, not templated.
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(requestBody)
-        }
+          body: JSON.stringify(requestBody),
+        },
       );
 
       if (!response.ok) {
@@ -393,20 +411,24 @@ Please generate a complete email that feels personal and genuine, not templated.
       }
 
       const data = await response.json();
-      const generatedEmail = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Failed to generate email content';
+      const generatedEmail =
+        data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        'Failed to generate email content';
 
       setEmailContent(generatedEmail);
-      
+
       toast({
-        title: "Email Generated",
-        description: "Personalized welcome email has been created successfully"
+        title: 'Email Generated',
+        description: 'Personalized welcome email has been created successfully',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Email Generation Error:', error);
       toast({
-        title: "Generation Failed",
-        description: error.message || "Failed to generate email. Please try again.",
-        variant: "destructive"
+        title: 'Generation Failed',
+        description:
+          (error instanceof Error ? error.message : '') ||
+          'Failed to generate email. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
@@ -416,9 +438,9 @@ Please generate a complete email that feels personal and genuine, not templated.
   const handleSaveDraft = async () => {
     if (!selectedHire || !emailContent) {
       toast({
-        title: "Missing Information",
-        description: "Please generate an email first before saving",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Please generate an email first before saving',
+        variant: 'destructive',
       });
       return;
     }
@@ -433,22 +455,24 @@ Please generate a complete email that feels personal and genuine, not templated.
         emailContent,
         cvInsights,
         savedAt: new Date().toISOString(),
-        fileName: uploadedFile?.name
+        fileName: uploadedFile?.name,
       };
 
-      const existingDrafts = JSON.parse(localStorage.getItem('emailDrafts') || '[]');
+      const existingDrafts = JSON.parse(
+        localStorage.getItem('emailDrafts') || '[]',
+      );
       const updatedDrafts = [...existingDrafts, draftData];
       localStorage.setItem('emailDrafts', JSON.stringify(updatedDrafts));
 
       toast({
-        title: "Draft Saved",
-        description: "Email draft has been saved successfully"
+        title: 'Draft Saved',
+        description: 'Email draft has been saved successfully',
       });
     } catch (error) {
       toast({
-        title: "Save Failed",
-        description: "Failed to save draft. Please try again.",
-        variant: "destructive"
+        title: 'Save Failed',
+        description: 'Failed to save draft. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -458,9 +482,9 @@ Please generate a complete email that feels personal and genuine, not templated.
   const handleSendEmail = async () => {
     if (!selectedHire || !emailContent) {
       toast({
-        title: "Missing Information",
-        description: "Please generate an email first before sending",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Please generate an email first before sending',
+        variant: 'destructive',
       });
       return;
     }
@@ -469,26 +493,26 @@ Please generate a complete email that feels personal and genuine, not templated.
     try {
       // Here you would typically send via your email service
       // For now, we'll simulate the sending process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       toast({
-        title: "Email Sent",
-        description: `Welcome email has been sent to ${selectedHire.email}`
+        title: 'Email Sent',
+        description: `Welcome email has been sent to ${selectedHire.email}`,
       });
 
       // Clear the form after successful send
-      setEmailContent("");
-      setCvInsights("");
+      setEmailContent('');
+      setCvInsights('');
       setUploadedFile(null);
-      setFilePreview("");
+      setFilePreview('');
       if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+        fileInputRef.current.value = '';
       }
     } catch (error) {
       toast({
-        title: "Send Failed",
-        description: "Failed to send email. Please try again.",
-        variant: "destructive"
+        title: 'Send Failed',
+        description: 'Failed to send email. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsSending(false);
@@ -496,7 +520,7 @@ Please generate a complete email that feels personal and genuine, not templated.
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="merdeka-onboard-layout">
       {/* Left Panel - Hire Selection and CV Analysis */}
       <div className="space-y-6">
         {/* AI Configuration Status */}
@@ -505,7 +529,9 @@ Please generate a complete email that feels personal and genuine, not templated.
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-orange-700">
                 <AlertCircle className="h-4 w-4" />
-                <p className="text-sm font-medium">AI Service Configuration Required</p>
+                <p className="text-sm font-medium">
+                  AI Service Configuration Required
+                </p>
               </div>
               <p className="text-sm text-orange-600 mt-1">
                 Please configure Gemini AI in Settings to enable CV analysis.
@@ -521,14 +547,21 @@ Please generate a complete email that feels personal and genuine, not templated.
         )}
 
         {/* Hire Selection */}
-        <Card>
-          <CardHeader>
+        <Card className="merdeka-onboard-card">
+          <CardHeader className="merdeka-onboard-card-header">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
               Select New Hire
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="merdeka-onboard-card-body">
+            <Input
+              className="merdeka-hire-search"
+              aria-label="Search welcome email hires"
+              placeholder="Search name, job title or department"
+              value={hireSearch}
+              onChange={(event) => setHireSearch(event.target.value)}
+            />
             {isLoading ? (
               <div className="flex items-center justify-center p-4">
                 <RefreshCw className="h-4 w-4 animate-spin mr-2" />
@@ -537,32 +570,58 @@ Please generate a complete email that feels personal and genuine, not templated.
             ) : (
               <ScrollArea className="h-[300px]">
                 <div className="space-y-2">
-                  {hires.map((hire) => (
-                    <div
-                      key={hire.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedHire?.id === hire.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-muted/50"
-                      }`}
-                      onClick={() => setSelectedHire(hire)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <div>
-                            <p className="font-medium">{hire.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {hire.title} • {hire.department}
-                            </p>
+                  {hires
+                    .filter((hire) =>
+                      [hire.name, hire.title, hire.department, hire.email].some(
+                        (value) =>
+                          value
+                            ?.toLowerCase()
+                            .includes(hireSearch.trim().toLowerCase()),
+                      ),
+                    )
+                    .map((hire) => (
+                      <button
+                        type="button"
+                        aria-pressed={selectedHire?.id === hire.id}
+                        key={hire.id}
+                        className={`merdeka-hire-option p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedHire?.id === hire.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:bg-muted/50'
+                        }`}
+                        onClick={() => setSelectedHire(hire)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <div>
+                              <p className="font-medium">{hire.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {hire.title} • {hire.department}
+                              </p>
+                            </div>
                           </div>
+                          <Badge variant="outline">
+                            {hire.account_creation_status || 'Pending'}
+                          </Badge>
                         </div>
-                        <Badge variant="outline">
-                          {hire.account_creation_status || "Pending"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                      </button>
+                    ))}
+                  {!isLoading &&
+                    !hires.some((hire) =>
+                      [hire.name, hire.title, hire.department, hire.email].some(
+                        (value) =>
+                          value
+                            ?.toLowerCase()
+                            .includes(hireSearch.trim().toLowerCase()),
+                      ),
+                    ) && (
+                      <p className="merdeka-onboard-empty" role="status">
+                        {hires.length
+                          ? 'No hires match your search.'
+                          : 'No new hires available.'}
+                      </p>
+                    )}
                 </div>
               </ScrollArea>
             )}
@@ -571,14 +630,14 @@ Please generate a complete email that feels personal and genuine, not templated.
 
         {/* CV Analysis */}
         {selectedHire && (
-          <Card>
-            <CardHeader>
+          <Card className="merdeka-onboard-card">
+            <CardHeader className="merdeka-onboard-card-header">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 CV Analysis
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="merdeka-onboard-card-body">
               <div className="space-y-4">
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="font-medium">{selectedHire.name}</p>
@@ -589,7 +648,7 @@ Please generate a complete email that feels personal and genuine, not templated.
                     Email: {selectedHire.email}
                   </p>
                 </div>
-                
+
                 {/* CV File Upload */}
                 <div className="space-y-4">
                   <Separator />
@@ -647,6 +706,7 @@ Please generate a complete email that feels personal and genuine, not templated.
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label="Remove uploaded CV"
                           onClick={removeUploadedFile}
                           className="text-green-600 hover:text-green-800"
                         >
@@ -661,10 +721,15 @@ Please generate a complete email that feels personal and genuine, not templated.
                     </div>
                   )}
                 </div>
-                
-                <Button 
+
+                <Button
                   onClick={handleAnalyzeCV}
-                  disabled={isAnalyzing || !aiSettings?.enabled || !aiSettings?.geminiApiKey || !uploadedFile}
+                  disabled={
+                    isAnalyzing ||
+                    !aiSettings?.enabled ||
+                    !aiSettings?.geminiApiKey ||
+                    !uploadedFile
+                  }
                   className="w-full"
                 >
                   {isAnalyzing ? (
@@ -700,14 +765,14 @@ Please generate a complete email that feels personal and genuine, not templated.
       {/* Right Panel - Email Generation and Preview */}
       <div className="space-y-6">
         {/* Email Generation */}
-        <Card>
-          <CardHeader>
+        <Card className="merdeka-onboard-card">
+          <CardHeader className="merdeka-onboard-card-header">
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               Welcome Email Generator
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="merdeka-onboard-card-body">
             <div className="space-y-4">
               <Button
                 onClick={handleGenerateEmail}
@@ -727,6 +792,15 @@ Please generate a complete email that feels personal and genuine, not templated.
                 )}
               </Button>
 
+              {!emailContent && (
+                <div className="merdeka-onboard-empty">
+                  <Mail className="h-6 w-6" aria-hidden="true" />
+                  <p>
+                    Select a new hire and analyze their CV to generate a
+                    personalized welcome email.
+                  </p>
+                </div>
+              )}
               {emailContent && (
                 <div className="flex gap-2 mt-4">
                   <Button
@@ -789,7 +863,7 @@ Please generate a complete email that feels personal and genuine, not templated.
         </Card>
 
         {/* Welcome Card Generator */}
-        <WelcomeCardGenerator 
+        <WelcomeCardGenerator
           selectedHire={selectedHire}
           emailContent={emailContent}
         />

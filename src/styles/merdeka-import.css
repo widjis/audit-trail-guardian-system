@@ -1,0 +1,213 @@
+/* Import business variant; source tokens and shared controls retain ownership. */
+.merdeka-import {
+  color: var(--mdka-gray-800);
+  padding-bottom: 24px;
+}
+.merdeka-import-heading {
+  margin-bottom: 20px;
+}
+.merdeka-import-heading h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.merdeka-import-heading p {
+  margin: 0;
+  color: var(--mdka-gray-500);
+  font-size: 13px;
+}
+.merdeka-import-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.merdeka-import .merdeka-import-card {
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 8px;
+  box-shadow: none;
+  min-width: 0;
+  overflow: hidden;
+}
+.merdeka-import .merdeka-import-card-header {
+  padding: 16px 20px;
+  background: var(--mdka-gray-50);
+  gap: 4px;
+}
+.merdeka-import .merdeka-import-card-header h3 {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.merdeka-import .merdeka-import-card-header p {
+  font-size: 12px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-import .merdeka-import-card-body {
+  padding: 20px;
+}
+.merdeka-import-template {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--mdka-gray-200);
+}
+.merdeka-import-template h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.merdeka-import-file-field {
+  padding: 20px;
+  border: 1px dashed var(--mdka-gray-300);
+  border-radius: 6px;
+  background: var(--mdka-gray-50);
+}
+.merdeka-import-file-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mdka-gray-600);
+}
+.merdeka-import input[type='file'] {
+  height: auto;
+  min-height: 38px;
+  background: white;
+  border: 1px solid var(--mdka-gray-300);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  max-width: 100%;
+}
+.merdeka-import input[type='file']::file-selector-button {
+  background: var(--mdka-gray-100);
+  color: var(--mdka-gray-700);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-right: 12px;
+}
+.merdeka-import button {
+  font-size: 12px;
+  border-radius: 6px;
+}
+.merdeka-import .merdeka-import-card-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--mdka-gray-200);
+  gap: 12px;
+}
+.merdeka-import-guidance {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.merdeka-import-steps {
+  display: grid;
+  gap: 20px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.merdeka-import-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.merdeka-import-step-number {
+  flex: none;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--mdka-blue-50);
+  color: var(--mdka-blue-600);
+  font-size: 12px;
+  font-weight: 600;
+}
+.merdeka-import-steps h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.merdeka-import-steps p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mdka-gray-500);
+}
+.merdeka-import-rules {
+  display: grid;
+  gap: 14px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.merdeka-import-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.merdeka-import-rules svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--mdka-blue-600);
+}
+.merdeka-import-rules strong {
+  font-weight: 600;
+}
+.merdeka-import-columns {
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 6px;
+  padding: 14px 16px;
+}
+.merdeka-import-columns summary {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.merdeka-import-columns > div {
+  margin-top: 12px;
+}
+.merdeka-import-columns > div > div {
+  overflow-wrap: anywhere;
+  padding: 5px 8px;
+  background: var(--mdka-gray-50);
+  border-radius: 4px;
+  color: var(--mdka-gray-600);
+}
+@media (max-width: 1199.98px) {
+  .merdeka-import-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .merdeka-import-guidance {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 575.98px) {
+  .merdeka-import-guidance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .merdeka-import .merdeka-import-card-header,
+  .merdeka-import .merdeka-import-card-body,
+  .merdeka-import .merdeka-import-card-footer {
+    padding: 16px;
+  }
+  .merdeka-import-template {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .merdeka-import-file-field {
+    padding: 14px;
+  }
+  .merdeka-import-card-footer button {
+    flex: 1;
+  }
+}

@@ -1,115 +1,251 @@
-
-import { ReactNode, useEffect, useState } from "react";
-import { useAuth } from "@/services/auth-service";
-import { useUserPreferences } from "@/services/user-preferences-service";
-import { useNavigate } from "react-router-dom";
-import { Box, AppBar, Toolbar, IconButton, Typography, Drawer, useMediaQuery, useTheme, CircularProgress } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import { Sidebar } from "./Sidebar";
+import { ReactNode, useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Drawer, useMediaQuery } from '@mui/material';
+import { authService, useAuth } from '@/services/auth-service';
+import { userPreferencesService } from '@/services/user-preferences-service';
+import { Sidebar } from './Sidebar';
+import '@/styles/merdeka.css';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
+const titles: Record<string, string> = {
+  dashboard: 'Dashboard',
+  hires: 'New Hires',
+  import: 'Import Data',
+  'onboard-email': 'Onboard Welcome Email',
+  'hris-sync': 'HRIS Sync',
+  settings: 'Settings',
+  'workflow-demo': 'Workflow Demo',
+};
+
 export function MainLayout({ children }: MainLayoutProps) {
-  const { isAuthenticated } = useAuth();
-  const { getPreference } = useUserPreferences();
+  const { getCurrentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery('(max-width:991.98px)');
+  const user = getCurrentUser();
+  const routePath = pathname.replace(/\/+$/, '') || '/';
+  const section = routePath.split('/')[1];
+  const title = titles[section] || 'MTI Onboarding';
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const authenticated = await isAuthenticated();
+    let active = true;
+    document.body.dataset.merdekaUi = 'true';
+    const checkSession = async () => {
+      const authenticated = await authService.verifyToken();
+      if (!active) return;
       if (!authenticated) {
-        navigate("/login");
+        navigate('/login', { replace: true });
+        return;
       }
       setIsLoading(false);
+      try {
+        const preferences = await userPreferencesService.getPreferences();
+        if (active) setSidebarCollapsed(Boolean(preferences.sidebarCollapsed));
+      } catch (error) {
+        console.error('Failed to load sidebar preference:', error);
+      }
     };
-    
-    checkAuth();
-  }, [isAuthenticated, navigate]);
+    void checkSession();
+    return () => {
+      active = false;
+      delete document.body.dataset.merdekaUi;
+    };
+  }, [navigate]);
 
-  // Load sidebar preference only once on component mount
   useEffect(() => {
-    if (!preferencesLoaded) {
-      const loadSidebarPreference = async () => {
-        try {
-          const savedCollapsed = await getPreference('sidebarCollapsed', false);
-          setSidebarCollapsed(Boolean(savedCollapsed));
-          setPreferencesLoaded(true);
-        } catch (error) {
-          console.error('Failed to load sidebar preference in MainLayout:', error);
-          setPreferencesLoaded(true);
-        }
-      };
-      
-      loadSidebarPreference();
-    }
-  }, [getPreference, preferencesLoaded]);
+    if (!isMobile) setMobileOpen(false);
+  }, [isMobile]);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
-  const handleSidebarCollapseChange = (collapsed: boolean) => {
-    setSidebarCollapsed(collapsed);
-  };
-
-  if (isLoading) {
-    return <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>;
-  }
-
-  const drawerWidth = sidebarCollapsed ? 60 : 240;
+  const initials = String(user?.username || 'User')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1, display: { md: 'none' } }}>
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}>
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6">MTI Onboarding</Typography>
-        </Toolbar>
-      </AppBar>
-      <Drawer
-        variant={isMobile ? 'temporary' : 'permanent'}
-        open={isMobile ? mobileOpen : true}
-        onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          transition: 'width 0.3s ease-in-out',
-          '& .MuiDrawer-paper': { 
-            width: drawerWidth, 
-            boxSizing: 'border-box',
-            transition: 'width 0.3s ease-in-out',
-            overflow: 'hidden'
-          },
-        }}
-      >
-        <Sidebar onClose={isMobile ? handleDrawerToggle : undefined} onCollapseChange={handleSidebarCollapseChange} collapsed={sidebarCollapsed} />
-      </Drawer>
-      <Box 
-        component="main" 
-        sx={{ 
-          flexGrow: 1, 
-          p: 3, 
-          overflow: 'auto', 
-          mt: { xs: 8, md: 0 },
-          width: `calc(100vw - ${drawerWidth}px)`,
-          transition: 'width 0.3s ease-in-out',
-          minHeight: '100vh',
-          boxSizing: 'border-box'
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
+    <div
+      className={`merdeka-surface merdeka-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+    >
+      <a className="merdeka-skip-link" href="#main-content">
+        Skip to content
+      </a>
+      {isLoading ? (
+        <div className="merdeka-session-loader" role="status">
+          Checking session…
+        </div>
+      ) : (
+        <div className="page">
+          {!isMobile && (
+            <aside
+              className={`navbar navbar-vertical navbar-expand-lg mdka-bg-gray-50 merdeka-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}
+            >
+              <Sidebar
+                collapsed={sidebarCollapsed}
+                onCollapseChange={setSidebarCollapsed}
+              />
+            </aside>
+          )}
+          <Drawer
+            anchor="left"
+            open={isMobile && mobileOpen}
+            onClose={() => setMobileOpen(false)}
+            ModalProps={{ keepMounted: true }}
+            PaperProps={{ sx: { width: 240 } }}
+          >
+            <div className="merdeka-surface merdeka-mobile-sidebar">
+              <Sidebar collapsed={false} onClose={() => setMobileOpen(false)} />
+            </div>
+          </Drawer>
+          <header className="navbar navbar-expand-md merdeka-topbar">
+            <div className="container-fluid">
+              <div className="merdeka-header-heading">
+                {isMobile && (
+                  <button
+                    className="merdeka-icon-button"
+                    aria-label="Open navigation"
+                    aria-expanded={mobileOpen}
+                    onClick={() => setMobileOpen(true)}
+                  >
+                    <i className="ti ti-menu-2" aria-hidden="true" />
+                  </button>
+                )}
+                {isMobile && (
+                  <img
+                    className="merdeka-mobile-logo"
+                    src="/merdeka/branding/mbm-logo.svg"
+                    alt="Merdeka Battery Materials"
+                  />
+                )}
+                {!isMobile && (
+                  <svg
+                    className="merdeka-header-chevron"
+                    aria-hidden="true"
+                    width="5"
+                    height="8"
+                    viewBox="0 0 5 8"
+                    fill="none"
+                  >
+                    <path
+                      d="M4.25 0.75L0.75 4L4.25 7.25"
+                      stroke="#64748B"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+                <span className="merdeka-header-title">{title}</span>
+              </div>
+              <div className="merdeka-header-account">
+                <span className="merdeka-company">
+                  PT. MERDEKA TSINGSHAN INDONESIA
+                </span>
+                <div
+                  className="merdeka-user"
+                  title={`${user?.username || 'User'} · ${user?.role || ''}`}
+                >
+                  <span className="merdeka-avatar" aria-hidden="true">
+                    {initials}
+                  </span>
+                  <span className="merdeka-user-info">
+                    <strong>{user?.username || 'User'}</strong>
+                    <small>{user?.role}</small>
+                  </span>
+                </div>
+                <span
+                  className="merdeka-account-separator"
+                  aria-hidden="true"
+                />
+                <button
+                  className="merdeka-icon-button merdeka-logout"
+                  aria-label="Logout"
+                  title="Logout"
+                  onClick={logout}
+                >
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M15.75 8.75L19.25 12L15.75 15.25"
+                      stroke="#F43F5E"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    ></path>
+                    <path
+                      d="M19 12H10.75"
+                      stroke="#F43F5E"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    ></path>
+                    <path
+                      d="M15.25 4.75H6.75C5.64543 4.75 4.75 5.64543 4.75 6.75V17.25C4.75 18.3546 5.64543 19.25 6.75 19.25H15.25"
+                      stroke="#F43F5E"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </header>
+          <div className="page-wrapper">
+            <div className="page-header">
+              <div className="container-xl">
+                <nav aria-label="Breadcrumb">
+                  <ol className="breadcrumb breadcrumb-arrows">
+                    <li className="breadcrumb-item">
+                      <Link to="/dashboard">Dashboard</Link>
+                    </li>
+                    {section !== 'dashboard' && (
+                      <li
+                        className="breadcrumb-item active"
+                        aria-current="page"
+                      >
+                        {section === 'hires' && routePath !== '/hires' ? (
+                          <Link to="/hires">New Hires</Link>
+                        ) : (
+                          title
+                        )}
+                      </li>
+                    )}
+                    {section === 'hires' && routePath !== '/hires' && (
+                      <li
+                        className="breadcrumb-item active"
+                        aria-current="page"
+                      >
+                        {routePath === '/hires/new'
+                          ? 'Add New Hire'
+                          : 'Hire Details'}
+                      </li>
+                    )}
+                  </ol>
+                </nav>
+              </div>
+            </div>
+            <main
+              id="main-content"
+              className={`container-xl merdeka-main${routePath === '/hires' ? '' : ' merdeka-legacy'}`}
+              tabIndex={-1}
+            >
+              {children}
+            </main>
+            <footer className="merdeka-footer">
+              MTI Onboarding · New Hire Management
+            </footer>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

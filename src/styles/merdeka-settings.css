@@ -1,0 +1,232 @@
+/* Settings layout adapter. Existing settings components own values and actions. */
+.merdeka-settings {
+  color: var(--mdka-gray-800);
+  padding-bottom: 24px;
+}
+.merdeka-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.merdeka-settings-heading h1 {
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.merdeka-settings-heading p {
+  font-size: 13px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-settings-heading > button {
+  gap: 8px;
+  font-size: 12px;
+}
+.merdeka-settings-heading > button svg {
+  width: 18px;
+  height: 18px;
+}
+.merdeka-settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.merdeka-settings-menu {
+  border: 1px solid var(--mdka-gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+.merdeka-settings-menu h2 {
+  margin: 0;
+  padding: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--mdka-gray-50);
+  border-bottom: 1px solid var(--mdka-gray-100);
+}
+.merdeka-settings-navigation {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.merdeka-settings-navigation > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: #475569;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.merdeka-settings-navigation > button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  color: #64748b;
+}
+.merdeka-settings-navigation > button.active {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+.merdeka-settings-navigation > button.active svg {
+  color: #2563eb;
+}
+.merdeka-settings-navigation > button:hover {
+  background: #f1f5f9;
+}
+.merdeka-settings-navigation > button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+.merdeka-settings-content {
+  min-width: 0;
+}
+.merdeka-settings-content [class~='bg-card'][class~='border'] {
+  border-color: var(--mdka-gray-200);
+  border-radius: 8px;
+  box-shadow: none;
+  min-width: 0;
+  overflow: hidden;
+}
+.merdeka-settings-content
+  [class~='bg-card'][class~='border']
+  > [class~='flex-col'][class~='p-6'] {
+  padding: 16px 20px;
+  background: var(--mdka-gray-50);
+  border-bottom: 1px solid var(--mdka-gray-100);
+}
+.merdeka-settings-content
+  [class~='bg-card'][class~='border']
+  > [class~='flex-col'][class~='p-6']
+  h3 {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.merdeka-settings-content
+  [class~='bg-card'][class~='border']
+  > [class~='flex-col'][class~='p-6']
+  p {
+  font-size: 12px;
+  color: var(--mdka-gray-500);
+}
+.merdeka-settings-content
+  [class~='bg-card'][class~='border']
+  > [class~='p-6']:not([class~='flex-col']) {
+  padding: 20px;
+}
+.merdeka-settings-content
+  [class~='bg-card'][class~='border']
+  > [class~='items-center'][class~='p-6'] {
+  border-top: 1px solid var(--mdka-gray-100);
+  padding: 16px 20px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.merdeka-settings-content label {
+  font-size: 12px;
+  color: var(--mdka-gray-600);
+  line-height: 1.5;
+}
+.merdeka-settings-content input:not([type='checkbox']):not([type='radio']),
+.merdeka-settings-content select,
+.merdeka-settings-content button[role='combobox'] {
+  font-size: 13px;
+  min-height: 36px;
+  border-color: var(--mdka-gray-300);
+  border-radius: 6px;
+}
+.merdeka-settings-content textarea {
+  font-size: 13px;
+  border-color: var(--mdka-gray-300);
+  border-radius: 6px;
+}
+.merdeka-settings-content button {
+  font-size: 12px;
+}
+.merdeka-settings-content table {
+  font-size: 12px;
+}
+.merdeka-settings-content th,
+.merdeka-settings-content td {
+  padding: 12px;
+}
+.merdeka-settings-content .relative.w-full.overflow-auto {
+  max-width: 100%;
+}
+.merdeka-settings-content [role='tablist'] {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  gap: 4px;
+  padding: 4px;
+}
+.merdeka-settings-content [role='tab'] {
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: normal;
+}
+.merdeka-settings-drawer {
+  font-family: Inter, system-ui, sans-serif;
+}
+.merdeka-settings-drawer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.merdeka-settings-drawer-heading h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+@media (max-width: 1100px) {
+  .merdeka-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 575.98px) {
+  .merdeka-settings-heading {
+    align-items: flex-start;
+  }
+  .merdeka-settings-heading > button {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .merdeka-settings-content
+    [class~='bg-card'][class~='border']
+    > [class~='p-6'] {
+    padding: 16px !important;
+  }
+  .merdeka-settings-content [class~='items-center'][class~='p-6'] button {
+    white-space: normal;
+    height: auto;
+    min-height: 36px;
+  }
+}
+/* Shared settings tables scroll inside their panel on narrow screens. */
+.merdeka-settings-content div:has(> table) {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.merdeka-settings {
+  overflow-x: clip;
+}
+.merdeka-shell:has(.merdeka-settings) .page {
+  overflow-x: clip;
+}
