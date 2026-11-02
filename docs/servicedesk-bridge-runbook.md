@@ -114,3 +114,25 @@ working observation from request holds; HELD is not an eligible onboarding reque
 Rollback for first observation install: stop/remove only the new bridge container,
 retain protected env/evidence and health volume. Never stop the active app/database.
 No database rollback is required for observation because it does not migrate or write.
+
+
+## Prepared release evidence - activation pending
+
+Source image commit 90e5be94da4b32e407e87e629f7a925669b95c51 is pushed and verified
+on origin/codex/merdeka-ui. Exact-archive SHA-256:
+0e93ee840cb5b3184c91e81fcc1fc4c721a8137c15d47c52ba9f7b5fd0f1a9c3.
+Server candidate mti-servicedesk-bridge:90e5be94da4b:
+sha256:44359c9a0515e1fe7fabd2730dae5c4d6bef2eceaa67089b643ac2ec2c46054c.
+Seven bridge tests passed inside this Node 22 image, network disabled/read-only.
+TLS/DNS read without a credential reached ServiceDesk (HTTP 400), certificate verified.
+Existing backend/frontend container IDs and images were retained.
+Candidate audit/build/test logs are under the protected deployment candidates/commit
+directory; concrete compose.json is prepared. No bridge container was activated.
+
+Automatic approval review rejected copying the active application's DB credentials
+into a new persistent bridge credential file because that expands secret access and
+blast radius without explicit consent. The credential-copy action did not execute;
+bridge.env was verified absent. User consent was requested and remains pending.
+Do not retry that copy or activate the service until the user decides. A separate
+observer without database credentials is the alternative offered. No migration ran.
+The documentation commit may be newer than the prepared image; no source code changed.
