@@ -1,0 +1,28 @@
+# Deploy from an exact-commit archive. Keep env file outside source/build context.
+# No host ports and no backend/frontend restart.
+services:
+  servicedesk-bridge:
+    image: ${SDP_BRIDGE_IMAGE:?exact bridge image required}
+    env_file:
+      - path: ${SDP_BRIDGE_ENV_FILE:?protected server env file required}
+        format: raw
+    environment:
+      SDP_BRIDGE_MODE: observe
+      SDP_BRIDGE_TEMPLATE_ID: '905'
+      SDP_BRIDGE_WORKFLOW_ID: '2'
+      SDP_BRIDGE_SITE_ID: '322'
+      SDP_BRIDGE_DEFAULT_SITE_NAME: Merdeka Tsingshan Indonesia
+      SDP_BRIDGE_REQUESTER_IDS: '18621'
+      SDP_BRIDGE_HR_IDS: '18622'
+      SDP_BRIDGE_IT_IDS: '18623'
+      SDP_UPLOAD_ROOT: /app/uploads
+    volumes:
+      - /root/audit-trail-guardian-system/uploads:/app/uploads:ro
+      - bridge-state:/state
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  bridge-state:

@@ -88,3 +88,74 @@ Route auth, disabled/config failure, validation, grade allowlist, dry run, dupli
 revision handling, and sanitized errors are covered. SQL migration/concurrency and deployment are pending.
 The existing weak legacy application auth remains a separate hardening issue; this endpoint does not use it.
 This milestone is a foundation, not an end-to-end onboarding integration.
+
+
+## I2 read-only evidence foundation — 2 November 2026
+
+Implemented a standalone read-only client and diagnostic gate in servicedesk-evidence.js.
+It is NOT mounted, scheduled, or connected to hire creation. It follows no redirects,
+uses HTTPS, bounded pagination/timeouts, sanitizes upstream errors, and rereads request
+data to detect edits during evidence collection. No external response bodies are logged.
+The gate validates allowlisted template/workflow/actual decision-maker IDs, both levels,
+individual decisions, order, and unresolved old/deleted cycles. It ALWAYS holds processing
+until a trusted approved-data snapshot binding exists. Current Approved status and a hash
+of current values do not establish that those values were approved. I2 remains incomplete.
+
+Live GET observations on request 7297: HR level 304 approved; IT level 307 pending.
+Approval levels expose System as action_taken_by, so use individual approval action_by
+for human identity. GET requests/{id}/approval_levels and each level's /approvals work
+with the configured on-prem API credential. Never use cloud API assumptions for this host.
+Department udf_pick_2865 and manager udf_pick_2866 currently return display strings,
+not reference IDs. Resolve uniquely against a trusted master; ambiguous/missing matches
+must hold intake. Resource detail mapping, date timezone semantics, and approved-revision
+binding remain pending. Do not invent a numeric revision from last_updated_time.
+
+The supplied SRF is one completed page, including personal data and handwritten signatures.
+Use its geometry/branding as a reference; never reuse it as an unchanged background.
+Generate clean fields and electronic approval evidence from verified records. The original
+paper's direct-manager/conditional HR labels differ from the agreed TA > HR > IT workflow;
+retain truthful role labels in the digital derivative. No PDF or signatures have been sent.
+
+Validation: node --test tests/servicedesk-intake.node.test.js tests/servicedesk-evidence.node.test.js.
+All tests use synthetic data. Live reads were read-only; no approval or request was changed.
+
+Read-only runtime evidence: the new client successfully read actual request 7297 and both approval decision lists. Diagnostic result FINAL_APPROVAL_PENDING (HR 304 Approved, IT 307 Pending Approval).
+SRF synthetic visual prototype: C:/Scripts/Projects/snipeit-project/output/pdf/MTI-New-Hire-SRF-synthetic-preview.pdf. It is a layout review artifact, not a reusable production generator, not an attachment, and not an approved SRF. No source handwritten signatures were retained.
+
+
+## Authorized scoped server test implementation - 2 November 2026
+
+The user instructed continuation through server-side test preparation. Runtime inspection
+found the active backend on Material-UI-LDAPTS / 286b867 with a local Dockerfile edit.
+Do not replace or update that checkout. Build a separate exact-commit bridge image from
+codex/merdeka-ui and add only a standalone integration Compose service. Existing backend,
+frontend, mounts and runtime env remain retained. No provisioning or notifications.
+
+Implementation scope: independent approval plus full paginated history verification,
+exact site-scoped master matching, Asia/Makassar date normalization, clean versioned SRF,
+durable idempotent jobs, attachment acknowledgment, and explicit allowlisted SQL promotion.
+Deploy observation first, restricted to template 905 / workflow 2 / requester 18621 /
+HR actor 18622 / IT actor 18623 / MTI site 322. Mutating processing remains off until
+live filled-resource and final-approval UAT evidence exists. Polling avoids editing the
+ServiceDesk workflow and does not send or decide any approval.
+
+History proof rule for the first approval cycle: complete history through CREATE and
+both individual decisions, no unrecognized operations or business field edits after
+the first HR decision. A concurrent source change or unavailable history must hold.
+Preserve all old approval history. Multiple/deleted approval cycles and revisions of an
+already-linked hire require manual review, never automatic approval-record deletion.
+The bridge targets the observed live hires.name/audit_logs.new_hire_id schema, not the
+stale bootstrap schema. Keep a dedicated job state and preserve every generated file.
+
+
+## Current candidate after I2/I3/I4/I5 implementation
+
+See servicedesk-bridge-runbook.md for the current authoritative scoped profile and
+limits. The earlier foundation sections are implementation history. The standalone
+bridge now includes history-based first-cycle verification, actual field mapping,
+clean PDF rendering, immutable job state, attachment acknowledgment/reconciliation,
+and explicit transactional hire linkage. Only observation is being released; process
+mode, migration, real attachment delivery and end-to-end acceptance remain pending.
+13 synthetic tests passed and seven exact SQL batches passed against temporary copies
+of actual live schema with rollback. No legacy app authentication/provisioning path is used.
+The manual bridge migration is separate from I1 inbox SQL; neither has been applied.

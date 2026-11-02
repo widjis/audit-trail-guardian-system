@@ -1,0 +1,14 @@
+{
+  "name": "mti-servicedesk-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "mssql": "10.0.4",
+    "pdf-lib": "1.17.1",
+    "zod": "3.23.8"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
