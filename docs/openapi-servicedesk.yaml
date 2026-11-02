@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: ServiceDesk intake contract
+  version: 1.0.0
+paths:
+  /integrations/servicedesk/new-hires:
+    post:
+      summary: Receive an approved New Hire claim for independent verification
+      description: Disabled by default. Writes only an inbox receipt, never creates hires or provisions accounts.
+      security:
+        - IntegrationBearer: []
+      parameters:
+        - in: query
+          name: dry_run
+          schema: {type: string, enum: ['true']}
+          description: Validate without inserting an inbox receipt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Intake'
+      responses:
+        '200': {description: Dry run passed or identical receipt replay}
+        '201': {description: Receipt persisted as RECEIVED_PENDING_VERIFICATION; hire_created=false}
+        '400': {description: Unsupported query parameter}
+        '401': {description: Invalid independent integration credential}
+        '409': {description: Existing revision contains different data}
+        '415': {description: JSON content type required}
+        '422': {description: Contract, approval claim, template or active grade validation failed}
+        '503': {description: Integration disabled, unconfigured, or storage unavailable}
+components:
+  securitySchemes:
+    IntegrationBearer: {type: http, scheme: bearer}
+  schemas:
+    Identity:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        name: {type: string, minLength: 1, maxLength: 250}
+    Intake:
+      type: object
+      additionalProperties: false
+      required: [schema_version, request_id, template_id, revision, requester, employee, requirements, approvals]
+      properties:
+        schema_version: {type: integer, enum: [1]}
+        request_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        template_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        revision: {type: integer, minimum: 1, maximum: 2147483647}
+        requester: {$ref: '#/components/schemas/Identity'}
+        employee:
+          type: object
+          additionalProperties: false
+          required: [name, title, position_grade, department_id, department_name, direct_manager_id, direct_manager_name, site_id, site_name, join_date]
+          properties:
+            name: {type: string, minLength: 1, maxLength: 250}
+            employee_id: {type: string, minLength: 1, maxLength: 250}
+            title: {type: string, minLength: 1, maxLength: 250}
+            position_grade: {type: string, minLength: 1, maxLength: 250, description: Exact active onboarding master value}
+            department_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+            department_name: {type: string, minLength: 1, maxLength: 250}
+            direct_manager_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+            direct_manager_name: {type: string, minLength: 1, maxLength: 250}
+            site_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+            site_name: {type: string, minLength: 1, maxLength: 250}
+            join_date: {type: string, format: date}
+        requirements:
+          type: object
+          additionalProperties: false
+          required: [equipment, ad_login, email_account, mailing_lists, shared_folders]
+          properties:
+            equipment: {type: string, nullable: true, enum: [Desktop, Notebook, null]}
+            ad_login: {type: boolean}
+            email_account: {type: boolean}
+            mailing_lists: {type: array, maxItems: 100, items: {type: string, minLength: 1, maxLength: 250}}
+            shared_folders:
+              type: array
+              maxItems: 100
+              items:
+                type: object
+                additionalProperties: false
+                required: [path, access]
+                properties:
+                  path: {type: string, minLength: 1, maxLength: 1000}
+                  access: {type: string, enum: [Read, Modify]}
+        approvals:
+          type: array
+          minItems: 2
+          maxItems: 2
+          description: Exactly HR then Site IT Head with nondecreasing decision timestamps; claims are independently verified later.
+          items:
+            type: object
+            additionalProperties: false
+            required: [stage, approver_id, approver_name, decision, decided_at]
+            properties:
+              stage: {type: string, enum: [hr, site_it_head]}
+              approver_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+              approver_name: {type: string, minLength: 1, maxLength: 250}
+              decision: {type: string, enum: [approved]}
+              decided_at: {type: string, format: date-time}
+              comment: {type: string, maxLength: 4000, default: ''}
+        notes: {type: string, maxLength: 8000, default: ''}

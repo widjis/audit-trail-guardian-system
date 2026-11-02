@@ -28,6 +28,11 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Independent authenticated machine intake; disabled unless explicitly configured.
+import { createServiceDeskRouter } from './routes/servicedesk-integration.js';
+import { serviceDeskInboxStore } from './services/servicedesk-inbox-store.js';
+app.use('/api/integrations/servicedesk', createServiceDeskRouter({ store: serviceDeskInboxStore }));
+
 // Custom middleware to attach user object to request
 app.use(extractUser);
 app.use(getCurrentUser);
