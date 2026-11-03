@@ -21,7 +21,7 @@ export async function processRequest(id, { source, store, config, render = rende
   catch (error) {
     if (error.code !== 'ENOENT') throw error;
     if(job.document_hash) throw new Hold('DOCUMENT_MISSING');
-    bytes = await render(payload);
+    bytes = await render(payload, { requestedAt: Number(evidence.request.created_time?.value) });
     // Immutable file: concurrent writers may not overwrite a previous artifact.
     try { await writeFile(file,bytes,{flag:'wx',mode:0o640}); }
     catch (writeError) { if(writeError.code!=='EEXIST') throw writeError;bytes=await readFile(file); }

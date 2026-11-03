@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "source_docx_sha256": "400db55ee1c0af0e2d3d038b40cb88cf33e367fd5030ee5797e78c1d523bce00",
+  "source_pdf_sha256": "2282fbada87a3a69ec85ae79d0ca8c7775e2b9f2b5c051ecad52358f64bb142b",
+  "base_pdf_sha256": "ee4ee771b4c236e08aec15ecdd9459034b7372078db2c14a9cfc7fe55b396907",
+  "continuation_pdf_sha256": "40423eab9cd6ad132e1072ff5bb17332b0f903be623060b58776735ef14c6a96",
+  "page_size": [
+    595.3200073242188,
+    841.9199829101562
+  ],
+  "redaction_rects": [
+    [
+      162.6199951171875,
+      155.42001342773438,
+      296.15985107421875,
+      166.4600067138672
+    ],
+    [
+      162.6199951171875,
+      185.05996704101562,
+      296.15985107421875,
+      196.09996032714844
+    ],
+    [
+      241.49000549316406,
+      482.3499755859375,
+      375.12908935546875,
+      493.3899841308594
+    ],
+    [
+      162.6199951171875,
+      169.81997680664062,
+      234.73329162597656,
+      180.85997009277344
+    ],
+    [
+      162.6199951171875,
+      199.81997680664062,
+      283.6515197753906,
+      210.85997009277344
+    ],
+    [
+      442.17999267578125,
+      482.3499755859375,
+      506.2229309082031,
+      493.3899841308594
+    ],
+    [
+      415.6300048828125,
+      495.78997802734375,
+      472.7398681640625,
+      506.8299865722656
+    ],
+    [
+      217.0,
+      588.7,
+      402.0,
+      614.3
+    ],
+    [
+      226.8,
+      656.8,
+      392.0,
+      668.1
+    ]
+  ],
+  "authority": "MTI-HRM-ICT-FRM-002_Rev.000 - Service Request Form (3).docx",
+  "intentional_changes": [
+    "Remove content-control placeholder text from generated PDF.",
+    "HR caption: HR Manager / Superintendent; no conditional SIM-only caption for New Hire.",
+    "IT caption: Site IT Head / Superintendent.",
+    "Direct Manager paper approval slot remains N/A; manager is information only.",
+    "Extra onboarding fields use justification space; long content continues on a detail page."
+  ]
+}

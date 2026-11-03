@@ -90,9 +90,14 @@ test('ambiguous upload timeout does not cause a second attachment or a hire',asy
 test('long approved access lists are preserved over continuation pages',async()=>{
   const p=await mapApprovedRequest(fixture(),config,masters);
   p.requirements.shared_folders=Array.from({length:70},(_,i)=>({path:`\\\\test-server\\synthetic-long-share-${i}`,access:'Read'}));
-  const pdf=await PDFDocument.load(await renderSrf(p));assert.ok(pdf.getPageCount()>1);
+  p.employee.name='Synthetic long employee name '.repeat(8).trim();
+  p.notes='Synthetic approved justification with preserved detail. '.repeat(45);
+  const bytes=await renderSrf(p);
+  const pdf=await PDFDocument.load(bytes);assert.ok(pdf.getPageCount()>1);
+  for(const page of pdf.getPages()) {assert.ok(Math.abs(page.getWidth()-595.32)<0.02);assert.ok(Math.abs(page.getHeight()-841.92)<0.02);}
+  if(process.env.SDP_LONG_PDF_OUTPUT){const {writeFile}=await import('node:fs/promises');await writeFile(process.env.SDP_LONG_PDF_OUTPUT,bytes);}
 });
 
 // Optional local visual QA output, containing synthetic data only.
 if(process.env.SDP_SYNTHETIC_PDF_OUTPUT){const p=await mapApprovedRequest(fixture(),config,masters);
-  const {writeFile}=await import('node:fs/promises');await writeFile(process.env.SDP_SYNTHETIC_PDF_OUTPUT,await renderSrf(p));}
+  const {writeFile}=await import('node:fs/promises');await writeFile(process.env.SDP_SYNTHETIC_PDF_OUTPUT,await renderSrf(p,{requestedAt:Date.parse('2026-11-01T14:00:00Z')}));}

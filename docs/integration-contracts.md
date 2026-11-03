@@ -159,3 +159,14 @@ mode, migration, real attachment delivery and end-to-end acceptance remain pendi
 13 synthetic tests passed and seven exact SQL batches passed against temporary copies
 of actual live schema with rollback. No legacy app authentication/provisioning path is used.
 The manual bridge migration is separate from I1 inbox SQL; neither has been applied.
+
+
+## SRF layout update - 3 November 2026
+
+Generator now uses sanitized native-Word PDF layouts derived from the supplied blank
+DOCX, preserving original page furniture and form structure. See servicedesk-srf-layout.md
+for exact source hash, minimal role-caption deviations, fields left blank and visual QA.
+The worker forwards source created_time only as requested-date rendering metadata;
+HTTP payload/schema and approval/provisioning logic remain unchanged. Final code passed
+13 synthetic tests and 70-folder/full-text extraction QA. Local edits only; server image
+90e5be9 and its pending activation/credential gate are not modified by this layout task.
