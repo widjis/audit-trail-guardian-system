@@ -1,5 +1,17 @@
 # ServiceDesk New Hire Integration
 
+## Current runtime - 3 November 2026
+
+Restricted bridge deployment 65ea705 is healthy in the existing onboarding Compose
+project/folder, process mode only for 905 and the three tester identities. Native DOCX
+layout and additive job migration are deployed. Source API/DB and app HTTP were verified;
+no linked hire yet because existing tester requests are pending/incomplete. Full user
+approval/attachment/onboarding/replay UAT remains open. I1 HTTP intake itself is not
+deployed into the retained backend; this active bridge uses independent polling.
+See servicedesk-bridge-runbook.md for current profile/evidence; older milestone text
+below is historical and does not override the current runtime status.
+
+
 ## Approved direction — 2 November 2026
 
 TA submits in ServiceDesk. HR makes the first decision, then Site IT Head approves.

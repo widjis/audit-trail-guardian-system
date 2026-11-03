@@ -1,5 +1,51 @@
 # ServiceDesk bridge server test runbook
 
+## Active restricted server deployment - 3 November 2026
+
+User explicitly approved the existing env changes and DB access for test template 905.
+Deployed bridge source commit: 65ea705c0c106662c85473f9a9fc70e088cfd73a.
+Image: audit-trail-guardian-system-servicedesk:65ea705c0c10;
+ID sha256:91a50f78ad990acf382b7044be90ed12d6f4078642ca97cc366eb8cc51b94dcc.
+Compose project: audit-trail-guardian-system. Container: its servicedesk-bridge service.
+Root: /root/audit-trail-guardian-system; override docker-compose.servicedesk.yml.
+Configuration: existing .env.production, protected backup and mode 600. No separate DB
+credential file was created. Only explicit DB and SDP environment keys reach the service.
+State: .runtime/servicedesk; source: .releases/servicedesk/commit; protected evidence and
+env recovery copies: .release-audit/servicedesk/commit, all below the same onboarding root.
+The older standalone directory/image are historical preparations, not the active service.
+
+Mode process is active only for template 905, workflow 2, requester 18621, HR actor 18622,
+IT actor 18623 and MTI site 322. Poll interval 30 seconds. No public port/webhook listener
+is exposed by this bridge. The separate I1 HTTP intake route is not deployed into the
+retained old backend image; the active path independently polls ServiceDesk approvals.
+The sanitized DOCX-based SRF layout is included in this deployed image.
+
+Applied additive dbo.servicedesk_bridge_jobs migration: 12 expected columns and primary
+key verified; no existing business table was altered. Health, source API and DB access
+verified. At verification, source 7297/7302 both HELD FINAL_APPROVAL_PENDING; jobs=0,
+linked hires=0. Neither is end-to-end acceptance. Both old requests also lack Position
+Grade, so use a fresh complete tester request rather than assuming they can promote.
+Frontend 9001 and backend settings 9002 returned HTTP 200, six active grades available.
+Existing backend/frontend container IDs and images were retained unchanged.
+
+13 local integration tests and 7 image tests passed. Complete user UAT is still pending:
+TA tester submits synthetic New Hire, HR and IT testers make their own decisions,
+then verify one SRF attachment on ticket, matching local SRF bytes, one linked onboarding
+hire/audit record and replay without duplicates. Do not impersonate test approvers or
+trigger AD/Exchange/Graph/WhatsApp fulfillment to prove the integration works.
+
+Operational rollback: stop only servicedesk-bridge, or change SDP_BRIDGE_MODE to observe
+and recreate only that service. Keep existing app containers and new additive job table,
+documents and approval history. Restore the protected env backup only after reviewing
+other subsequent env changes; never overwrite newer configuration blindly.
+Documentation HEAD may be newer than the image SHA; docs-only updates need no rebuild.
+
+## Historical preparation and design notes
+
+Earlier not-deployed/pending-credential statements below describe previous milestones;
+the active status above supersedes them. Full business UAT remains pending.
+
+
 ## Current scope
 
 Standalone polling bridge, independent of the existing backend/frontend release.
