@@ -1,5 +1,14 @@
 # ServiceDesk New Hire Integration
 
+## Verified UAT 7309
+
+Latest bridge image source is 0c189e5. UAT 7309 is COMPLETE with one linked hire,
+one original PDF attachment and one intake audit. Repeated polling is idempotent;
+both systems' PDF bytes match, and onboarding preview/download work. Actual TA/HR/IT
+decisions were retained. See the runbook's latest entry for exact IDs, hashes and limits.
+This supersedes earlier pending-UAT/active-65ea705 status; other cases remain unverified.
+
+
 ## Current runtime - 3 November 2026
 
 Restricted bridge deployment 65ea705 is healthy in the existing onboarding Compose

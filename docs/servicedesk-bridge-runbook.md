@@ -1,5 +1,46 @@
 # ServiceDesk bridge server test runbook
 
+## Latest verified UAT and release - 3 November 2026
+
+UAT request 7309 completed the TA > HR > IT happy path. Original decisions remain
+Approved; request remains In Progress. No approvals or source fields were edited by
+the integration. Original approved data revision 134992 is retained.
+
+Active bridge commit: 0c189e5571baec0f1760ab8dc425b0822659a06f.
+Image: audit-trail-guardian-system-servicedesk:0c189e5571ba;
+ID sha256:796dfa8b8fadd8feac0f71421de2a32a1c5ee80512c46032d2e19809787b3357.
+Same onboarding folder/Compose/test identities as below; backend/frontend retained.
+17 local tests and 11 tests inside the final candidate image passed. Seven final SQL
+mutation batches passed on temporary live-schema copies with rollback before deployment.
+
+Observed result:
+- One COMPLETE job for request 7309/revision 134992.
+- One linked hire 20e8d0eb-d2a9-4b77-80a3-ca070c2fd369, one ServiceDesk Intake audit.
+- One PDF attachment in ServiceDesk, ID 29499. Existing ATTACHED state recovered without
+  uploading a second file. Local and remote PDF SHA-256:
+  573f70da344dd7bbbe0008c0dfb33c12714a7903a913ae29394039b0a7cae2cb.
+- Backend /api/hires/id, /srf-preview and /srf-download work; preview/download return the
+  same PDF. The existing frontend srf-service uses /srf-download, not /srf-document GET.
+  Do not assume frontend port 9001 proxies /api; current backend API is on port 9002.
+- Final PDF's two pages visually inspected: the long TA tester display name appears in
+  the numbered detail appendix, rather than being truncated in the original form slot.
+- Repeated polling returned COMPLETE duplicate:true. One source hire, one intake audit,
+  and one ServiceDesk SRF remained. No AD, license, membership or notification dispatched.
+
+UAT exposed and corrected three integration gaps: resolve one global department when
+no exact-site entry exists; recognize native CREATE+ATTACHMENT audit without changing
+the request revision; respect hires.submitted_by's FK to local users. External TA names
+are retained in immutable evidence/SRF and are not invented as local identities. This
+FK stays NULL until an explicit local identity mapping exists.
+
+Protected release/rollback/build/test/activation evidence remains under
+/root/audit-trail-guardian-system/.release-audit/servicedesk/0c189e5571baec0f1760ab8dc425b0822659a06f.
+Only this completed happy-path UAT and replay are verified. Rejected/revised requests,
+multiple approval cycles, ambiguous real upload recovery and other catalog templates
+still need their own acceptance. Operational templates remain disabled from the bridge.
+Earlier active-commit/status entries below are retained as release history.
+
+
 ## Active restricted server deployment - 3 November 2026
 
 User explicitly approved the existing env changes and DB access for test template 905.
