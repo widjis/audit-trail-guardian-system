@@ -1,0 +1,34 @@
+# Run with the onboarding Compose project and its existing .env.production.
+# This service receives only the listed settings; AD/Graph/WhatsApp secrets are excluded.
+services:
+  servicedesk-bridge:
+    image: ${SDP_BRIDGE_IMAGE:?verified bridge image required}
+    environment:
+      DB_HOST: ${DB_HOST:?}
+      DB_PORT: ${DB_PORT:-1433}
+      DB_NAME: ${DB_NAME:?}
+      DB_USER: ${DB_USER:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_ENCRYPT: ${DB_ENCRYPT:-false}
+      DB_INSTANCE: ${DB_INSTANCE:-}
+      DB_TRUST_SERVER_CERTIFICATE: 'true'
+      SDP_API_URL: ${SDP_API_URL:?}
+      SDP_API_TOKEN: ${SDP_API_TOKEN:?}
+      SDP_BRIDGE_MODE: ${SDP_BRIDGE_MODE:-observe}
+      SDP_BRIDGE_TEMPLATE_ID: '905'
+      SDP_BRIDGE_WORKFLOW_ID: '2'
+      SDP_BRIDGE_SITE_ID: '322'
+      SDP_BRIDGE_DEFAULT_SITE_NAME: Merdeka Tsingshan Indonesia
+      SDP_BRIDGE_REQUESTER_IDS: '18621'
+      SDP_BRIDGE_HR_IDS: '18622'
+      SDP_BRIDGE_IT_IDS: '18623'
+      SDP_UPLOAD_ROOT: /app/uploads
+      SDP_POLL_INTERVAL_MS: '30000'
+    volumes:
+      - ./uploads:/app/uploads
+      - ./.runtime/servicedesk:/state
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

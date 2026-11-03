@@ -136,3 +136,27 @@ bridge.env was verified absent. User consent was requested and remains pending.
 Do not retry that copy or activate the service until the user decides. A separate
 observer without database credentials is the alternative offered. No migration ran.
 The documentation commit may be newer than the prepared image; no source code changed.
+
+
+## Revised deployment scope authorized 3 November 2026
+
+User explicitly permits a separate container but requires one onboarding folder/repository.
+Use docker-compose.servicedesk.yml alongside existing docker-compose.yml, the existing
+audit-trail-guardian-system Compose project, and /root/audit-trail-guardian-system.
+All new persistent configuration, runtime state and release evidence stay under that root.
+Do NOT create the former standalone project or bridge.env. The service references only
+explicit DB fields from the existing onboarding .env.production, plus the ServiceDesk
+API settings added there. It does not inherit the full AD/Graph/WhatsApp environment.
+No DB password is duplicated into a separate bridge credential file. This replaces the
+previous proposal rejected by automatic review. Existing env gets a protected backup.
+
+Use an exact-commit archive below .releases/ for the candidate build because the live
+checkout is on an older application branch with local Dockerfile changes. Do not pull,
+reset or replace the existing backend/frontend to deploy the added scoped service.
+Record both application checkout HEAD and bridge image source revision. The old external
+candidate preparation directory is historical, not the new deployment root.
+
+Initial startup observe; after verified API/DB connectivity and additive bridge state
+migration, process mode is allowed only for test template 905/requester 18621/HR 18622/
+IT 18623. No real approver impersonation or operational template activation. Final HR/IT
+decisions must be made through the tester identities. No AD/license/message dispatch.
