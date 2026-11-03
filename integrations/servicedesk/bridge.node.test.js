@@ -128,3 +128,25 @@ test('department fallback rejects another site, duplicate globals and ambiguous 
   departments.pop();users.push({id:'3388',name:'Synthetic Manager'});
   await assert.rejects(source.masterIds('Human Resources','Synthetic Manager','322'));
 });
+
+
+test('native CREATE attachment audit preserves original revision and supports delivery replay',()=>{
+  const e=fixture();
+  const event={id:'135000',operation:'CREATE',request:{id:'7297'},time:{value:'1793592789071'},
+    diff:[{field:{name:'ATTACHMENT'},previous_value:'',current_value:'MTI-SRF-7297-r134873-0123456789abcdef.pdf'}]};
+  e.history.unshift(event);assert.equal(verifyApprovedHistory(e,config),134873);
+  event.diff[0].current_value='MTI-SRF-7297-r134874-0123456789abcdef.pdf';
+  assert.throws(()=>verifyApprovedHistory(e,config),{message:'ATTACHMENT_REVISION_MISMATCH'});
+  event.diff[0].current_value='unrelated.pdf';assert.throws(()=>verifyApprovedHistory(e,config));
+  event.diff[0].current_value='MTI-SRF-7297-r134873-0123456789abcdef.pdf';
+  event.diff.push({field:{name:'udf_pick_2860'},current_value:'Desktop'});assert.throws(()=>verifyApprovedHistory(e,config));
+});
+
+test('attachment history cannot conceal request creation or predate final approval',()=>{
+  const e=fixture();e.history=e.history.filter(h=>h.operation!=='CREATE');
+  e.history.push({id:'135000',operation:'CREATE',request:{id:'7297'},time:{value:'1793592789071'},
+    diff:[{field:{name:'ATTACHMENT'},previous_value:'',current_value:'MTI-SRF-7297-r134873-0123456789abcdef.pdf'}]});
+  assert.throws(()=>verifyApprovedHistory(e,config),{message:'REVISION_UNRESOLVED'});
+  const f=fixture();f.history.push({...e.history.at(-1),time:{value:'1793592689072'}});
+  assert.throws(()=>verifyApprovedHistory(f,config));
+});

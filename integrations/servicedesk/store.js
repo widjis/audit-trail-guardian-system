@@ -57,6 +57,9 @@ export async function createStore(env) {
         const grade=(await new sql.Request(tx).input('grade',sql.VarChar(255),payload.employee.position_grade)
           .query('SELECT name FROM dbo.position_grades WITH(HOLDLOCK) WHERE name=@grade AND is_active=1')).recordset;
         if(!grade.some(g=>g.name===payload.employee.position_grade)) throw new Hold('GRADE_NOT_ACTIVE');
+        // submitted_by is an FK to local users, not a ServiceDesk display name.
+        // Keep it NULL until an explicit local identity mapping exists. The TA
+        // identity remains in the immutable source payload/evidence and SRF.
         const hireId=randomUUID(),p=payload.employee;
         await new sql.Request(tx).input('id',sql.NVarChar(100),hireId).input('name',sql.NVarChar(250),p.name)
           .input('title',sql.NVarChar(250),p.title).input('grade',sql.NVarChar(250),p.position_grade)
@@ -64,12 +67,11 @@ export async function createStore(env) {
           .input('date',sql.Date,p.join_date).input('mailing',sql.NVarChar(sql.MAX),payload.requirements.mailing_lists.join(','))
           .input('path',sql.VarChar(1000),file).input('document',sql.VarChar(250),file.split('/').pop())
           .input('remarks',sql.NVarChar(sql.MAX),`Ready for ICT Processing | ServiceDesk #${payload.request_id} revision ${payload.revision}. Requirements and approval evidence retained in SRF. No provisioning performed.`)
-          .input('requester',sql.NVarChar(250),payload.requester.name)
           .query(`INSERT INTO dbo.hires(id,name,title,position_grade,department,direct_report,on_site_date,mailing_list,
             account_creation_status,license_assigned,status_srf,microsoft_365_license,laptop_ready,
             srf_document_path,srf_document_name,srf_document_uploaded_at,remarks,workflow_status,submitted_by,submitted_at)
             VALUES(@id,@name,@title,@grade,@department,@manager,@date,@mailing,
-              'Pending',0,1,'None','Pending',@path,@document,GETDATE(),@remarks,'approved',@requester,GETDATE())`);
+              'Pending',0,1,'None','Pending',@path,@document,GETDATE(),@remarks,'approved',NULL,GETDATE())`);
         await new sql.Request(tx).input('id',sql.NVarChar(100),randomUUID()).input('hire',sql.NVarChar(100),hireId)
           .input('details',sql.NVarChar(sql.MAX),JSON.stringify({request_id:payload.request_id,revision:payload.revision,payload_hash:hash,document_hash:docHash,attachment_id:job.attachment_id}))
           .query(`INSERT INTO dbo.audit_logs(id,new_hire_id,action_type,status,message,details,performed_by)

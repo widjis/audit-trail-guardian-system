@@ -193,3 +193,17 @@ first, otherwise one exact-name global (site:null) entry. Never substitute anoth
 site or choose arbitrarily among duplicate scoped/global entries. Manager remains a
 unique exact-name match. This changes mapping only, not request data or approvals.
 Regression tests cover the observed API shape, site preference and ambiguity holds.
+
+
+## UAT 7309 attachment replay and local submitter FK
+
+The first attempt generated/uploaded SRF 29499 and reached ATTACHED, then the hire
+transaction rolled back: live hires.submitted_by is FK_hires_submitted_by to local
+users. An external TA name is not a local user ID. Leave that nullable FK NULL;
+retain the original TA in source payload/evidence and SRF, without inventing users.
+On-prem history reports the PDF attachment as CREATE + ATTACHMENT, not request CREATE.
+Recognize only deterministic own-PDF names for this request/revision after both
+approvals, with a single ATTACHMENT diff. Other/mixed modifications still hold.
+Keep the original request revision; compare downloaded bytes to stored SHA-256.
+Resume ATTACHED without reuploading or deleting audit history. Reverify SQL against
+temporary live-schema copies, then let the normal worker transaction finish UAT.

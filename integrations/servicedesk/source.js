@@ -92,6 +92,9 @@ export function verifyApprovedHistory(e, config) {
   const start = Math.min(...hr.decisions.filter(d => d.status?.name === 'Approved').map(d => Number(d.action_taken_on.value)));
   const safeUpdates = new Set(['assigned_time', 'status', 'technician', 'group', 'approval_status']);
   const safeOperations = new Set(['Approve', 'REQAPPROVAL']);
+  const finalDecisionTime = Math.max(...e.approvals.flatMap(a => a.decisions)
+    .filter(d => d.status?.name === 'Approved').map(d => Number(d.action_taken_on.value)));
+  const generatedAttachments = [];
   const seen = new Set(); let revision = 0; let created = false;
   for (const event of e.history) {
     identifier(event.id);
@@ -99,6 +102,17 @@ export function verifyApprovedHistory(e, config) {
     if (seen.has(event.id) || String(event.request?.id) !== String(q.id) || !Number.isSafeInteger(time) || time <= 0 || !Array.isArray(event.diff))
       throw new Hold('HISTORY_INCOMPLETE');
     seen.add(event.id);
+    // On-prem history uses CREATE for an attachment too. It is not the request
+    // creation/revision. Recognize only our deterministic PDF name, after both
+    // approvals, and later require the same revision. Delivery verifies full bytes.
+    if (event.operation === 'CREATE' && event.diff.some(d => d.field?.name === 'ATTACHMENT')) {
+      const change = event.diff[0];
+      const match = typeof change.current_value === 'string' && change.current_value.match(/^MTI-SRF-([1-9][0-9]*)-r([1-9][0-9]*)-[a-f0-9]{16}\.pdf$/);
+      if (event.diff.length !== 1 || !match || match[1] !== String(q.id) || time < finalDecisionTime ||
+          ![null, ''].includes(change.previous_value)) throw new Hold('UNRECOGNIZED_POST_APPROVAL_OPERATION');
+      generatedAttachments.push(Number(match[2]));
+      continue;
+    }
     if (event.operation === 'CREATE') { created = true; if (time > start) throw new Hold('HISTORY_INCOMPLETE'); }
     if (time >= start) {
       if (event.operation === 'UPDATE') {
@@ -110,6 +124,7 @@ export function verifyApprovedHistory(e, config) {
     }
   }
   if (!created || !Number.isSafeInteger(revision) || revision < 1 || revision > 2147483647) throw new Hold('REVISION_UNRESOLVED');
+  if (generatedAttachments.some(r => r !== revision)) throw new Hold('ATTACHMENT_REVISION_MISMATCH');
   return revision;
 }
 
