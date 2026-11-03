@@ -58,11 +58,15 @@ export function createSource(config, fetchImpl = fetch) {
       return { ...second, history };
     },
     async masterIds(department, manager, siteId) {
-      const departments = (await matches('departments', 'departments', department))
-        .filter(d => d.name === department && String(d.site?.id) === siteId);
+      const departments = (await matches('departments', 'departments', department)).filter(d => d.name === department);
+      const scoped = departments.filter(d => String(d.site?.id) === siteId);
+      const global = departments.filter(d => d.site == null);
+      // A global department applies to all sites. Never select a department
+      // belonging to another site or choose between duplicate global matches.
+      const applicable = scoped.length ? scoped : global;
       const users = (await matches('users', 'users', manager)).filter(u => u.name === manager);
-      if (departments.length !== 1 || users.length !== 1) throw new Hold('MASTER_MATCH_NOT_UNIQUE');
-      return { departmentId: identifier(departments[0].id), managerId: identifier(users[0].id) };
+      if (applicable.length !== 1 || users.length !== 1) throw new Hold('MASTER_MATCH_NOT_UNIQUE');
+      return { departmentId: identifier(applicable[0].id), managerId: identifier(users[0].id) };
     },
     attachments: id => list(`requests/${identifier(id)}/attachments`, 'attachments'),
     download: (requestId, attachmentId) => request(`requests/${identifier(requestId)}/attachments/${identifier(attachmentId)}/download`, {}, true),

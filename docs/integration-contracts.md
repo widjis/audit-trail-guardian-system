@@ -182,3 +182,14 @@ The worker forwards source created_time only as requested-date rendering metadat
 HTTP payload/schema and approval/provisioning logic remain unchanged. Final code passed
 13 synthetic tests and 70-folder/full-text extraction QA. Local edits only; server image
 90e5be9 and its pending activation/credential gate are not modified by this layout task.
+
+
+## UAT 7309 master resolution correction
+
+7309 reached HR+IT Approved and In Progress but was held before any job/hire/upload
+because Human Resources has no site-322 entry. Live API supplies one global department
+(1802) and a different-site entry (1202, site 303). Resolve an exact unique site match
+first, otherwise one exact-name global (site:null) entry. Never substitute another
+site or choose arbitrarily among duplicate scoped/global entries. Manager remains a
+unique exact-name match. This changes mapping only, not request data or approvals.
+Regression tests cover the observed API shape, site preference and ambiguity holds.

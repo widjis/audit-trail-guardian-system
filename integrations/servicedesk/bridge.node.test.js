@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { PDFDocument } from 'pdf-lib';
-import { mapApprovedRequest, verifyApprovedHistory, sourceFields, sha256 } from './source.js';
+import { createSource, mapApprovedRequest, verifyApprovedHistory, sourceFields, sha256 } from './source.js';
 import { processRequest } from './worker.js';
 import { renderSrf } from './srf.js';
 const config={templateId:'905',workflowId:'2',siteId:'322',requesterIds:['18621'],hrIds:['18622'],itIds:['18623'],mode:'observe'};
@@ -101,3 +101,30 @@ test('long approved access lists are preserved over continuation pages',async()=
 // Optional local visual QA output, containing synthetic data only.
 if(process.env.SDP_SYNTHETIC_PDF_OUTPUT){const p=await mapApprovedRequest(fixture(),config,masters);
   const {writeFile}=await import('node:fs/promises');await writeFile(process.env.SDP_SYNTHETIC_PDF_OUTPUT,await renderSrf(p,{requestedAt:Date.parse('2026-11-01T14:00:00Z')}));}
+
+
+test('department resolution uses unique global fallback, preferring an exact site match',async()=>{
+  let departments=[{id:'1802',name:'Human Resources',site:null},{id:'1202',name:'Human Resources',site:{id:'303'}}];
+  let users=[{id:'3387',name:'Synthetic Manager'}];
+  const source=createSource({baseUrl:'https://synthetic.invalid/api/v3/',token:'synthetic-token'},async url=>({ok:true,
+    json:async()=>({response_status:{status_code:2000},list_info:{has_more_rows:false},
+      ...(url.pathname.endsWith('/departments')?{departments}:{users})})}));
+  assert.deepEqual(await source.masterIds('Human Resources','Synthetic Manager','322'),{departmentId:'1802',managerId:'3387'});
+  departments.push({id:'1900',name:'Human Resources',site:{id:'322'}});
+  assert.equal((await source.masterIds('Human Resources','Synthetic Manager','322')).departmentId,'1900');
+  departments.push({id:'1901',name:'Human Resources',site:{id:'322'}});
+  await assert.rejects(source.masterIds('Human Resources','Synthetic Manager','322'),{message:'MASTER_MATCH_NOT_UNIQUE'});
+});
+
+test('department fallback rejects another site, duplicate globals and ambiguous users',async()=>{
+  let departments=[{id:'1202',name:'Human Resources',site:{id:'303'}}];
+  let users=[{id:'3387',name:'Synthetic Manager'}];
+  const source=createSource({baseUrl:'https://synthetic.invalid/api/v3/',token:'synthetic-token'},async url=>({ok:true,
+    json:async()=>({response_status:{status_code:2000},list_info:{has_more_rows:false},
+      ...(url.pathname.endsWith('/departments')?{departments}:{users})})}));
+  await assert.rejects(source.masterIds('Human Resources','Synthetic Manager','322'));
+  departments=[{id:'1802',name:'Human Resources',site:null},{id:'1803',name:'Human Resources',site:null}];
+  await assert.rejects(source.masterIds('Human Resources','Synthetic Manager','322'));
+  departments.pop();users.push({id:'3388',name:'Synthetic Manager'});
+  await assert.rejects(source.masterIds('Human Resources','Synthetic Manager','322'));
+});
