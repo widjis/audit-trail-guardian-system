@@ -1,3 +1,25 @@
+## Role-dependent authorization layout - 5 November 2026
+
+Requester names now use the full authorization name area, reduce font within a
+bounded range and wrap to two lines if necessary. Names never move to an appendix;
+oversized names fail rendering instead of truncating. HR Superintendent uses the
+first row under Requestor; HR Manager uses the second; Site IT Head stays last.
+The inactive HR row has no decision/name/date/stamp. Direct Manager remains employee
+information, not a workflow approval. Original printed caption/parentheses were
+redacted from the derived base asset, and its manifest hash/version updated.
+
+Decision stamps overlay approver name and role caption at 30% opacity. Unknown or
+pending decisions still cannot render a stamp. Intake still accepts approved only.
+Future approved HR selections may include optional role hr_superintendent/hr_manager;
+IT approvals cannot carry HR role. A configured source picklist field can map exact
+labels HR Superintendent/HR Manager. Legacy snapshots omit the optional field, so
+payload hashes stay stable; the agreed existing HR Approver/Superintendent uses
+the first row. A rendering override cannot contradict the approved selection.
+
+UI routing/role picker configuration is pending tester-account choice. Do not claim
+two independent HR accounts are configured or tested before that choice is resolved.
+Current draft variants use the same retained 7309 approval solely for layout review.
+
 ## Decision stamps and nullable edit fields — 5 November 2026
 
 Approved electronic decisions now display a green APPROVED stamp in each approval

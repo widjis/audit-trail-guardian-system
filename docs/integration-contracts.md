@@ -1,3 +1,12 @@
+## HR role metadata and SRF presentation update - 5 November 2026
+
+An optional role enum (hr_superintendent or hr_manager) may accompany only the HR
+approval. A selected role is hashed with approved requirements and chooses the SRF
+authorization row. Existing payloads omit the field and retain their previous hash.
+No new approval rights or revision-cycle automation is introduced by this extension.
+ServiceDesk role-picklist/routing setup is pending tester identity confirmation.
+PDF decision stamps use 30% opacity across name/title; requester stays on page one.
+
 # ServiceDesk New Hire Integration
 
 ## Verified UAT 7309

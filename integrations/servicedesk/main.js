@@ -6,7 +6,7 @@ import { processRequest } from './worker.js';
 const env=process.env;
 const ids=name=>(env[name]||'').split(',').map(s=>s.trim()).filter(Boolean);
 const config={baseUrl:env.SDP_API_URL,token:env.SDP_API_TOKEN,mode:env.SDP_BRIDGE_MODE||'observe',
-  templateId:env.SDP_BRIDGE_TEMPLATE_ID,workflowId:env.SDP_BRIDGE_WORKFLOW_ID,siteId:env.SDP_BRIDGE_SITE_ID,defaultSiteName:env.SDP_BRIDGE_DEFAULT_SITE_NAME,
+  hrRoleField:env.SDP_BRIDGE_HR_ROLE_FIELD,templateId:env.SDP_BRIDGE_TEMPLATE_ID,workflowId:env.SDP_BRIDGE_WORKFLOW_ID,siteId:env.SDP_BRIDGE_SITE_ID,defaultSiteName:env.SDP_BRIDGE_DEFAULT_SITE_NAME,
   requesterIds:ids('SDP_BRIDGE_REQUESTER_IDS'),hrIds:ids('SDP_BRIDGE_HR_IDS'),itIds:ids('SDP_BRIDGE_IT_IDS'),uploadRoot:env.SDP_UPLOAD_ROOT||'/app/uploads'};
 const numeric=s=>/^[1-9][0-9]{0,19}$/.test(s||'');
 if(!['observe','process'].includes(config.mode)||![config.templateId,config.workflowId,config.siteId].every(numeric)||

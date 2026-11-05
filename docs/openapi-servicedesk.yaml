@@ -98,6 +98,7 @@ components:
               stage: {type: string, enum: [hr, site_it_head]}
               approver_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
               approver_name: {type: string, minLength: 1, maxLength: 250}
+              role: {type: string, enum: [hr_superintendent, hr_manager], description: Optional for HR stage only; selects the signed SRF row.}
               decision: {type: string, enum: [approved]}
               decided_at: {type: string, format: date-time}
               comment: {type: string, maxLength: 4000, default: ''}

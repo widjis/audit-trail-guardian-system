@@ -164,3 +164,19 @@ test('decision stamps embed approved and rejected PNGs and refuse pending', asyn
   const pdf = await PDFDocument.create();
   await assert.rejects(drawApprovalStamp(pdf, pdf.addPage(), 'pending', { x: 0, y: 0 }), /Unsupported stamp/);
 });
+
+test('selected HR role is bound to approved payload; legacy hashes remain unchanged', async () => {
+  const e = fixture();
+  const legacy = await mapApprovedRequest(e, config, masters);
+  assert.equal(legacy.approvals[0].role, undefined);
+  for (const [label, role] of [['HR Superintendent', 'hr_superintendent'], ['HR Manager', 'hr_manager']]) {
+    e.request.udf_fields.udf_pick_test_role = label;
+    const data = await mapApprovedRequest(e, { ...config, hrRoleField: 'udf_pick_test_role' }, masters);
+    assert.equal(data.approvals[0].role, role);
+    const pdf = await PDFDocument.load(await renderSrf(data));
+    assert.equal(pdf.getPageCount(), 1);
+    await assert.rejects(renderSrf(data, { hrRole: role === 'hr_manager' ? 'hr_superintendent' : 'hr_manager' }), /conflicts/);
+  }
+  e.request.udf_fields.udf_pick_test_role = 'Other';
+  await assert.rejects(mapApprovedRequest(e, { ...config, hrRoleField: 'udf_pick_test_role' }, masters));
+});

@@ -6,8 +6,11 @@ import { newHireSchema, payloadHash } from '../../src/server/services/servicedes
 
 // The supplied DOCX is the layout authority. Runtime values are overlaid on a
 // sanitized native-Word PDF, retaining the source's vectors, logos and fonts.
-export async function renderSrf(input, { requestedAt } = {}) {
+export async function renderSrf(input, { requestedAt, hrRole } = {}) {
   const data = newHireSchema.parse(input);
+  if (hrRole && data.approvals[0].role && hrRole !== data.approvals[0].role) throw new Error('HR presentation role conflicts with approved selection');
+  hrRole = data.approvals[0].role || hrRole || 'hr_superintendent';
+  if (!['hr_superintendent', 'hr_manager'].includes(hrRole)) throw new Error('Explicit HR role required');
   const [baseBytes, continuationBytes, manifestBytes] = await Promise.all([
     readFile(new URL('./assets/srf-layout-base.pdf', import.meta.url)),
     readFile(new URL('./assets/srf-continuation-base.pdf', import.meta.url)),
@@ -84,23 +87,40 @@ export async function renderSrf(input, { requestedAt } = {}) {
   slot('Justification', data.notes || 'New Hire ICT setup.', 93.38, 447.19, 428, 9);
   const meta = `Position Grade: ${employee.position_grade} | Join Date: ${employee.join_date} | Employee ID: ${employee.employee_id || 'Not yet assigned'}`;
   slot('Additional onboarding information', meta, 93.38, 460, 428, 8);
-  slot('Requested by - Talent Acquisition', data.requester.name, 242.5, 490.63, 131, 10, true);
+  // Requester names belong in the authorization block, not an appendix.
+  let requesterSize = 10;
+  while (normal.widthOfTextAtSize(data.requester.name, requesterSize) > 184.7 && requesterSize > 7) requesterSize -= 0.25;
+  if (normal.widthOfTextAtSize(data.requester.name, requesterSize) <= 184.7) {
+    slot('Requested by - Talent Acquisition', data.requester.name, 217.25, 490.63, 184.7, requesterSize, true);
+  } else {
+    const words = data.requester.name.split(/\s+/); let line = ''; const lines = [];
+    for (const word of words) {
+      if (normal.widthOfTextAtSize(line ? `${line} ${word}` : word, 7) > 184.7 && line) { lines.push(line); line = word; }
+      else line = line ? `${line} ${word}` : word;
+    }
+    if (line) lines.push(line);
+    if (lines.length > 2 || lines.some(v => normal.widthOfTextAtSize(v, 7) > 184.7)) throw new Error('Requester name exceeds two-line authorization area');
+    lines.forEach((v, i) => slot('Requested by - Talent Acquisition', v, 217.25, 482 + i * 9, 184.7, 7, true));
+  }
   const submission = Number(requestedAt);
   if (Number.isSafeInteger(submission) && submission > 0) slot('Request submission date', localDate(submission), 443, 490.63, 78, 9.3);
-  center('N/A - not an approval step for New Hire', 526, 7.5);
-  slot('Direct Manager - information only', `Manager (info): ${employee.direct_manager_name}`, 217.25, 539, 184.7, 7.5, true);
-  center('HR Manager / Superintendent', 598.03, 10, true);
+  center('HR Superintendent', 558, 10, true);
+  center('HR Manager', 598.03, 10, true);
   center('Electronic approval recorded in ServiceDesk', 607.51, 6.5);
   center('Site IT Head / Superintendent', 665.26, 10, true);
   for (const approval of data.approvals) {
     const hr = approval.stage === 'hr';
-    await drawApprovalStamp(pdf, first, approval.decision, { x: 350, y: height - (hr ? 574 : 639), width: 45 });
-    slot(`${approval.stage} approval comment`, approval.comment || 'Approved electronically', 217.25, hr ? 567 : 632, 120, 7.2);
-    slot(`${approval.stage} approver`, approval.approver_name, 217.25, hr ? 579 : 646, 184.7, 10, true);
-    mark(190.13, hr ? 584.47 : 638.26);
-    const y = hr ? 591.31 : 645.10;
+    const supt = hr && hrRole === 'hr_superintendent';
+    const nameY = !hr ? 646 : supt ? 539 : 579;
+    const commentY = !hr ? 632 : supt ? 527 : 567;
+    slot(`${approval.stage} approval comment`, approval.comment || 'Approved electronically', 217.25, commentY, 184.7, 7.2, true);
+    slot(`${approval.stage} approver`, approval.approver_name, 217.25, nameY, 184.7, 10, true);
+    mark(190.13, !hr ? 638.26 : supt ? 530.83 : 584.47);
+    const y = !hr ? 645.10 : supt ? 537.67 : 591.31;
     slot(`${approval.stage} approval date`, localDate(approval.decided_at), 443, y, 78, 9.3);
     slot(`${approval.stage} approval time`, `${localTime(approval.decided_at)} UTC+8`, 443, y + 10, 78, 7);
+    // Overlay after text: translucent ink crosses the name and role caption.
+    await drawApprovalStamp(pdf, first, approval.decision, { x: 236, y: height - (!hr ? 674 : supt ? 566 : 606), width: 145, opacity: 0.3 });
   }
   draw(first, 72.02, 687, `ServiceDesk #${data.request_id} | Revision ${data.revision} | HR user ${data.approvals[0].approver_id} | IT user ${data.approvals[1].approver_id}`, 6.5);
   draw(first, 72.02, 697, `Approved data SHA-256: ${payloadHash(data)}`, 6.1);

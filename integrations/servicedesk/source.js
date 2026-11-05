@@ -185,6 +185,14 @@ export async function mapApprovedRequest(e, config, source) {
     return { stage: index === 0 ? 'hr' : 'site_it_head', approver_id: String(winner.action_by.id),
       approver_name: winner.action_by.name, decision: 'approved', decided_at: new Date(Number(winner.action_taken_on.value)).toISOString(), comment: winner.comments || '' };
   });
+  // Optional new-form role is part of the immutable approved payload. Legacy
+  // requests omit it so their original payload hashes and replay remain stable.
+  if (config.hrRoleField) {
+    const selected = scalar(f[config.hrRoleField]);
+    const roles = { 'HR Superintendent': 'hr_superintendent', 'HR Manager': 'hr_manager' };
+    if (selected && !roles[selected]) throw new Hold('UNKNOWN_HR_ROLE');
+    if (selected) approvals[0].role = roles[selected];
+  }
   const employeeId = scalar(f.udf_sline_2858);
   const payload = { schema_version: 1, request_id: String(q.id), template_id: String(q.template.id), revision,
     requester: { id: String(q.requester.id), name: q.requester.name },

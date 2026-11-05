@@ -10,6 +10,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
 const approval = z.object({
   stage: z.enum(['hr', 'site_it_head']), approver_id: id,
   approver_name: text, decision: z.literal('approved'),
+  role: z.enum(['hr_superintendent', 'hr_manager']).optional(),
   decided_at: z.string().datetime({ offset: true }),
   comment: z.string().max(4000).default(''),
 }).strict();
@@ -36,6 +37,7 @@ export const newHireSchema = z.object({
   approvals: z.array(approval).length(2),
   notes: z.string().max(8000).default(''),
 }).strict().superRefine((v, ctx) => {
+  if (v.approvals[1]?.role) ctx.addIssue({ code: 'custom', path: ['approvals', 1, 'role'], message: 'HR role only belongs to HR approval' });
   if (v.approvals[0]?.stage !== 'hr' || v.approvals[1]?.stage !== 'site_it_head') {
     ctx.addIssue({ code: 'custom', path: ['approvals'], message: 'Require HR then Site IT Head approval' });
   }

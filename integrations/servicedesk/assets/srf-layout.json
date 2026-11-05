@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "source_docx_sha256": "400db55ee1c0af0e2d3d038b40cb88cf33e367fd5030ee5797e78c1d523bce00",
   "source_pdf_sha256": "2282fbada87a3a69ec85ae79d0ca8c7775e2b9f2b5c051ecad52358f64bb142b",
-  "base_pdf_sha256": "ee4ee771b4c236e08aec15ecdd9459034b7372078db2c14a9cfc7fe55b396907",
+  "base_pdf_sha256": "b0a358b3de819d1e643abb031bfecc99c951ad5b19c5eb0da19d565b878794b6",
   "continuation_pdf_sha256": "40423eab9cd6ad132e1072ff5bb17332b0f903be623060b58776735ef14c6a96",
   "page_size": [
     595.3200073242188,
@@ -62,6 +62,24 @@
       656.8,
       392.0,
       668.1
+    ],
+    [
+      227,
+      548,
+      392,
+      562
+    ],
+    [
+      239,
+      481,
+      247,
+      495
+    ],
+    [
+      373,
+      481,
+      383,
+      495
     ]
   ],
   "authority": "MTI-HRM-ICT-FRM-002_Rev.000 - Service Request Form (3).docx",
@@ -69,7 +87,7 @@
     "Remove content-control placeholder text from generated PDF.",
     "HR caption: HR Manager / Superintendent; no conditional SIM-only caption for New Hire.",
     "IT caption: Site IT Head / Superintendent.",
-    "Direct Manager paper approval slot remains N/A; manager is information only.",
-    "Extra onboarding fields use justification space; long content continues on a detail page."
+    "Extra onboarding fields use justification space; long content continues on a detail page.",
+    "HR Superintendent uses the first approval row; HR Manager uses the second. Requester name stays on page one. Semi-transparent decision stamps overlay approver name and title."
   ]
 }
