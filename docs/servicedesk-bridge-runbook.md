@@ -1,3 +1,15 @@
+## Verified frontend autofill correction - 5 November 2026
+
+Active frontend source 948797e33f303eb24a8b65f34fd1203c08795e4d;
+image sha256:3f5da27588e8b62e4616bf1e30892ec83a8b0ecd36dbaa967921a8f054f2d25f.
+Bridge remains at 28b223611c9611e5502c0d31b7bbcc332706f802; backend retained.
+Production browser reload verified employee username and password display blank,
+webkit-autofill false. Focusing username unlocks editing; typing test.purapura
+displayed 13/20 characters, then field was cleared. No Update/provisioning submitted.
+SQL/API username/email remain NULL; Direct Manager remains Widji Santoso [MTI].
+Build passed. Rollback and activation records under the same release-audit root
+with subdirectory 948797e33f303eb24a8b65f34fd1203c08795e4d.
+
 ## Stamp release and hire edit verification - 5 November 2026
 
 Bridge source/image revision: 28b223611c9611e5502c0d31b7bbcc332706f802.
