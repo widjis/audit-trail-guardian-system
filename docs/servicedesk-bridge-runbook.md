@@ -1,3 +1,27 @@
+## Active one-page SRF authorization layout - 5 November 2026
+
+Bridge source 65c1efd1935c0df9624b409d709968183a9d3cfb, image
+sha256:df0a70cf6c1ec5336b8a91221e1d1c62ac97adcb09c9baf506be0ae4791ee659.
+19 regression tests passed locally, 13 inside final image. Frontend/backend retained.
+Requester name fits directly on page one. Green decision stamps at 30% opacity
+overlay HR Superintendent and Site IT Head name/title; HR Manager row remains unused.
+Both HR role layouts were rendered/visually reviewed as one-page drafts. The stored
+HR Approver/Superintendent decision for 7309 uses the first row under Requestor.
+
+Active 7309 presentation: MTI-SRF-7309-r134992-eb24119c7eff5341.pdf,
+SHA256 eb24119c7eff5341b799df78c8fd3b2ad4390cf22c7cd574f07fa79c1b7b9826,
+ServiceDesk attachment 29592. Prior presentation 29591 and original 29499 retained;
+original bridge job/hash remains unchanged. Separate SRF Presentation Update audit
+records the newer version. Backend download hash matched; health/replay COMPLETE
+duplicate:true; no AD provisioning. Saved username/email remain test.purapura and
+test.purapura@merdekabattery.com, account Pending.
+
+Workflow/role-picklist routing remains unchanged. Need user choice whether HR Manager
+tests reuse HR tester or use a distinct tester before configuring that branch.
+Optional approved role contract and read mapping are ready but no role field/env
+binding or new approver rights were activated. Preserve original decisions/history.
+Protected release evidence: .release-audit/servicedesk/65c1efd1935c0df9624b409d709968183a9d3cfb.
+
 ## Verified imported-hire username defaults - 5 November 2026
 
 Active frontend source: 2dfc45b1bfe91944a1a6ae58c98ce5ae09d520f6.
