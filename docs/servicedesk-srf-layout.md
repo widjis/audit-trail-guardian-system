@@ -9,7 +9,8 @@ only: rejected requests must never create an onboarding record.
 SVG masters and transparent PNGs are maintained in integrations/servicedesk/assets.
 Artwork is native vector artwork, without a checkerboard or opaque background.
 Existing archived PDFs/job hashes remain immutable; this layout applies to newly
-generated artifacts. A restyled 7309 review copy is separate from its original.
+generated artifacts. A restyled 7309 presentation copy is linked in onboarding and attached separately in
+ServiceDesk; original PDF, attachment and bridge job hash remain intact.
 
 HireForm now normalizes SQL NULL fields to existing empty form defaults on load.
 In particular, an unprovisioned username is an empty editable string rather than
@@ -83,3 +84,14 @@ Implementation changes: integrations/servicedesk/srf.js, worker.js (source submi
 date), bridge.node.test.js (expanded long-content coverage), and three layout assets.
 Current edits are local only and are not in the previously prepared server image
 90e5be9. No deployment, credentials, database data or ServiceDesk request was changed.
+
+## Credential autofill regression
+
+On 5 November the live edit form displayed a saved login username despite SQL/API
+username and email remaining NULL. DOM reported webkit-autofill true. This was
+browser credential autofill, not a mapping from Direct Manager to employee.
+Employee account inputs now use dedicated names, explicit autocomplete hints,
+password-manager ignore hints and remain read-only until the user focuses them.
+Input handlers map the dedicated names back to the existing API fields. No account
+credentials are generated from manager identity, and no hire Update was submitted
+during verification.

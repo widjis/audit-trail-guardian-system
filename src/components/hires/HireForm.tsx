@@ -95,6 +95,7 @@ const emptyHire: Omit<NewHire, 'id' | 'created_at' | 'updated_at'> = {
 };
 
 export function HireForm({ currentUser }: HireFormProps) {
+  const [accountFieldsFocused, setAccountFieldsFocused] = useState(false);
   const { id } = useParams<{ id: string }>();
   const isNewHire = id === 'new';
   const [hire, setHire] =
@@ -359,7 +360,9 @@ export function HireForm({ currentUser }: HireFormProps) {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    const { name, value } = e.target;
+    const { value } = e.target;
+    const name = e.target.name === 'employee_account_username' ? 'username'
+      : e.target.name === 'employee_initial_password' ? 'password' : e.target.name;
     logger.ui.debug('HireForm', `Input changed: ${name} = ${value}`);
 
     // Update the state with the new value
@@ -866,7 +869,12 @@ export function HireForm({ currentUser }: HireFormProps) {
                 </label>
                 <Input
                   id="username"
-                  name="username"
+                  name="employee_account_username"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  readOnly={!accountFieldsFocused}
+                  onFocus={() => setAccountFieldsFocused(true)}
                   value={hire.username}
                   onChange={handleInputChange}
                   placeholder="Auto-generated from email"
@@ -888,7 +896,12 @@ export function HireForm({ currentUser }: HireFormProps) {
                 <div className="flex relative">
                   <Input
                     id="password"
-                    name="password"
+                    name="employee_initial_password"
+                    autoComplete="new-password"
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    readOnly={!accountFieldsFocused}
+                    onFocus={() => setAccountFieldsFocused(true)}
                     type={showPassword ? 'text' : 'password'}
                     value={hire.password}
                     onChange={handleInputChange}

@@ -1,3 +1,34 @@
+## Stamp release and hire edit verification - 5 November 2026
+
+Bridge source/image revision: 28b223611c9611e5502c0d31b7bbcc332706f802.
+Bridge image ID: sha256:fa6f193cdd2a42883623b2b8d7ebdb7a1183144bee0a3424ddb8e3ee8fb4b3de.
+Initial frontend null-field fix used the same revision. A follow-up frontend-only
+release isolates employee account fields from browser saved-login autofill.
+Backend image/container and upload mounts were retained. No migration/provisioning.
+Build passed; 18 integration tests passed locally and 12 in the bridge image.
+
+7309 original evidence PDF and attachment 29499 remain unchanged. A separate stamped
+presentation PDF is now the onboarding SRF and ServiceDesk attachment 29591:
+MTI-SRF-7309-r134992-b377acad2218aec7.pdf
+SHA256 b377acad2218aec7a8f4cfb61a30dc99890d59299a661bb3754856e4ff3d9e38.
+Both approved stages were reverified against immutable payload before upload and
+promotion. Audit action SRF Presentation Update records original and new hashes.
+The original COMPLETE bridge job retains its original hash/path/attachment. There
+are intentionally TWO source SRF attachments: original evidence and stamped copy.
+Download from backend returned the stamped hash. Bridge remains healthy and 7309
+replay returns COMPLETE duplicate:true; other two test requests still await approval.
+
+Production browser verified Edit Hire renders for an unprovisioned account. SQL/API
+username remains NULL. Browser autofill displayed the saved login before the follow-up
+fix; it was not a manager mapping and no hire Update was submitted.
+
+Same root/Compose project. Frontend now additionally uses the maintained root overlay
+docker-compose.frontend-release.json after the original frontend and bridge overlays.
+Protected rollback/build/activation/presentation evidence:
+/root/audit-trail-guardian-system/.release-audit/servicedesk/28b223611c9611e5502c0d31b7bbcc332706f802.
+Rejected stamp renderer tested independently; the intake still refuses rejected
+requests and does not create rejected onboarding records.
+
 # ServiceDesk bridge server test runbook
 
 ## Latest verified UAT and release - 3 November 2026
