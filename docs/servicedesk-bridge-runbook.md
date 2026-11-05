@@ -1,3 +1,14 @@
+## Verified imported-hire username defaults - 5 November 2026
+
+Active frontend source: 2dfc45b1bfe91944a1a6ae58c98ce5ae09d520f6.
+Image: sha256:fc0005ce1c95e9a2e5cd181b7ae5f86dc0e31bb355b12163373151555bd26a8a.
+Build passed; live browser shows Test User PuraPura -> test.purapura and
+test.purapura@merdekabattery.com with webkit-autofill false. Existing name-input
+helpers now also run when imported hires load with empty account values. Saved
+email/username values are not overwritten. No Update or AD provisioning submitted.
+Backend/bridge container IDs retained; bridge stays on 28b2236 as documented below.
+Rollback/build/activation records: .release-audit/servicedesk/2dfc45b1bfe91944a1a6ae58c98ce5ae09d520f6.
+
 ## Verified frontend autofill correction - 5 November 2026
 
 Active frontend source 948797e33f303eb24a8b65f34fd1203c08795e4d;
