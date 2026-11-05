@@ -1,3 +1,20 @@
+## Decision stamps and nullable edit fields — 5 November 2026
+
+Approved electronic decisions now display a green APPROVED stamp in each approval
+slot. Name and decision time remain readable text; short comments remain beside the stamp and longer comments use the
+detail appendix. The reusable renderer includes a red REJECTED stamp and refuses
+unknown/pending decisions. The intake contract still accepts approved requests
+only: rejected requests must never create an onboarding record.
+
+SVG masters and transparent PNGs are maintained in integrations/servicedesk/assets.
+Artwork is native vector artwork, without a checkerboard or opaque background.
+Existing archived PDFs/job hashes remain immutable; this layout applies to newly
+generated artifacts. A restyled 7309 review copy is separate from its original.
+
+HireForm now normalizes SQL NULL fields to existing empty form defaults on load.
+In particular, an unprovisioned username is an empty editable string rather than
+crashing on .length. Loading a form does not create an AD account or assign a license.
+
 # ServiceDesk SRF layout from the supplied DOCX
 
 ## Authority and scope - 3 November 2026

@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { drawApprovalStamp } from './approval-stamp.js';
 import { newHireSchema, payloadHash } from '../../src/server/services/servicedesk-contract.js';
 
 // The supplied DOCX is the layout authority. Runtime values are overlaid on a
@@ -93,7 +94,8 @@ export async function renderSrf(input, { requestedAt } = {}) {
   center('Site IT Head / Superintendent', 665.26, 10, true);
   for (const approval of data.approvals) {
     const hr = approval.stage === 'hr';
-    slot(`${approval.stage} approval comment`, approval.comment || 'Approved electronically', 217.25, hr ? 567 : 632, 184.7, 7.2, true);
+    await drawApprovalStamp(pdf, first, approval.decision, { x: 350, y: height - (hr ? 574 : 639), width: 45 });
+    slot(`${approval.stage} approval comment`, approval.comment || 'Approved electronically', 217.25, hr ? 567 : 632, 120, 7.2);
     slot(`${approval.stage} approver`, approval.approver_name, 217.25, hr ? 579 : 646, 184.7, 10, true);
     mark(190.13, hr ? 584.47 : 638.26);
     const y = hr ? 591.31 : 645.10;

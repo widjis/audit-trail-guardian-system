@@ -150,3 +150,17 @@ test('attachment history cannot conceal request creation or predate final approv
   const f=fixture();f.history.push({...e.history.at(-1),time:{value:'1793592689072'}});
   assert.throws(()=>verifyApprovedHistory(f,config));
 });
+
+test('decision stamps embed approved and rejected PNGs and refuse pending', async () => {
+  const { drawApprovalStamp } = await import('./approval-stamp.js');
+  for (const decision of ['approved', 'rejected']) {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage();
+    await drawApprovalStamp(pdf, page, decision, { x: 40, y: 40 });
+    const reopened = await PDFDocument.load(await pdf.save());
+    assert.equal(reopened.getPageCount(), 1);
+    assert.ok((await pdf.save()).length > 1000);
+  }
+  const pdf = await PDFDocument.create();
+  await assert.rejects(drawApprovalStamp(pdf, pdf.addPage(), 'pending', { x: 0, y: 0 }), /Unsupported stamp/);
+});

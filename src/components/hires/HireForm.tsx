@@ -183,7 +183,13 @@ export function HireForm({ currentUser }: HireFormProps) {
         hireFormData.on_site_date = date.toISOString().split('T')[0];
       }
 
-      setHire(hireFormData);
+      // SQL NULL is valid before ICT provisions an account. Controlled inputs
+      // and username validation require empty strings rather than nullable values.
+      const normalized = { ...emptyHire, ...hireFormData };
+      for (const key of Object.keys(emptyHire)) {
+        if (normalized[key] == null) normalized[key] = emptyHire[key];
+      }
+      setHire(normalized);
 
       // Update AD account details
       updateADAccountDetails(hireFormData.name, hireFormData.department);
