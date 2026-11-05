@@ -95,3 +95,11 @@ password-manager ignore hints and remain read-only until the user focuses them.
 Input handlers map the dedicated names back to the existing API fields. No account
 credentials are generated from manager identity, and no hire Update was submitted
 during verification.
+
+## Imported hire account-name defaults
+
+Loading an imported hire now applies the existing name-input helpers when email or
+username is absent. First and final name words form firstname.lastname; username
+is the email local part, limited to 20 characters. Test User PuraPura therefore
+previews test.purapura and test.purapura@merdekabattery.com. Existing saved values
+are preserved. Defaults are form state until Update, and do not provision accounts.

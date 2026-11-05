@@ -190,6 +190,14 @@ export function HireForm({ currentUser }: HireFormProps) {
       for (const key of Object.keys(emptyHire)) {
         if (normalized[key] == null) normalized[key] = emptyHire[key];
       }
+      // Imported hires bypass the name-input change handler. Apply the same
+      // employee-name convention on load, without replacing saved account data.
+      if (!normalized.email && normalized.name) {
+        normalized.email = generateEmailFromName(normalized.name);
+      }
+      if (!normalized.username && normalized.email) {
+        normalized.username = generateUsernameFromEmail(normalized.email);
+      }
       setHire(normalized);
 
       // Update AD account details
